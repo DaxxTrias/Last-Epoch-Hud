@@ -7,7 +7,7 @@ namespace Mod.Cheats.ESP
     internal static class SpriteManager
     {
         // Placeholder for sprites to be assigned elsewhere
-        public static Sprite npcSprite { get; set; }
+        public static Sprite? npcSprite { get; set; }
 
         public static Sprite ToSprite(this string base64)
         {
