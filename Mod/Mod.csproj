@@ -8,6 +8,8 @@
    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>  
    <RuntimeIdentifier>win-x64</RuntimeIdentifier>  
    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+   <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnablePackageValidation>true</EnablePackageValidation>
  </PropertyGroup>  
 
  <ItemGroup>  
