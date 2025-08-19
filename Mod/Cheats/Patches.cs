@@ -1,61 +1,38 @@
 ﻿using UnityEngine;
-using Il2Cpp;
-using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using MelonLoader;
-using static MelonLoader.LoaderConfig;
+using Il2Cpp;
+// using Il2CppDMM;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppLE.UI;
 using Il2CppLE.Telemetry;
-using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppItemFiltering;
+using HarmonyPatch = HarmonyLib.HarmonyPatch;
+using static MelonLoader.LoaderConfig;
 using static Il2Cpp.GroundItemManager;
+using Mod.Utils;
 
 
 namespace Mod.Cheats.Patches
 {
     public class MapIconPatch : MonoBehaviour
     {
-        private bool isInitialized = false;
+        // private bool isInitialized = false;
+        private static readonly string Icon_Base64 = SpriteBases.npcMapIcon;
 
-        public void InitializeDMMapIcon(GameObject actor)
+        [HarmonyPatch(typeof(ActorSync), nameof(ActorSync.ReceiveInitDisplayInformation))]
+        private static class ActorSync_MessageSyncRarit
         {
-            if (isInitialized) return;
-
-            //var ourCont = actor.AddComponent<MinimapIconManager>();
-
-            if (actor.GetComponent<DMMapIconManager>() == null)
+            private static void Postfix(ActorSync __instance, byte rarity)
             {
-                //DMMapIconManager? mapIcon = actor.AddComponent<DMMapIconManager>();
-                //BaseDMMapIcon? baseMapIcon = null;
+                try
+                {
+                    
+                }
+                catch (Exception)
+                {
 
-                //if (mapIcon == null)
-                //{
-                //    MelonLogger.Msg($"[Mod] Failed to add DMMapIconManager to {actor.name}");
-                //    return;
-                //}
-                //else
-                //{
-                //    mapIcon.Start();
-                //    baseMapIcon = mapIcon.GetComponent<BaseDMMapIcon>();
-                //}
-
-
-                //mapIcon.icon = DMMapWorldIcon.iconType.arenaIcon;
-
-                // Modify the RectTransform to adjust the size
-                //RectTransform rt = mapIcon.GetComponent<RectTransform>();
-                //if (rt != null)
-                //{
-                //    // Shrink the icon size to 20x20 pixels (or adjust as needed)
-                //    rt.sizeDelta = new Vector2(20, 20);
-                //}
-
-                //mapIcon.img = HarmonyPatches.DMMapIconHooks.FriendlyDotImage;
-
-                //mapIcon.text = "*";
-                // Change the color of the DMMapIcon (derived from Image)
-                //mapIcon.img.color = Color.red;  // Change to any desired UnityEngine.Color
+                }
             }
-            isInitialized = true;
         }
     }
 
@@ -75,8 +52,15 @@ namespace Mod.Cheats.Patches
             {
                 MelonLogger.Msg("[Mod] UIBase.Awake hooked. Disabling bug submission button");
                 //__instance.gameObject.SetActive(false);
-                __instance.bugReportButton.gameObject.SetActive(false);
-                __instance.bugReportPanel.Close();
+                if (__instance != null)
+                {
+                    var bugButton = __instance.bugReportButton;
+                    if (bugButton != null && bugButton.gameObject != null)
+                        bugButton.gameObject.SetActive(false);
+                    var bugPanel = __instance.bugReportPanel;
+                    if (bugPanel != null)
+                        bugPanel.Close();
+                }
             }
         }
 
@@ -86,7 +70,8 @@ namespace Mod.Cheats.Patches
             public static void Prefix(ref CharacterSelect __instance)
             {
                 MelonLogger.Msg("[Mod] CharacterSelect.Awake hooked. Disabling bug submission button");
-                __instance.submitBugReportButton.gameObject.SetActive(false);
+                if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
+                    __instance.submitBugReportButton.gameObject.SetActive(false);
             }
         }
 
@@ -98,8 +83,15 @@ namespace Mod.Cheats.Patches
                 
                 MelonLogger.Msg("[Mod] UIBase.OpenBugReportPanel hooked and blocked.");
                 //__instance.gameObject.SetActive(false);
-                __instance.bugReportButton.gameObject.SetActive(false);
-                __instance.bugReportPanel.Close();
+                if (__instance != null)
+                {
+                    var bugButton = __instance.bugReportButton;
+                    if (bugButton != null && bugButton.gameObject != null)
+                        bugButton.gameObject.SetActive(false);
+                    var bugPanel = __instance.bugReportPanel;
+                    if (bugPanel != null)
+                        bugPanel.Close();
+                }
                 return false;
             }
         }
@@ -110,7 +102,8 @@ namespace Mod.Cheats.Patches
             public static bool Prefix(ref BugSubmitter __instance)
             {
                 MelonLogger.Msg("[Mod] BugSubmitter.Submit hooked and blocked.");
-                __instance.gameObject.gameObject.SetActive(false);
+                if (__instance != null && __instance.gameObject != null)
+                    __instance.gameObject.SetActive(false);
                 return false;
             }
         }
@@ -121,7 +114,8 @@ namespace Mod.Cheats.Patches
             public static bool Prefix(ref BugSubmitter __instance)
             {
                 MelonLogger.Msg("[Mod] BugSubmitter.ShowSubmitPanel hooked and blocked.");
-                __instance.btn_Submit.gameObject.SetActive(false);
+                if (__instance != null && __instance.btn_Submit != null && __instance.btn_Submit.gameObject != null)
+                    __instance.btn_Submit.gameObject.SetActive(false);
                 return false;
             }
         }

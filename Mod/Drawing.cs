@@ -3,185 +3,224 @@ using Color = UnityEngine.Color;
 
 namespace Mod
 {
-    internal class Drawing
-    {
-        public static Texture2D lineTex = new Texture2D(1, 1);
-        public static GUIStyle StringStyle { get; set; } = new GUIStyle(GUI.skin.label);
+	internal class Drawing
+	{
+		public static Texture2D? lineTex = new Texture2D(1, 1);
+		public static GUIStyle? StringStyle { get; private set; }
 
-        static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
-        {
-            if (vecIn.z < 0)
-            {
-                vecIn *= -1;
-            }
+		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
+		{
+			if (vecIn.z < 0)
+			{
+				vecIn *= -1;
+			}
 
-            return new Vector2(
-                               Mathf.Clamp(vecIn.x, padding.x, Screen.width - padding.x),
-                                              Mathf.Clamp(vecIn.y, padding.y, Screen.height - padding.y)
-                                                         );
-        }
+			return new Vector2(
+							   Mathf.Clamp(vecIn.x, padding.x, Screen.width - padding.x),
+											  Mathf.Clamp(vecIn.y, padding.y, Screen.height - padding.y)
+											 );
+		}
 
-        public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
-        {
-            Vector3 screen = Camera.main.WorldToScreenPoint(worldPosition);
-            screen.y = Screen.height - screen.y;
-            // Clamp the label to the screen
-            Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
+		public static void SetupGuiStyle()
+		{
+			// Must be called from within OnGUI
+			if (StringStyle == null)
+			{
+				StringStyle = new GUIStyle(GUI.skin.label);
+			}
+		}
 
-            var content = new GUIContent(label);
-            var size = StringStyle.CalcSize(content);
-            var upperLeft = centered ? position - size / 2f : position;
-            GUI.Label(new Rect(upperLeft, size), content);
-        }
+		public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
+		{
+			var cam = Camera.main;
+			if (cam == null) return;
+			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
+			screen.y = Screen.height - screen.y;
+			// Clamp the label to the screen
+			Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
 
-        public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
-        {
-            var backup = StringStyle.normal.textColor;
-            StringStyle.normal.textColor = color;
-            DrawString(worldPosition, label, centered);
-            StringStyle.normal.textColor = backup;
-        }
+			var content = new GUIContent(label);
+			var style = StringStyle ?? new GUIStyle();
+			var size = style.CalcSize(content);
+			var upperLeft = centered ? position - size / 2f : position;
+			GUI.Label(new Rect(upperLeft, size), content, style);
+		}
 
-        public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
-        {
-            Vector3 screen = Camera.main.WorldToScreenPoint(worldPosition);
-            screen.y = Screen.height - screen.y;
+		public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
+		{
+			var style = StringStyle ?? new GUIStyle();
+			var backup = style.normal.textColor;
+			style.normal.textColor = color;
+			DrawString(worldPosition, label, centered);
+			style.normal.textColor = backup;
+		}
 
-            // Clamp the label to the screen
-            Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
+		public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
+		{
+			var cam = Camera.main;
+			if (cam == null) return;
+			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
+			screen.y = Screen.height - screen.y;
 
-            // Split the label into two parts: first 3 characters and the rest
-            string firstPart = label.Length > 3 ? label.Substring(0, 3) : label;
-            string secondPart = label.Length > 3 ? label.Substring(3) : string.Empty;
+			// Clamp the label to the screen
+			Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
 
-            var firstContent = new GUIContent(firstPart);
-            var secondContent = new GUIContent(secondPart);
+			// Split the label into two parts: first 3 characters and the rest
+			string firstPart = label.Length > 3 ? label.Substring(0, 3) : label;
+			string secondPart = label.Length > 3 ? label.Substring(3) : string.Empty;
 
-            var firstSize = StringStyle.CalcSize(firstContent);
-            var secondSize = StringStyle.CalcSize(secondContent);
+			var firstContent = new GUIContent(firstPart);
+			var secondContent = new GUIContent(secondPart);
 
-            var totalSize = new Vector2(firstSize.x + secondSize.x, Mathf.Max(firstSize.y, secondSize.y));
-            var upperLeft = centered ? position - totalSize / 2f : position;
+			var style = StringStyle ?? new GUIStyle();
+			var firstSize = style.CalcSize(firstContent);
+			var secondSize = style.CalcSize(secondContent);
 
-            // Backup the current GUI color
-            Color prevColor = GUI.color;
+			var totalSize = new Vector2(firstSize.x + secondSize.x, Mathf.Max(firstSize.y, secondSize.y));
+			var upperLeft = centered ? position - totalSize / 2f : position;
 
-            // Draw the first part with the custom color
-            GUI.color = color;
-            GUI.Label(new Rect(upperLeft, firstSize), firstContent);
+			// Backup the current GUI color
+			Color prevColor = GUI.color;
 
-            // Draw the second part with the default color
-            GUI.color = prevColor;
-            GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), secondContent);
+			// Draw the first part with the custom color
+			GUI.color = color;
+			GUI.Label(new Rect(upperLeft, firstSize), firstContent, style);
 
-            // Restore the previous GUI color
-            GUI.color = prevColor;
-        }
+			// Draw the second part with the default color
+			GUI.color = prevColor;
+			GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), secondContent, style);
 
-        public static void DrawLine(Vector3 worldA, Vector3 worldB, Color color, float width)
-        {
-            if (lineTex == null)
-            {
-                lineTex = new Texture2D(1, 1);
-            }
+			// Restore the previous GUI color
+			GUI.color = prevColor;
+		}
 
-            Color prevColor = GUI.color;
-            Matrix4x4 prevMatrix = GUI.matrix;
+		public static void DrawLine(Vector3 worldA, Vector3 worldB, Color color, float width)
+		{
+			if (lineTex == null)
+			{
+				lineTex = new Texture2D(1, 1);
+				lineTex.SetPixel(0, 0, Color.white);
+				lineTex.Apply();
+			}
 
-            Vector3 screenA = Camera.main.WorldToScreenPoint(worldA);
-            Vector3 screenB = Camera.main.WorldToScreenPoint(worldB);
+			Color prevColor = GUI.color;
+			Matrix4x4 prevMatrix = GUI.matrix;
 
-            screenA.y = Screen.height - screenA.y;
-            screenB.y = Screen.height - screenB.y;
+			var cam = Camera.main;
+			if (cam == null) return;
+			Vector3 screenA = cam.WorldToScreenPoint(worldA);
+			Vector3 screenB = cam.WorldToScreenPoint(worldB);
+
+			screenA.y = Screen.height - screenA.y;
+			screenB.y = Screen.height - screenB.y;
 
 
-            // Clamp points to screen with padding
-            Vector2 pointA = ClampToScreen(screenA, new Vector2(25, 25));
-            Vector2 pointB = ClampToScreen(screenB, new Vector2(25, 25));
+			// Clamp points to screen with padding
+			Vector2 pointA = ClampToScreen(screenA, new Vector2(25, 25));
+			Vector2 pointB = ClampToScreen(screenB, new Vector2(25, 25));
 
-            // Calculate angle and magnitude
-            float angle = Mathf.Atan2(pointB.y - pointA.y, pointB.x - pointA.x) * 180f / Mathf.PI;
-            float magnitude = (pointB - pointA).magnitude;
+			// Calculate angle and magnitude
+			float angle = Mathf.Atan2(pointB.y - pointA.y, pointB.x - pointA.x) * 180f / Mathf.PI;
+			float magnitude = (pointB - pointA).magnitude;
 
-            // Apply color
-            GUI.color = color;
+			// Apply color
+			GUI.color = color;
 
-            // Create matrix for rotation
-            Matrix4x4 matrix = Matrix4x4.TRS(pointA, Quaternion.Euler(0, 0, angle), Vector3.one);
+			// Create matrix for rotation
+			Matrix4x4 matrix = Matrix4x4.TRS(pointA, Quaternion.Euler(0, 0, angle), Vector3.one);
 
-            // Apply the matrix
-            GUI.matrix = matrix;
+			// Apply the matrix
+			GUI.matrix = matrix;
 
-            // Draw the line
-            GUI.DrawTexture(new Rect(0, -width / 2, magnitude, width), lineTex);
+			// Draw the line
+			GUI.DrawTexture(new Rect(0, -width / 2, magnitude, width), lineTex);
 
-            // Revert GUI color and matrix to previous state
-            GUI.color = prevColor;
-            GUI.matrix = prevMatrix;
-        }
+			// Revert GUI color and matrix to previous state
+			GUI.color = prevColor;
+			GUI.matrix = prevMatrix;
+		}
 
-        public static Color ItemRarityToColor(string rarity)
-        {
-            var color = Color.white;
+		public static Color ItemRarityToColor(string rarity)
+		{
+			var color = Color.white;
 
-            if (rarity.Contains("Magic"))
-            {
-                color = Color.blue;
-            }
-            else if (rarity.Contains("Common"))
-            {
-                color = Color.white;
-            }
-            else if (rarity.Contains("Unique"))
-            {
-                color = Color.red;
-            }
-            else if (rarity.Contains("Legendary"))
-            {
-                color = new Color(1.0f, 0.5f, 0.0f);
-            }
-            else if (rarity.Contains("Rare"))
-            {
-                color = Color.yellow;
-            }
-            else if (rarity.Contains("Set"))
-            {
-                color = Color.green;
-            }
-            else if (rarity.Contains("Exalted"))
-            {
-                color = new Color(0.5f, 0, 0.5f);
-            }
+			if (rarity.Contains("Magic"))
+			{
+				color = Color.blue;
+			}
+			else if (rarity.Contains("Common"))
+			{
+				color = Color.white;
+			}
+			else if (rarity.Contains("Unique"))
+			{
+				color = Color.red;
+			}
+			else if (rarity.Contains("Legendary"))
+			{
+				color = new Color(1.0f, 0.5f, 0.0f);
+			}
+			else if (rarity.Contains("Rare"))
+			{
+				color = Color.yellow;
+			}
+			else if (rarity.Contains("Set"))
+			{
+				color = Color.green;
+			}
+			else if (rarity.Contains("Exalted"))
+			{
+				color = new Color(0.5f, 0, 0.5f);
+			}
 
-            return color;
-        }
+			return color;
+		}
 
-        public static Color AlignmentToColor(string alignment)
-        {
-            var color = Color.white;
-            switch (alignment)
-            {
-                case "Good":
-                    color = Color.green;
-                    break;
-                case "Evil":
-                    color = Color.red;
-                    break;
-                case "Barrel":
-                    color = Color.yellow;
-                    break;
-                case "HostileNeutral":
-                    color = Color.blue;
-                    break;
-                case "FriendlyNeutral":
-                    color = Color.cyan;
-                    break;
-                case "SummonedCorpse":
-                    color = Color.magenta;
-                    break;
-            }
+		public static Color AlignmentToColor(string alignment)
+		{
+			var color = Color.white;
+			switch (alignment)
+			{
+				case "Good":
+					color = Color.green;
+					break;
+				case "Evil":
+					color = Color.red;
+					break;
+				case "Barrel":
+					color = Color.yellow;
+					break;
+				case "HostileNeutral":
+					color = Color.blue;
+					break;
+				case "FriendlyNeutral":
+					color = Color.cyan;
+					break;
+				case "SummonedCorpse":
+					color = Color.magenta;
+					break;
+			}
 
-            return color;
-        }
-    }
+			return color;
+		}
+
+		public static void Initialize()
+		{
+			if (lineTex != null)
+			{
+				lineTex.SetPixel(0, 0, Color.white);
+				lineTex.Apply();
+			}
+		}
+
+		public static void Cleanup()
+		{
+			if (lineTex != null)
+			{
+				UnityEngine.Object.Destroy(lineTex);
+				lineTex = null;
+			}
+			// Do not touch GUI.skin here; class can now be safely touched outside OnGUI
+		}
+	}
 }

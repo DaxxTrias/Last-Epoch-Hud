@@ -84,17 +84,6 @@ namespace Mod.Cheats.ESP
                     //ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
                     ESP.AddString(name, position, color);
 
-                    // prototype that didnt quite work. will revisit later
-                    // Check and initialize DMMapIcon if it does not exist
-                    //DMMapWorldIcon mapIcon = actor.GetComponent<DMMapWorldIcon>();
-                    //if (mapIcon == null)
-                    //{
-                    //MapIconPatch.InitializeDMMapIcon(actor.gameObject);
-
-                    //var actorGO = actor.gameObject;
-                    //actorGO.AddComponent<MapIconPatch>();
-                    //mapIcon = actor.GetComponent<DMMapWorldIcon>(); // retrieve the newly added component
-                    //}
                 }
             }
         }
