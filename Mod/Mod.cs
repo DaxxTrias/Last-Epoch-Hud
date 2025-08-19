@@ -31,6 +31,7 @@ namespace Mod
         public override void OnLateInitializeMelon() // Runs after OnApplicationStart.
         {
             //MelonLogger.Msg("OnApplicationLateStart");
+            Drawing.Initialize();
         }
 
         public override void OnSceneWasLoaded(int buildindex, string sceneName) // Runs when a Scene has Loaded and is passed the Scene's Build Index and Name.
@@ -116,6 +117,8 @@ namespace Mod
         public override void OnApplicationQuit() // Runs when the Game is told to Close.
         {
             //MelonLogger.Msg("OnApplicationQuit");
+            SpriteManager.Cleanup();
+            Drawing.Cleanup();
         }
 
         public override void OnPreferencesSaved() // Runs when Melon Preferences get saved.

@@ -52,8 +52,15 @@ namespace Mod.Cheats.Patches
             {
                 MelonLogger.Msg("[Mod] UIBase.Awake hooked. Disabling bug submission button");
                 //__instance.gameObject.SetActive(false);
-                __instance.bugReportButton.gameObject.SetActive(false);
-                __instance.bugReportPanel.Close();
+                if (__instance != null)
+                {
+                    var bugButton = __instance.bugReportButton;
+                    if (bugButton != null && bugButton.gameObject != null)
+                        bugButton.gameObject.SetActive(false);
+                    var bugPanel = __instance.bugReportPanel;
+                    if (bugPanel != null)
+                        bugPanel.Close();
+                }
             }
         }
 
@@ -63,7 +70,8 @@ namespace Mod.Cheats.Patches
             public static void Prefix(ref CharacterSelect __instance)
             {
                 MelonLogger.Msg("[Mod] CharacterSelect.Awake hooked. Disabling bug submission button");
-                __instance.submitBugReportButton.gameObject.SetActive(false);
+                if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
+                    __instance.submitBugReportButton.gameObject.SetActive(false);
             }
         }
 
@@ -75,8 +83,15 @@ namespace Mod.Cheats.Patches
                 
                 MelonLogger.Msg("[Mod] UIBase.OpenBugReportPanel hooked and blocked.");
                 //__instance.gameObject.SetActive(false);
-                __instance.bugReportButton.gameObject.SetActive(false);
-                __instance.bugReportPanel.Close();
+                if (__instance != null)
+                {
+                    var bugButton = __instance.bugReportButton;
+                    if (bugButton != null && bugButton.gameObject != null)
+                        bugButton.gameObject.SetActive(false);
+                    var bugPanel = __instance.bugReportPanel;
+                    if (bugPanel != null)
+                        bugPanel.Close();
+                }
                 return false;
             }
         }
@@ -87,7 +102,8 @@ namespace Mod.Cheats.Patches
             public static bool Prefix(ref BugSubmitter __instance)
             {
                 MelonLogger.Msg("[Mod] BugSubmitter.Submit hooked and blocked.");
-                __instance.gameObject.gameObject.SetActive(false);
+                if (__instance != null && __instance.gameObject != null)
+                    __instance.gameObject.SetActive(false);
                 return false;
             }
         }
@@ -98,7 +114,8 @@ namespace Mod.Cheats.Patches
             public static bool Prefix(ref BugSubmitter __instance)
             {
                 MelonLogger.Msg("[Mod] BugSubmitter.ShowSubmitPanel hooked and blocked.");
-                __instance.btn_Submit.gameObject.SetActive(false);
+                if (__instance != null && __instance.btn_Submit != null && __instance.btn_Submit.gameObject != null)
+                    __instance.btn_Submit.gameObject.SetActive(false);
                 return false;
             }
         }

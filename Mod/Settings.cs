@@ -49,7 +49,7 @@ namespace Mod
 
         public static bool DrawGoldPiles()
         {
-            return itemDrawings["Gold Piles"];
+            return itemDrawings.TryGetValue("Gold Piles", out bool draw) ? draw : false;
         }
 
         public static bool ShouldDrawItemRarity(string rarity)
@@ -67,7 +67,7 @@ namespace Mod
 
         public static bool ShouldDrawNPCAlignment(string alignment)
         {
-            return npcDrawings[alignment];
+            return npcDrawings.TryGetValue(alignment, out bool draw) ? draw : false;
         }
 
         public static bool ShouldDrawNPCClassification(DisplayActorClass actorClass)
@@ -87,7 +87,7 @@ namespace Mod
                     break;
             }
 
-            return npcClassifications[classificationKey];
+            return npcClassifications.TryGetValue(classificationKey, out bool draw) ? draw : false;
         }
 
         public static bool ShouldDrawShrine(string shrineType)
