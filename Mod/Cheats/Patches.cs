@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using MelonLoader;
 using Il2Cpp;
-using Il2CppDMM;
+// using Il2CppDMM;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppLE.UI;
 using Il2CppLE.Telemetry;
@@ -16,7 +16,7 @@ namespace Mod.Cheats.Patches
 {
     public class MapIconPatch : MonoBehaviour
     {
-        private bool isInitialized = false;
+        // private bool isInitialized = false;
         private static string Icon_Base64 = SpriteBases.npcMapIcon;
 
         [HarmonyPatch(typeof(ActorSync), nameof(ActorSync.ReceiveInitDisplayInformation))]
@@ -28,7 +28,7 @@ namespace Mod.Cheats.Patches
                 {
                     
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
 
                 }
