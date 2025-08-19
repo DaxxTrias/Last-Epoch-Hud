@@ -103,6 +103,7 @@ namespace Mod
 
             try
             {
+                Drawing.SetupGuiStyle();
                 Menu.OnGUI();
                 ESP.OnGUI();
             }

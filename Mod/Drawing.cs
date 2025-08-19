@@ -6,7 +6,7 @@ namespace Mod
 	internal class Drawing
 	{
 		public static Texture2D? lineTex = new Texture2D(1, 1);
-		public static GUIStyle StringStyle { get; set; } = new GUIStyle(GUI.skin.label);
+		public static GUIStyle? StringStyle { get; private set; }
 
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
@@ -21,6 +21,15 @@ namespace Mod
 											 );
 		}
 
+		public static void SetupGuiStyle()
+		{
+			// Must be called from within OnGUI
+			if (StringStyle == null)
+			{
+				StringStyle = new GUIStyle(GUI.skin.label);
+			}
+		}
+
 		public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
 		{
 			var cam = Camera.main;
@@ -31,17 +40,19 @@ namespace Mod
 			Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
 
 			var content = new GUIContent(label);
-			var size = StringStyle.CalcSize(content);
+			var style = StringStyle ?? new GUIStyle();
+			var size = style.CalcSize(content);
 			var upperLeft = centered ? position - size / 2f : position;
-			GUI.Label(new Rect(upperLeft, size), content);
+			GUI.Label(new Rect(upperLeft, size), content, style);
 		}
 
 		public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
-			var backup = StringStyle.normal.textColor;
-			StringStyle.normal.textColor = color;
+			var style = StringStyle ?? new GUIStyle();
+			var backup = style.normal.textColor;
+			style.normal.textColor = color;
 			DrawString(worldPosition, label, centered);
-			StringStyle.normal.textColor = backup;
+			style.normal.textColor = backup;
 		}
 
 		public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
@@ -61,8 +72,9 @@ namespace Mod
 			var firstContent = new GUIContent(firstPart);
 			var secondContent = new GUIContent(secondPart);
 
-			var firstSize = StringStyle.CalcSize(firstContent);
-			var secondSize = StringStyle.CalcSize(secondContent);
+			var style = StringStyle ?? new GUIStyle();
+			var firstSize = style.CalcSize(firstContent);
+			var secondSize = style.CalcSize(secondContent);
 
 			var totalSize = new Vector2(firstSize.x + secondSize.x, Mathf.Max(firstSize.y, secondSize.y));
 			var upperLeft = centered ? position - totalSize / 2f : position;
@@ -72,11 +84,11 @@ namespace Mod
 
 			// Draw the first part with the custom color
 			GUI.color = color;
-			GUI.Label(new Rect(upperLeft, firstSize), firstContent);
+			GUI.Label(new Rect(upperLeft, firstSize), firstContent, style);
 
 			// Draw the second part with the default color
 			GUI.color = prevColor;
-			GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), secondContent);
+			GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), secondContent, style);
 
 			// Restore the previous GUI color
 			GUI.color = prevColor;
@@ -208,6 +220,7 @@ namespace Mod
 				UnityEngine.Object.Destroy(lineTex);
 				lineTex = null;
 			}
+			// Do not touch GUI.skin here; class can now be safely touched outside OnGUI
 		}
 	}
 }

@@ -17,7 +17,7 @@ namespace Mod.Cheats.Patches
     public class MapIconPatch : MonoBehaviour
     {
         // private bool isInitialized = false;
-        private static string Icon_Base64 = SpriteBases.npcMapIcon;
+        private static readonly string Icon_Base64 = SpriteBases.npcMapIcon;
 
         [HarmonyPatch(typeof(ActorSync), nameof(ActorSync.ReceiveInitDisplayInformation))]
         private static class ActorSync_MessageSyncRarit
