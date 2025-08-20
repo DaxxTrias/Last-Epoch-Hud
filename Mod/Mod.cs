@@ -75,6 +75,7 @@ namespace Mod
                 ESP.OnUpdate();
                 AutoPotion.OnUpdate();
                 Menu.OnUpdate();
+                MinimapEnemyCircles.Update();
                 if (Settings.timeScale != 1.0f)
                     UnityEngine.Time.timeScale = Settings.timeScale;
             }

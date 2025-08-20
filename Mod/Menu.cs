@@ -86,6 +86,25 @@ namespace Mod
                 Settings.minimapZoomUnlock = GUILayout.Toggle(Settings.minimapZoomUnlock, "Minimap Zoom Unlock");
                 Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack");
 
+                #region spacing
+                GUILayout.Space(10);
+                #endregion
+
+                // Minimap Enemy Circles Settings
+                GUI.color = Color.green;
+                GUILayout.Label("Monster Type Filters:");
+                GUI.color = Color.white;
+                Settings.showMagicMonsters = GUILayout.Toggle(Settings.showMagicMonsters, "Show Magic Monsters (Blue)");
+                Settings.showRareMonsters = GUILayout.Toggle(Settings.showRareMonsters, "Show Rare Monsters (Yellow)");
+                Settings.showWhiteMonsters = GUILayout.Toggle(Settings.showWhiteMonsters, "Show White Monsters");
+
+                #region spacing
+                GUILayout.Space(10);
+                #endregion
+
+                GUILayout.Label("Minimap Scale: " + Settings.minimapScale.ToString("F1"));
+                Settings.minimapScale = GUILayout.HorizontalSlider(Settings.minimapScale, 1.0f, 15.0f);
+
                 bool previousPlayerLantern = Settings.playerLantern;
                 Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
                 if (Settings.playerLantern != previousPlayerLantern)

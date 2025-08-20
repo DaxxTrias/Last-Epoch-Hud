@@ -17,6 +17,12 @@ namespace Mod
         public static bool useAnyWaypoint = false;
         //public static bool pickupCrafting = false;
 
+        // Minimap Enemy Circles Settings
+        public static float minimapScale = 8.3f;
+        public static bool showMagicMonsters = true;
+        public static bool showRareMonsters = true;
+        public static bool showWhiteMonsters = false;
+
         public static Dictionary<string, bool> npcClassifications = new Dictionary<string, bool>
         {
             { "Normal", false },
