@@ -73,6 +73,13 @@ namespace Mod.Cheats
                     MelonLogger.Msg("AutoPotion: Components cached successfully");
                 }
 
+                // In offline mode, LocalPlayer component does not exist; only require PlayerHealth
+                if (ObjectManager.IsOfflineMode())
+                {
+                    return _cachedPlayerHealth != null;
+                }
+
+                // In online mode, require both LocalPlayer (for input) and PlayerHealth
                 return _cachedLocalPlayer != null && _cachedPlayerHealth != null;
             }
             catch (System.Exception ex)
@@ -126,6 +133,9 @@ namespace Mod.Cheats
                 // Early exit if auto-potion is disabled
                 if (!Settings.useAutoPot) return;
                 
+                // Skip entirely in offline mode because LocalPlayer input component is not present
+                if (ObjectManager.IsOfflineMode()) return;
+                
                 // Check cooldown
                 if (!IsCooldownExpired()) return;
                 
@@ -135,7 +145,7 @@ namespace Mod.Cheats
                 // Validate player state
                 if (!IsPlayerStateValid()) return;
 
-                // Use the potion
+                // Use the potion (requires LocalPlayer component -> online mode only)
                 _cachedLocalPlayer?.PotionKeyPressed();
                 _lastUseTime = Time.time;
                 
@@ -156,6 +166,9 @@ namespace Mod.Cheats
             {
                 // Early exit if auto-potion is disabled or no player exists
                 if (!Settings.useAutoPot || !ObjectManager.HasPlayer()) return;
+
+                // If offline, disable behavior entirely
+                if (ObjectManager.IsOfflineMode()) return;
 
                 // Initialize components if needed
                 if (!InitializeComponents()) return;
@@ -209,6 +222,7 @@ namespace Mod.Cheats
                 MelonLogger.Msg($"  Last Use Time: {_lastUseTime:F2}");
                 MelonLogger.Msg($"  Current Time: {Time.time:F2}");
                 MelonLogger.Msg($"  Cooldown Expired: {IsCooldownExpired()}");
+                MelonLogger.Msg($"  Offline Mode: {ObjectManager.IsOfflineMode()}");
                 
                 if (_cachedPlayerHealth != null)
                 {
