@@ -11,6 +11,7 @@ namespace Mod.Cheats
         private static LocalPlayer? _cachedLocalPlayer;
         private static PlayerHealth? _cachedPlayerHealth;
         private static ChangeHealthMaterialDuringLifetime? _cachedReaperCheck;
+        private static GameObject? _cachedPlayerObject;
         
         // Timing and state management
         private static float _lastUseTime = 0f;
@@ -61,8 +62,9 @@ namespace Mod.Cheats
                 }
 
                 // Cache components only if they've changed or aren't initialized
-                if (!_componentsInitialized || _cachedLocalPlayer?.gameObject != localPlayer)
+                if (!_componentsInitialized || _cachedPlayerObject != localPlayer)
                 {
+                    _cachedPlayerObject = localPlayer;
                     _cachedLocalPlayer = localPlayer.GetComponent<LocalPlayer>();
                     _cachedPlayerHealth = localPlayer.GetComponent<PlayerHealth>();
                     _cachedReaperCheck = localPlayer.GetComponentInChildren<ChangeHealthMaterialDuringLifetime>();
@@ -187,6 +189,7 @@ namespace Mod.Cheats
             _cachedLocalPlayer = null;
             _cachedPlayerHealth = null;
             _cachedReaperCheck = null;
+            _cachedPlayerObject = null;
             _componentsInitialized = false;
             MelonLogger.Msg("AutoPotion: Component cache cleared");
         }
