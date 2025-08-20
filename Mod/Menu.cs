@@ -122,6 +122,9 @@ namespace Mod
             {
                 GUILayout.Label("Auto HP Pot Threshold %: " + Settings.autoHealthPotion.ToString("F1"));
                 Settings.autoHealthPotion = GUILayout.HorizontalSlider(Settings.autoHealthPotion, 0.0f, 100.0f);
+                
+                GUILayout.Label("Auto HP Pot Cooldown: " + Settings.autoPotionCooldown.ToString("F1") + "s");
+                Settings.autoPotionCooldown = GUILayout.HorizontalSlider(Settings.autoPotionCooldown, 0.1f, 5.0f);
             }
 
             GUILayout.EndVertical();
@@ -183,6 +186,12 @@ namespace Mod
             if (Input.GetKeyDown(KeyCode.Insert))
             {
                 guiVisible = !guiVisible;
+            }
+            
+            // Debug key for auto-potion system (F12)
+            if (Input.GetKeyDown(KeyCode.F12))
+            {
+                AutoPotion.LogDebugInfo();
             }
         }
     }

@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using Mod.Cheats;
 
 namespace Mod.Game
 {
@@ -8,15 +9,17 @@ namespace Mod.Game
 
         public static void AttemptToFindPlayer()
         {
-            localPlayer = GameObject.Find("MainPlayer(Clone)");
+            localPlayer = GameObject.Find("MainPlayer(Clone)"); // offline mode
             if (localPlayer == null)
             {
-                localPlayer = GameObject.Find("Local Player(Clone)");
+                localPlayer = GameObject.Find("Local Player(Clone)"); // online mode
             }
         }
 
         public static void OnSceneLoaded()
         {
+            // Clear any cached references when scene changes
+            ClearPlayerCache();
             AttemptToFindPlayer();
         }
 
@@ -38,6 +41,15 @@ namespace Mod.Game
             }
 
             return localPlayer;
+        }
+
+        /// <summary>
+        /// Clears cached player reference and related component caches
+        /// </summary>
+        public static void ClearPlayerCache()
+        {
+            localPlayer = null;
+            AutoPotion.ClearCache();
         }
     }
 }
