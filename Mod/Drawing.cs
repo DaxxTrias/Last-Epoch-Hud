@@ -16,9 +16,9 @@ namespace Mod
 			}
 
 			return new Vector2(
-							   Mathf.Clamp(vecIn.x, padding.x, Screen.width - padding.x),
-											  Mathf.Clamp(vecIn.y, padding.y, Screen.height - padding.y)
-											 );
+							  Mathf.Clamp(vecIn.x, padding.x, Screen.width - padding.x),
+							  Mathf.Clamp(vecIn.y, padding.y, Screen.height - padding.y)
+							 );
 		}
 
 		public static void SetupGuiStyle()

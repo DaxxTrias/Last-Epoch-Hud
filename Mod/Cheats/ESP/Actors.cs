@@ -56,7 +56,7 @@ namespace Mod.Cheats.ESP
                     //    .actorClass)) continue;
 
                     var actorDisplayInfo = actor.GetComponent<ActorDisplayInformation>();
-                    var displayInfo = actor.GetComponent<DisplayInformation>();
+                    // var displayInfo = actor.GetComponent<DisplayInformation>();
                     if (actorDisplayInfo != null)
                     {
                         if (actor.gameObject.GetComponent<LootLizardFleeing>() != null ||
