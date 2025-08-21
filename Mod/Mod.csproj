@@ -44,6 +44,9 @@
    <Reference Include="Il2CppSystem.Core">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSystem.Core.dll</HintPath>  
    </Reference>
+   <Reference Include="Il2CppSirenix.Serialization">
+     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSirenix.Serialization.dll</HintPath>
+   </Reference>
    <Reference Include="MelonLoader">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\MelonLoader.dll</HintPath>  
    </Reference>
