@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Color = UnityEngine.Color;
+using MelonLoader;
 
 namespace Mod
 {
@@ -7,6 +8,10 @@ namespace Mod
 	{
 		public static Texture2D? lineTex = new Texture2D(1, 1);
 		public static GUIStyle? StringStyle { get; private set; }
+
+		// private static int debugLastFrame = -1;
+		// private static int debugLogsThisFrame = 0;
+		// private const int DebugMaxLogsPerFrame = 8;
 
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
@@ -45,6 +50,22 @@ namespace Mod
 			var style = StringStyle ?? new GUIStyle();
 			var size = style.CalcSize(content);
 			var upperLeft = centered ? position - size / 2f : position;
+
+			// if (Settings.debugESPNames)
+			// {
+			// 	if (debugLastFrame != Time.frameCount)
+			// 	{
+			// 		debugLastFrame = Time.frameCount;
+			// 		debugLogsThisFrame = 0;
+			// 	}
+			// 	if (debugLogsThisFrame < DebugMaxLogsPerFrame)
+			// 	{
+			// 		debugLogsThisFrame++;
+			// 		string printable = label.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+			// 		MelonLogger.Msg($"ESP Name Debug: '{printable}' len={label.Length} size=({size.x:F1},{size.y:F1}) screen=({screen.x:F1},{screen.y:F1}) clamped=({position.x:F1},{position.y:F1}) rect=({upperLeft.x:F1},{upperLeft.y:F1},{size.x:F1},{size.y:F1})");
+			// 	}
+			// }
+
 			GUI.Label(new Rect(upperLeft, size), content, style);
 		}
 
