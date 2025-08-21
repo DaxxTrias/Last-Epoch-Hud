@@ -15,11 +15,19 @@ namespace Mod.Cheats.ESP
         //        FriendlyNeutral: Seems to be neutral NPCs
         //        SummonedCorpse: Necromancer summons
 
+        private static string SanitizeLabel(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            // Replace control characters that can cause IMGUI clipping or wrapping
+            var sanitized = value.Replace("\r", " ").Replace("\n", " ").Replace("\t", " ");
+            return sanitized.Trim();
+        }
+
         private static string GetActorName(ActorVisuals actor)
         {
             if (actor.isPlayer && actor.UserIdentity != null)
             {
-                return actor.UserIdentity.Username;
+                return SanitizeLabel(actor.UserIdentity.Username);
             }
             else
             {
@@ -27,11 +35,30 @@ namespace Mod.Cheats.ESP
 
                 if (displayInformation != null)
                 {
-                    return displayInformation.displayName;
+                    // Prefer the localized name when available; fall back to displayName
+                    string? localizedName = null;
+                    try
+                    {
+                        localizedName = displayInformation.GetLocalizedName();
+                    }
+                    catch (Exception)
+                    {
+                        // Some IL2CPP builds may throw; ignore and use fallbacks
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(localizedName))
+                    {
+                        return SanitizeLabel(localizedName);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(displayInformation.displayName))
+                    {
+                        return SanitizeLabel(displayInformation.displayName);
+                    }
                 }
             }
 
-            return actor.name;
+            return SanitizeLabel(actor.name);
         }
 
         public static void GatherActors()

@@ -27,6 +27,8 @@ namespace Mod
 			if (StringStyle == null)
 			{
 				StringStyle = new GUIStyle(GUI.skin.label);
+				StringStyle.clipping = TextClipping.Overflow;
+				StringStyle.wordWrap = false;
 			}
 		}
 
