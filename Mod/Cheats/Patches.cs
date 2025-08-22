@@ -6,6 +6,10 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppLE.UI;
 using Il2CppLE.Telemetry;
 using Il2CppItemFiltering;
+using Il2CppLidgren.Network;
+using Il2CppSystem.Net;
+using Il2CppSteamworks;
+
 using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using static MelonLoader.LoaderConfig;
 using static Il2Cpp.GroundItemManager;
@@ -39,10 +43,9 @@ namespace Mod.Cheats.Patches
     [HarmonyPatch]
     internal class HarmonyPatches
     {
-        // TODO: implement patches to guard against accidental self reports of modifying the game
-        // patch out the SendBugToServer() function
-        // il2CppLE->il2Cpp->il2CppLELE.Utility->ClickUp->SubmitNewBugReport()
-        // should also patch out the crash handler if possible
+        //todo: verify that the patches are working
+        //todo: verify there arent any new methods that should be patched
+        //todo: verify that we patched out the unreal crash handler
 
         #region security / detection patches
         [HarmonyPatch(typeof(UIBase), "Awake")]
@@ -50,7 +53,7 @@ namespace Mod.Cheats.Patches
         {
             public static void Prefix(ref UIBase __instance)
             {
-                MelonLogger.Msg("[Mod] UIBase.Awake hooked. Disabling bug submission button");
+                MelonLogger.Msg("[LeHud.Hooks]  UIBase.Awake hooked. Disabling bug submission button");
                 //__instance.gameObject.SetActive(false);
                 if (__instance != null)
                 {
@@ -69,7 +72,7 @@ namespace Mod.Cheats.Patches
         {
             public static void Prefix(ref CharacterSelect __instance)
             {
-                MelonLogger.Msg("[Mod] CharacterSelect.Awake hooked. Disabling bug submission button");
+                MelonLogger.Msg("[LeHud.Hooks]  CharacterSelect.Awake hooked. Disabling bug submission button");
                 if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
                     __instance.submitBugReportButton.gameObject.SetActive(false);
             }
@@ -80,8 +83,8 @@ namespace Mod.Cheats.Patches
         {
             public static bool Prefix(ref UIBase __instance)
             {
-                
-                MelonLogger.Msg("[Mod] UIBase.OpenBugReportPanel hooked and blocked.");
+
+                MelonLogger.Msg("[LeHud.Hooks]  UIBase.OpenBugReportPanel hooked and blocked.");
                 //__instance.gameObject.SetActive(false);
                 if (__instance != null)
                 {
@@ -101,7 +104,7 @@ namespace Mod.Cheats.Patches
         {
             public static bool Prefix(ref BugSubmitter __instance)
             {
-                MelonLogger.Msg("[Mod] BugSubmitter.Submit hooked and blocked.");
+                MelonLogger.Msg("[LeHud.Hooks]  BugSubmitter.Submit hooked and blocked.");
                 if (__instance != null && __instance.gameObject != null)
                     __instance.gameObject.SetActive(false);
                 return false;
@@ -113,7 +116,7 @@ namespace Mod.Cheats.Patches
         {
             public static bool Prefix(ref BugSubmitter __instance)
             {
-                MelonLogger.Msg("[Mod] BugSubmitter.ShowSubmitPanel hooked and blocked.");
+                MelonLogger.Msg("[LeHud.Hooks]  BugSubmitter.ShowSubmitPanel hooked and blocked.");
                 if (__instance != null && __instance.btn_Submit != null && __instance.btn_Submit.gameObject != null)
                     __instance.btn_Submit.gameObject.SetActive(false);
                 return false;
@@ -155,7 +158,7 @@ namespace Mod.Cheats.Patches
         {
             public static bool Prefix(Il2CppSystem.Exception exception, UnityEngine.Object context)
             {
-                MelonLogger.Msg("[Mod] ClientLogHandler.LogException hooked and blocked.");
+                MelonLogger.Msg("[LeHud.Hooks]  ClientLogHandler.LogException hooked and blocked.");
 
                 // Log all elements
                 //MelonLogger.Msg($"Context: {context?.name ?? "null"}");
@@ -170,7 +173,7 @@ namespace Mod.Cheats.Patches
         {
             public static bool Prefix(AccountSupport __instance)
             {
-                MelonLogger.Msg("[Mod] AccountSupport_GetLogsZip hooked and blocked.");
+                MelonLogger.Msg("[LeHud.Hooks]  AccountSupport_GetLogsZip hooked and blocked.");
                 return false;
             }
         }
@@ -214,7 +217,7 @@ namespace Mod.Cheats.Patches
                     //MelonLogger.Msg("reverseZoomDirection: " + __instance.reverseZoomDirection.ToString());
                     __instance.zoomDefault = -52.5f;
                     isPatched = true;
-                    MelonLogger.Msg("[Mod] Camera max zoom patched (3x)");
+                    MelonLogger.Msg("[LeHud.Hooks]  Camera max zoom patched (3x)");
                     // zoomDefault: -17.5
                     // zoomMin: -7
                 }
@@ -223,7 +226,7 @@ namespace Mod.Cheats.Patches
                     //MelonLogger.Msg("[Mod] CameraManager unhooked");
                     __instance.zoomDefault = -17.5f;
                     isPatched = false;
-                    MelonLogger.Msg("[Mod] Camera max zoom unpatched (1x)");
+                    MelonLogger.Msg("[LeHud.Hooks]  Camera max zoom unpatched (1x)");
                 }
             }
         }
@@ -241,7 +244,7 @@ namespace Mod.Cheats.Patches
                     //MelonLogger.Msg("minimap zoomDefault: " + __instance.maxMinimapZoom.ToString());
                     __instance.maxMinimapZoom = float.MaxValue;
                     isPatched = true;
-                    MelonLogger.Msg("[Mod] minimap max zoom patched ()");
+                    MelonLogger.Msg("[LeHud.Hooks]  minimap max zoom patched ()");
                     // zoomdefault: 37.5
                 }
                 else if (isPatched && !Settings.minimapZoomUnlock)
@@ -249,7 +252,7 @@ namespace Mod.Cheats.Patches
                     //MelonLogger.Msg("[Mod] DMMapZoom unhooked");
                     __instance.maxMinimapZoom = 37.5f;
                     isPatched = false;
-                    MelonLogger.Msg("[Mod] minimap max zoom unpatched (1x)");
+                    MelonLogger.Msg("[LeHud.Hooks]  minimap max zoom unpatched (1x)");
                 }
             }
         }
@@ -268,7 +271,7 @@ namespace Mod.Cheats.Patches
             }
         }
 
-        //todo: partially working. disabled until can polish
+        //todo: partially working. disabled until can polish (verify it still partially works in new update)
         //[HarmonyPatch(typeof(GroundItemManager), "dropItemForPlayer", new Type[] { typeof(Actor), typeof(ItemData), typeof(Vector3), typeof(bool) })]
         //public class GroundItemManager_vacuumNearbyStackableItems
         //{
@@ -428,6 +431,432 @@ namespace Mod.Cheats.Patches
 
         //    //MelonLogger.Msg($"[Mod] BaseDMMapIcon.UpdateIcons: {__instance.name}");
         //}
+        #endregion
+
+        #region user action monitoring patches
+        // TODO: These patches need correct type names - commenting out for now
+        // These patches help us understand what user actions trigger anti-idle events
+        
+        /*
+        [HarmonyPatch(typeof(Il2CppLE.UI.InventoryPanel), "Open")]
+        public class InventoryPanel_Open
+        {
+            private static void Postfix(Il2CppLE.UI.InventoryPanel __instance)
+            {
+                try
+                {
+                    MelonLogger.Msg("[AntiIdle] Inventory panel opened - this might trigger anti-idle reset");
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] InventoryPanel.Open Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLE.UI.InventoryPanel), "Close")]
+        public class InventoryPanel_Close
+        {
+            private static void Postfix(Il2CppLE.UI.InventoryPanel __instance)
+            {
+                try
+                {
+                    MelonLogger.Msg("[AntiIdle] Inventory panel closed - this might trigger anti-idle reset");
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] InventoryPanel.Close Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLE.UI.CharacterPanel), "Open")]
+        public class CharacterPanel_Open
+        {
+            private static void Postfix(Il2CppLE.UI.CharacterPanel __instance)
+            {
+                try
+                {
+                    MelonLogger.Msg("[AntiIdle] Character panel opened - this might trigger anti-idle reset");
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] CharacterPanel.Open Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLE.UI.CharacterPanel), "Close")]
+        public class CharacterPanel_Close
+        {
+            private static void Postfix(Il2CppLE.UI.CharacterPanel __instance)
+            {
+                try
+                {
+                    MelonLogger.Msg("[AntiIdle] Character panel closed - this might trigger anti-idle reset");
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] CharacterPanel.Close Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        // Monitor player movement/input
+        [HarmonyPatch(typeof(Il2CppLE.Player.LocalPlayer), "Update")]
+        public class LocalPlayer_Update
+        {
+            private static void Postfix(Il2CppLE.Player.LocalPlayer __instance)
+            {
+                try
+                {
+                    // Only log occasionally to avoid spam
+                    if (Time.frameCount % 300 == 0) // Every 300 frames (about 5 seconds at 60fps)
+                    {
+                        MelonLogger.Msg("[AntiIdle] Player update tick - checking for movement/input");
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] LocalPlayer.Update Postfix error: {e.Message}");
+                }
+            }
+        }
+        */
+        #endregion
+
+        #region networking / anti-idle patches
+
+        // NetPeer heartbeat hooks disabled: fields do not expose IL2CPP accessors
+#if false
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetPeer), "get_m_lastHeartbeat")]
+        public class NetPeer_LastHeartbeat_Get
+        {
+            private static void Postfix(Il2CppLidgren.Network.NetPeer __instance, double __result)
+            {
+                try
+                {
+                    MelonLogger.Msg($"[Mod] NetPeer getter called: {__result}");
+                    if (__instance != null)
+                    {
+                        AntiIdleSystem.SetNetPeer(__instance);
+                        AntiIdleSystem.OnHeartbeatRead(__result);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] NetPeer.m_lastHeartbeat getter Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetPeer), "set_m_lastHeartbeat")]
+        public class NetPeer_LastHeartbeat_Set
+        {
+            private static void Prefix(Il2CppLidgren.Network.NetPeer __instance, double value)
+            {
+                try
+                {
+                    MelonLogger.Msg($"[Mod] NetPeer setter called: {value}");
+                    if (__instance != null)
+                    {
+                        AntiIdleSystem.SetNetPeer(__instance);
+                        AntiIdleSystem.OnHeartbeatWrite(value);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[Mod] NetPeer.m_lastHeartbeat setter Prefix error: {e.Message}");
+                }
+            }
+        }
+#endif
+        // TODO: Uncomment and fix namespace references once we confirm the correct types
+        // These patches will hook into networking methods to detect and prevent idle timeouts
+
+
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetMultiClient), "get_ConnectionStatus")]
+        public class NetMultiClient_ConnectionStatus
+        {
+            private static void Postfix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppLidgren.Network.NetConnectionStatus __result)
+            {
+                try
+                {
+                    if (__instance != null)
+                    {
+                        // Update references
+                        AntiIdleSystem.SetNetMultiClient(__instance);
+                        AntiIdleSystem.OnConnectionStatusChanged(__result);
+
+                        // Attempt to capture server connection from property if available
+                        try
+                        {
+                            var type = __instance.GetType();
+                            var prop = type.GetProperty("ServerConnection", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                            if (prop != null)
+                            {
+                                var conn = prop.GetValue(__instance);
+                                if (conn != null)
+                                    AntiIdleSystem.SetServerConnection(conn);
+                            }
+                            else
+                            {
+                                // Fallbacks: try common collections: Connections, m_connections, connection, m_connection
+                                object? candidate = null;
+
+                                // 1) Properties that look like collections of connections
+                                var props = type.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                                foreach (var p in props)
+                                {
+                                    var n = p.Name.ToLowerInvariant();
+                                    if (n.Contains("connection"))
+                                    {
+                                        try
+                                        {
+                                            var val = p.GetValue(__instance);
+                                            candidate = TryPickSingleConnection(val) ?? candidate;
+                                            if (candidate != null) break;
+                                        }
+                                        catch { }
+                                    }
+                                }
+
+                                // 2) Fields that look like collections of connections
+                                if (candidate == null)
+                                {
+                                    var fields = type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                                    foreach (var f in fields)
+                                    {
+                                        var n = f.Name.ToLowerInvariant();
+                                        if (n.Contains("connection"))
+                                        {
+                                            try
+                                            {
+                                                var val = f.GetValue(__instance);
+                                                candidate = TryPickSingleConnection(val) ?? candidate;
+                                                if (candidate != null) break;
+                                            }
+                                            catch { }
+                                        }
+                                    }
+                                }
+
+                                if (candidate != null)
+                                {
+                                    AntiIdleSystem.SetServerConnection(candidate);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.ConnectionStatus Postfix error: {e.Message}");
+                }
+            }
+
+            // Try to pick a single NetConnection from various collection shapes
+            private static object? TryPickSingleConnection(object? value)
+            {
+                if (value == null) return null;
+                try
+                {
+                    var valType = value.GetType();
+
+                    // If it's already a NetConnection, return it
+                    if (valType.Name.Contains("NetConnection"))
+                        return value;
+
+                    // Handle Il2Cpp arrays
+                    if (valType.IsArray)
+                    {
+                        var arr = value as System.Array;
+                        if (arr != null && arr.Length == 1)
+                            return arr.GetValue(0);
+                        if (arr != null && arr.Length > 0)
+                            return arr.GetValue(0); // pick first as best-effort
+                    }
+
+                    // Handle generic collections (List<NetConnection>, etc.)
+                    var countProp = valType.GetProperty("Count") ?? valType.GetProperty("Length");
+                    if (countProp != null)
+                    {
+                        var countObj = countProp.GetValue(value);
+                        int count = 0;
+                        try { count = Convert.ToInt32(countObj); } catch { }
+                        if (count > 0)
+                        {
+                            var indexer = valType.GetMethod("get_Item");
+                            if (indexer != null)
+                                return indexer.Invoke(value, new object[] { 0 });
+
+                            // Fallback: enumerate via IEnumerable
+                            var enumerable = value as System.Collections.IEnumerable;
+                            if (enumerable != null)
+                            {
+                                foreach (var item in enumerable)
+                                    return item; // first
+                            }
+                        }
+                    }
+
+                    // Handle single field/property named similarly to a NetConnection
+                    foreach (var p in valType.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+                    {
+                        if (p.PropertyType.Name.Contains("NetConnection"))
+                            return p.GetValue(value);
+                    }
+                    foreach (var f in valType.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+                    {
+                        if (f.FieldType.Name.Contains("NetConnection"))
+                            return f.GetValue(value);
+                    }
+                }
+                catch { }
+                return null;
+            }
+        }
+        
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetMultiClient), "Connect")]
+        public class NetMultiClient_Connect
+        {
+            private static void Prefix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppSystem.Net.IPEndPoint endPoint, Il2CppLidgren.Network.NetOutgoingMessage hailMessage)
+            {
+                try
+                {
+                    // Reduced: no verbose prefix log
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Prefix error: {e.Message}");
+                }
+            }
+
+            private static void Postfix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppSystem.Net.IPEndPoint endPoint, Il2CppLidgren.Network.NetOutgoingMessage hailMessage, Il2CppLidgren.Network.NetConnection __result)
+            {
+                try
+                {
+                    // Trimmed: only set references; status changes are logged via AntiIdleSystem
+                    
+                    // Store the connection for monitoring
+                    if (__result != null)
+                    {
+                        AntiIdleSystem.SetServerConnection(__result);
+                        AntiIdleSystem.SetNetMultiClient(__instance);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetMultiClient), "Disconnect")]
+        public class NetMultiClient_Disconnect
+        {
+            private static void Prefix(Il2CppLidgren.Network.NetMultiClient __instance, string reason)
+            {
+                try
+                {
+                    MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {reason ?? "No reason provided"}");
+                    
+                    // Log disconnect attempt for anti-idle analysis
+                    AntiIdleSystem.OnDisconnectAttempted(reason);
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix error: {e.Message}");
+                }
+            }
+
+            private static void Postfix(Il2CppLidgren.Network.NetMultiClient __instance, string reason)
+            {
+                try
+                {
+                    MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix - Disconnection completed");
+                    
+                    // Clear stored references
+                    AntiIdleSystem.ClearConnections();
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetMultiClient), "SendMessage")]
+        public class NetMultiClient_SendMessage
+        {
+            private static void Prefix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppLidgren.Network.NetOutgoingMessage message, Il2CppLidgren.Network.NetDeliveryMethod deliveryMethod, int sequenceChannel)
+            {
+                try
+                {
+                    
+                    // Track message sending for anti-idle analysis
+                    AntiIdleSystem.OnMessageSent(message, deliveryMethod, sequenceChannel);
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.SendMessage Prefix error: {e.Message}");
+                }
+            }
+
+            private static void Postfix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppLidgren.Network.NetOutgoingMessage message, Il2CppLidgren.Network.NetDeliveryMethod deliveryMethod, int sequenceChannel, Il2CppLidgren.Network.NetSendResult __result)
+            {
+                try
+                {
+                    // Reduced: no per-message logging
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.SendMessage Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        // Hook into individual NetConnection status changes
+        [HarmonyPatch(typeof(Il2CppLidgren.Network.NetConnection), "get_Status")]
+        public class NetConnection_Status
+        {
+            private static void Postfix(Il2CppLidgren.Network.NetConnection __instance, Il2CppLidgren.Network.NetConnectionStatus __result)
+            {
+                try
+                {
+                    if (__instance != null)
+                    {
+                        // Track individual connection status (reduced logging)
+                        AntiIdleSystem.OnNetConnectionStatusChanged(__instance, __result);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  NetConnection.Status Postfix error: {e.Message}");
+                }
+            }
+        }
+
+        // Hook into Steam networking callbacks if available
+        [HarmonyPatch(typeof(Il2CppSteamworks.SteamNetworkingSockets), "ConnectionStatusChanged")]
+        public class SteamNetworking_ConnectionStatusChanged
+        {
+            private static void Prefix(Il2CppSteamworks.SteamNetworkingSockets __instance, Il2CppSteamworks.Data.SteamNetConnectionStatusChangedCallback_t data)
+            {
+                try
+                {
+                    MelonLogger.Msg($"[LeHud.Hooks]  SteamNetworking.ConnectionStatusChanged Prefix - Callback data received");
+                    
+                    // Track Steam networking status changes
+                    AntiIdleSystem.OnSteamConnectionStatusChanged(data);
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  SteamNetworking.ConnectionStatusChanged Prefix error: {e.Message}");
+                }
+            }
+        }
         #endregion
     }
 }

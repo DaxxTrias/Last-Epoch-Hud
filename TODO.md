@@ -82,25 +82,54 @@
 - Consider button placement (bottom of inventory)
 - Add visual feedback for button interactions
 
-### 5. Anti-Idle Kick Prevention
+### Item Tooltip Enhancements (Affix Tiers)
 
 **Status**: 📋 Planned  
-**Complexity**: Low-Medium  
-**Dependencies**: UI system, timing system
+**Complexity**: Medium-High  
+**Dependencies**: Item tooltip UI, item data parsing
 
 **Tasks**:
-- [ ] Research idle detection mechanisms
-- [ ] Implement periodic UI interaction (window open/close)
-- [ ] Add configurable idle prevention interval
-- [ ] Add toggle for anti-idle system
-- [ ] Test effectiveness across different game states
-- [ ] Add logging for idle prevention events
+- [ ] Hook into item tooltip creation/update to obtain the current tooltip object
+- [ ] Parse item affixes and determine tier values for each affix
+- [ ] Extend tooltip UI to display per-affix tier (e.g., T1–T7)
+- [ ] Add settings to enable/disable tier display and style
+- [ ] Validate for different item rarities and crafted/exalted tiers
+- [ ] Ensure performance is acceptable when hovering rapidly over items
 
 **Implementation Notes**:
-- Simple approach: periodically open/close inventory or character panel
-- More sophisticated: simulate mouse movement or key presses
-- Consider game state awareness (in combat, in menu, etc.)
-- Add settings for prevention method and frequency
+- Prefer postfix patches on tooltip build methods; cache reflection where possible
+- Avoid allocations in per-frame updates; update UI only on tooltip refresh
+- Consider color-coding tiers and handling hybrid/implicit affixes
+
+### 5. Anti-Idle Kick Prevention
+
+**Status**: ✅ Deployed (synthetic keepalive with jitter/state gating); further validation ongoing  
+**Complexity**: Low-Medium  
+**Dependencies**: Networking patches
+
+**Tasks**:
+- [x] Research idle detection mechanisms (NetMultiClient.ConnectionStatus)
+- [x] Create AntiIdleSystem with targeted logging
+- [x] Add networking patches for connection monitoring
+- [x] Implement periodic anti-idle action system
+- [x] Fix namespaces and apply Harmony bootstrap
+- [x] Discover heartbeat timer threshold (~100s) and implement reset
+- [x] Use NetTime.Now and recursive FIELD write for `m_lastHeartbeat`
+- [x] Capture `ServerConnection` robustly (property/collections)
+- [x] Tone down logging (remove per-frame ConnectionStatus pulses; minimal snapshots)
+- [x] Add configurable heartbeat frequency (Settings)
+- [x] Add synthetic keepalive (ReliableUnordered), with jittered intervals and connected-state gating
+- [x] Add direct `NetConnection.SendMessage` attempt and client/peer fallbacks
+- [ ] Validate effectiveness across scenes and very long idles (30m+)
+
+**Desired Future Improvements**:
+- [ ] Protocol-correct keepalive: identify real ping/keepalive opcode/payload and use it instead of generic tiny user message; fall back intelligently.
+- [ ] Detection minimization: add jitter to intervals, gate sends to connected/active states only, and adapt/back off on failures to reduce telemetry footprint.
+
+**Implementation Notes**:
+- Heartbeat writes prefer FIELD, fallback to PROPERTY; target = NetTime.Now
+- Minimal logs: heartbeat write lines and brief status snapshots only
+- `ServerConnection` captured; `m_timeoutDeadline` advances as expected
 
 ## 🔄 On Hold / Future Features
 
@@ -190,7 +219,7 @@
 2. **Combat Screen Flash** - Uses existing UI hooking, good user value
 3. **Auto Disconnect** - Extends AutoPotion, safety feature
 4. **Stash Button** - High user value, but complex UI integration
-5. **Anti-Idle Prevention** - Simple implementation, good QoL feature
+5. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
 6. **NPC Minimap Icons** - On hold until DMMap system stabilizes
 
 ## 🔧 Technical Considerations
