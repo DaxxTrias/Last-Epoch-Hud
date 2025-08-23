@@ -30,6 +30,12 @@ namespace Mod.Cheats
         private static RectTransform? mapContainer;   // ".../DMMap Canvas/Map" (optional for later)
         private static GameObject? smallMinimapBg;    // "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG"
         
+        // Prebuilt sprites cache to avoid per-frame texture allocations
+        private static Sprite? spriteWhite;
+        private static Sprite? spriteYellow;
+        private static Sprite? spriteBlue;
+        private static Sprite? spriteRed;
+        
         public static void Update()
         {
             // Only update debug info every 30 frames (about twice per second at 60fps)
@@ -144,6 +150,9 @@ namespace Mod.Cheats
                 // Bind small minimap BG sentinel
                 smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
                 
+                // Build sprite cache once
+                EnsureSpriteCache();
+                
                 if (iconsContainer != null)
                 {
                     isInitialized = true;
@@ -159,6 +168,22 @@ namespace Mod.Cheats
                 if (updateDebug) lastDebugInfo = $"Initialize error: {e.Message}";
                 return false;
             }
+        }
+        
+        private static void EnsureSpriteCache()
+        {
+            // Choose a fixed reasonable texture size for cached sprites; scale via RectTransform
+            const int baseSize = 16;
+            if (spriteWhite == null) spriteWhite = BuildCircleSprite(baseSize, Color.white);
+            if (spriteYellow == null) spriteYellow = BuildCircleSprite(baseSize, Color.yellow);
+            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, Color.blue);
+            if (spriteRed == null) spriteRed = BuildCircleSprite(baseSize, Color.red);
+        }
+        
+        private static Sprite BuildCircleSprite(int size, Color color)
+        {
+            var tex = CreateCircleTexture(size, color);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
         
         public static void UpdateEnemyCircles(bool updateDebug = true)
@@ -348,6 +373,15 @@ namespace Mod.Cheats
             return Color.white;
         }
         
+        private static Sprite? GetSpriteForColor(Color color)
+        {
+            // Map arbitrary input color to the closest cached sprite
+            if (color.Equals(Color.red)) return spriteRed;
+            if (color.Equals(Color.yellow)) return spriteYellow;
+            if (color.Equals(Color.blue)) return spriteBlue;
+            return spriteWhite;
+        }
+        
         private static bool ShouldShowEnemyType(ActorVisuals enemy)
         {
             var displayInfo = enemy.GetComponent<ActorDisplayInformation>();
@@ -385,16 +419,27 @@ namespace Mod.Cheats
                     return;
                 }
                 
+                // Clamp and unify size to avoid zero/invalid textures
+                int size = Mathf.Max(2, Mathf.RoundToInt(Settings.minimapCircleSize));
+                Vector2 sizeDelta = new Vector2(size, size);
+                
+                // Resolve sprite from cache; build on-demand fallback if needed
+                Sprite? sprite = GetSpriteForColor(color);
+                if (sprite == null)
+                {
+                    sprite = BuildCircleSprite(Mathf.Max(8, size), color);
+                }
+                
+                // Create object only after we have a valid sprite
                 var circleObj = new GameObject($"EnemyCircle_{enemy.name}");
                 circleObj.transform.SetParent(iconsContainer.transform, false);
                 
                 var rectTransform = circleObj.AddComponent<RectTransform>();
                 rectTransform.anchoredPosition = position;
-                rectTransform.sizeDelta = new Vector2(Settings.minimapCircleSize, Settings.minimapCircleSize);
+                rectTransform.sizeDelta = sizeDelta;
                 
                 var image = circleObj.AddComponent<UnityEngine.UI.Image>();
-                var texture = CreateCircleTexture((int)Settings.minimapCircleSize, color);
-                var sprite = Sprite.Create(texture, new Rect(0, 0, Settings.minimapCircleSize, Settings.minimapCircleSize), new Vector2(0.5f, 0.5f));
+                image.raycastTarget = false;
                 image.sprite = sprite;
                 
                 enemyCircles.Add(circleObj);
@@ -408,6 +453,7 @@ namespace Mod.Cheats
         
         private static Texture2D CreateCircleTexture(int size, Color color)
         {
+            size = Mathf.Max(2, size);
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
             var center = new Vector2(size / 2f, size / 2f);
@@ -441,7 +487,7 @@ namespace Mod.Cheats
             {
                 if (circle != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(circle);
+                    UnityEngine.Object.Destroy(circle);
                 }
             }
             enemyCircles.Clear();
