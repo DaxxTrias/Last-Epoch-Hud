@@ -28,6 +28,7 @@ namespace Mod.Cheats
         // Target containers discovered from the scene hierarchy (screenshot)
         private static RectTransform? iconsContainer; // ".../DMMap Canvas/Icons"
         private static RectTransform? mapContainer;   // ".../DMMap Canvas/Map" (optional for later)
+        private static GameObject? smallMinimapBg;    // "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG"
         
         public static void Update()
         {
@@ -48,7 +49,7 @@ namespace Mod.Cheats
             
             if (!Initialize(shouldUpdateDebug)) return;
             
-            // Skip rendering if fullscreen map is open
+            // Skip rendering if fullscreen map is open (detected via small minimap BG inactive)
             if (IsFullscreenMapOpen())
             {
                 ClearCircles();
@@ -88,19 +89,14 @@ namespace Mod.Cheats
         
         private static bool IsFullscreenMapOpen()
         {
-            // Heuristic: look for an active canvas containing "Map" but not DMMap/minimap/internal containers
-            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
+            // Explicit sentinel: when small minimap BG is disabled, fullscreen map is likely open
+            if (smallMinimapBg != null)
             {
-                if (canvas == null || !canvas.isActiveAndEnabled) continue;
-                string n = canvas.name;
-                if (string.IsNullOrEmpty(n)) continue;
-                string lower = n.ToLowerInvariant();
-                if (lower.Contains("map") && !lower.Contains("dmmap") && !lower.Contains("mini"))
-                {
-                    return true;
-                }
+                return !smallMinimapBg.activeInHierarchy;
             }
-            return false;
+            // If not bound yet, try to find once by explicit path
+            smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
+            return smallMinimapBg != null && !smallMinimapBg.activeInHierarchy;
         }
         
         public static bool Initialize(bool updateDebug = true)
@@ -144,6 +140,9 @@ namespace Mod.Cheats
                 {
                     mapContainer = mapGO.GetComponent<RectTransform>();
                 }
+                
+                // Bind small minimap BG sentinel
+                smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
                 
                 if (iconsContainer != null)
                 {
