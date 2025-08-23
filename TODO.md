@@ -104,12 +104,18 @@
 - [x] Tone down logging (remove per-frame ConnectionStatus pulses; minimal snapshots)
 - [x] Add configurable heartbeat frequency (Settings)
 - [x] Add synthetic keepalive (ReliableUnordered), with jittered intervals and connected-state gating
-- [x] Add direct `NetConnection.SendMessage` attempt and client/peer fallbacks
+- [x] Suppression gates: pause synthetic keepalive on user activity, scene change, and outbound network traffic
 - [ ] Validate effectiveness across scenes and very long idles (30m+)
+
+**What exists now**:
+- Jittered send interval with ±2s randomness to avoid signatures
+- Connected-state gating; one-shot snapshots on status change only
+- Suppression windows: input activity, scene change, and network-send events
+- Quiet heartbeat reset attempts; minimal logs toggled via internal flags
 
 **Desired Future Improvements**:
 - [ ] Protocol-correct keepalive: identify real ping/keepalive opcode/payload and use it instead of generic tiny user message; fall back intelligently.
-- [ ] Detection minimization: add jitter to intervals, gate sends to connected/active states only, and adapt/back off on failures to reduce telemetry footprint.
+- [ ] Backoff tuning: adaptive jitter/backoff on failures; consolidate suppression configuration
 
 **Implementation Notes**:
 - Heartbeat writes prefer FIELD, fallback to PROPERTY; target = NetTime.Now
