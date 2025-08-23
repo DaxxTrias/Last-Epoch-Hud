@@ -109,7 +109,14 @@ namespace Mod
                 GUILayout.Space(10);
                 #endregion
 
-                Settings.useAnyWaypoint = GUILayout.Toggle(Settings.useAnyWaypoint, "Allow Any Waypoint");
+                if (!ObjectManager.IsOfflineMode())
+                {
+                    GUILayout.Label("Allow Any Waypoint: unavailable in online mode");
+                }
+                else
+                {
+                    Settings.useAnyWaypoint = GUILayout.Toggle(Settings.useAnyWaypoint, "Allow Any Waypoint");
+                }
                 //Settings.pickupCrafting = GUILayout.Toggle(Settings.pickupCrafting, "Pickup Crafting Items");
 
                 // Settings.debugESPNames = GUILayout.Toggle(Settings.debugESPNames, "Debug ESP Names");

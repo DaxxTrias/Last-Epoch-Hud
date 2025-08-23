@@ -16,6 +16,7 @@ using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using static MelonLoader.LoaderConfig;
 using static Il2Cpp.GroundItemManager;
 using Mod.Utils;
+using Mod.Game;
 
 
 namespace Mod.Cheats.Patches
@@ -494,7 +495,7 @@ namespace Mod.Cheats.Patches
                 {
                     //MelonLogger.Msg("[Mod] UIWaypointStandard.OnPointerEnter hooked");
 
-                    if (Settings.useAnyWaypoint)
+                    if (Settings.useAnyWaypoint && ObjectManager.IsOfflineMode())
                         __instance.isActive = true;
                 }
             }
