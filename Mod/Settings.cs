@@ -1,4 +1,4 @@
-﻿using Il2Cpp;
+using Il2Cpp;
 
 namespace Mod
 {
@@ -28,6 +28,17 @@ namespace Mod
         public static float networkActivitySuppressionSeconds = 45f; // Suppress after any outbound message
 
         //public static bool pickupCrafting = false;
+
+        // Minimap Enemy Circles Settings
+        public static bool showMinimapEnemyCircles = true;
+        public static float minimapCircleSize = 6f;
+        public static float minimapScale = 8.3f; // Fallback scale if autoScaleMinimap is disabled
+        public static bool autoScaleMinimap = true; // Derive pixels-per-meter from Icons rect and draw distance
+        public static bool showMagicMonsters = true;
+        public static bool showRareMonsters = true;
+        public static bool showWhiteMonsters = false;
+        public static float minimapOffsetX = 0f;
+        public static float minimapOffsetY = 0f;
 
         // public static bool debugESPNames = false;
 

@@ -1,4 +1,4 @@
-﻿using MelonLoader;
+using MelonLoader;
 using Mod.Cheats;
 using Mod.Cheats.ESP;
 using Mod.Game;
@@ -93,11 +93,12 @@ namespace Mod
 				ESP.OnUpdate();
 				AutoPotion.OnUpdate();
 				Menu.OnUpdate();
+        MinimapEnemyCircles.Update();
 				AntiIdleSystem.OnUpdate(); // Add anti-idle system
 				if (Settings.timeScale != 1.0f)
 					UnityEngine.Time.timeScale = Settings.timeScale;
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
 				MelonLogger.Error(e.ToString());
 			}
