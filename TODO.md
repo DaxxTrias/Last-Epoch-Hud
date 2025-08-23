@@ -20,8 +20,7 @@
 - Use similar approach to `DisplayActorClass` for shrine types
 - Consider shrine states (active/inactive, buffed/unbuffed)
 
-
-### 3. Auto Disconnect on Low Health
+### 2. Auto Disconnect on Low Health
 
 **Status**: 📋 Planned  
 **Complexity**: Medium  
@@ -43,7 +42,7 @@
 
 ## 🎯 Medium Priority Features
 
-### 4. Stash Button in Inventory
+### 3. Stash Button in Inventory
 
 **Status**: 📋 Planned  
 **Complexity**: High  
@@ -63,7 +62,7 @@
 - Consider button placement (bottom of inventory)
 - Add visual feedback for button interactions
 
-### Item Tooltip Enhancements (Affix Tiers)
+### 4. Item Tooltip Enhancements (Affix Tiers)
 
 **Status**: 📋 Planned  
 **Complexity**: Medium-High  
@@ -112,9 +111,33 @@
 - Minimal logs: heartbeat write lines and brief status snapshots only
 - `ServerConnection` captured; `m_timeoutDeadline` advances as expected
 
+### 6. Minimap Enemy Circles (Stopgap)
+
+**Status**: ✅ Deployed (basic overlay; approximations)  
+**Complexity**: Medium  
+**Dependencies**: ActorManager, UI hierarchy (`DMMap Canvas/Icons`)
+
+**What exists now**:
+- [x] Basic minimap enemy circles parented under `DMMap Canvas/Icons`
+- [x] Rarity-colored sprites (white/blue/yellow/red) with pooled textures
+- [x] World→minimap mapping with basis rotation, map rotation, axis flips
+- [x] Auto-scale by `Icons` rect and `minimapWorldRadiusMeters`; adjustable via `minimapScaleFactor`
+- [x] Fullscreen map suppression via explicit sentinel path
+
+**Limitations**:
+- Uses heuristic scaling/rotation; not using native DMMap conversion or zoom
+- Overlay may drift with unusual map modes/zoom; manual tuning required
+- Manual cleanup; relies on our lifecycle instead of DMMap's
+
+**Next steps**:
+- [ ] Replace overlay with native DMMap icon API (preferred)
+- [ ] Read DMMap zoom/rotation directly; remove basis/flip hacks
+- [ ] Bind to DMap lifecycle (create/destroy) so icons clean up naturally
+- [ ] Remove overlay code once DMMap path is stable
+
 ## 🔄 On Hold / Future Features
 
-### 6. NPC Icons on Minimap
+### 7. NPC Icons on Minimap
 
 **Status**: ⏸️ On Hold  
 **Complexity**: High  
@@ -133,6 +156,7 @@
 - Need to adapt to new game update changes
 - Consider performance impact of multiple minimap icons
 - May need to wait for game update to settle
+- Note: A stopgap overlay renderer (enemy circles) is currently deployed and will be replaced by the native DMMap icon path when feasible
 
 ## 🛠️ Technical Improvements
 
@@ -200,7 +224,7 @@
 2. **Auto Disconnect** - Extends AutoPotion, safety feature
 3. **Stash Button** - High user value, but complex UI integration
 4. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
-5. **NPC Minimap Icons** - On hold until DMMap system stabilizes
+5. **NPC Minimap Icons** - On hold until DMMap system stabilizes (stopgap overlay deployed)
 
 ## 🔧 Technical Considerations
 
