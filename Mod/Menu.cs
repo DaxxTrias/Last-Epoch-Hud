@@ -89,14 +89,14 @@ namespace Mod
                 Settings.minimapZoomUnlock = GUILayout.Toggle(Settings.minimapZoomUnlock, "Minimap Zoom Unlock");
                 Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack");
 
-                #region spacing
-                GUILayout.Space(10);
-                #endregion
-
                 bool previousPlayerLantern = Settings.playerLantern;
                 Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
                 if (Settings.playerLantern != previousPlayerLantern)
                     GameMods.playerLantern();
+
+                #region spacing
+                GUILayout.Space(10);
+                #endregion
 
                 #region spacing
                 GUILayout.Space(10);
