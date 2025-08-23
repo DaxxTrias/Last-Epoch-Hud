@@ -7,7 +7,7 @@ using HarmonyLib;
 using Il2CppLidgren.Network;
 using Il2CppSystem.Net;
 
-[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.3.4", "Daxx")]
+[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.3.5", "Daxx")]
 [assembly: MelonGame("Eleventh Hour Games", "Last Epoch")]
 
 namespace Mod
@@ -18,7 +18,7 @@ namespace Mod
 		public const string Description = "Hud mod for Last Epoch"; // Description for the Mod.  (Set as null if none)
 		public const string Author = "Daxx"; // Author of the Mod.  (MUST BE SET)
 		public const string Company = null; // Company that made the Mod.  (Set as null if none)
-		public const string Version = "0.3.4"; // Version of the Mod.  (MUST BE SET)
+		public const string Version = "0.3.5"; // Version of the Mod.  (MUST BE SET)
 		public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
 	}
 
