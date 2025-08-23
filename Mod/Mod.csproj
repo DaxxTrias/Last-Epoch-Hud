@@ -8,6 +8,8 @@
    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>  
    <RuntimeIdentifier>win-x64</RuntimeIdentifier>  
    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+   <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnablePackageValidation>true</EnablePackageValidation>
  </PropertyGroup>  
 
  <ItemGroup>  
@@ -33,6 +35,12 @@
    <Reference Include="Il2CppLE.Telemetry.Client">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppLE.Telemetry.Client.dll</HintPath>  
    </Reference>
+   <Reference Include="Il2CppLidgren.Network">
+     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppLidgren.Network.dll</HintPath>
+   </Reference>
+   <Reference Include="Il2CppFacepunch.Steamworks.Win64">
+     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppFacepunch.Steamworks.Win64.dll</HintPath>
+   </Reference>
    <Reference Include="Il2Cppmscorlib">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2Cppmscorlib.dll</HintPath>  
    </Reference>
@@ -41,6 +49,9 @@
    </Reference>
    <Reference Include="Il2CppSystem.Core">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSystem.Core.dll</HintPath>  
+   </Reference>
+   <Reference Include="Il2CppSirenix.Serialization">
+     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSirenix.Serialization.dll</HintPath>
    </Reference>
    <Reference Include="MelonLoader">  
      <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\MelonLoader.dll</HintPath>  
