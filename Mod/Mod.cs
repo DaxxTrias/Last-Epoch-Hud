@@ -33,7 +33,7 @@ namespace Mod
 			try
 			{
 				s_harmony = new HarmonyLib.Harmony(HarmonyId);
-				s_harmony.PatchAll(typeof(global::Mod.Cheats.Patches.HarmonyPatches).Assembly);
+				s_harmony.PatchAll(typeof(Mod).Assembly);
 				MelonLogger.Msg("[Mod] Harmony patches applied");
 				VerifyNetworkingTargets();
 			}

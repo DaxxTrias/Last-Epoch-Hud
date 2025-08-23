@@ -13,6 +13,7 @@ namespace Mod.Cheats
     internal static class AntiIdleSystem
     {
         private const bool VerboseHeartbeatLogs = false; // Toggle to re-enable detailed heartbeat write logs
+        private const bool VerboseStatusLogs = false; // Toggle to re-enable status/info logs
         #region Fields and Properties
         
         // Networking references (will be set by patches)
@@ -157,29 +158,36 @@ namespace Mod.Cheats
                 // Only log if status actually changed
                 if (_lastConnectionStatus != statusString)
                 {
-                    MelonLogger.Msg($"[AntiIdle] Connection status changed from '{_lastConnectionStatus ?? "None"}' to '{statusString}'");
+                    if (VerboseStatusLogs)
+                        MelonLogger.Msg($"[AntiIdle] Connection status changed from '{_lastConnectionStatus ?? "None"}' to '{statusString}'");
                     _lastConnectionStatus = statusString;
                     _isConnected = string.Equals(statusString, "Connected", StringComparison.OrdinalIgnoreCase);
                     
                     // Also emit a one-time snapshot of key objects on status change only
-                    if (_netMultiClient != null)
+                    if (VerboseStatusLogs)
                     {
-                        var clientType = _netMultiClient.GetType();
-                        MelonLogger.Msg($"[AntiIdle] NetMultiClient: {clientType.Name}");
-                    }
-                    else
-                    {
-                        MelonLogger.Msg("[AntiIdle] NetMultiClient: null");
+                        if (_netMultiClient != null)
+                        {
+                            var clientType = _netMultiClient.GetType();
+                            MelonLogger.Msg($"[AntiIdle] NetMultiClient: {clientType.Name}");
+                        }
+                        else
+                        {
+                            MelonLogger.Msg("[AntiIdle] NetMultiClient: null");
+                        }
                     }
 
-                    if (_serverConnection != null)
+                    if (VerboseStatusLogs)
                     {
-                        var connType = _serverConnection.GetType();
-                        MelonLogger.Msg($"[AntiIdle] ServerConnection: {connType.Name}");
-                    }
-                    else
-                    {
-                        MelonLogger.Msg("[AntiIdle] ServerConnection: null");
+                        if (_serverConnection != null)
+                        {
+                            var connType = _serverConnection.GetType();
+                            MelonLogger.Msg($"[AntiIdle] ServerConnection: {connType.Name}");
+                        }
+                        else
+                        {
+                            MelonLogger.Msg("[AntiIdle] ServerConnection: null");
+                        }
                     }
                     
                     // Treat status transitions as activity (short suppression)
@@ -270,7 +278,8 @@ namespace Mod.Cheats
             try
             {
                 var statusString = status?.ToString() ?? "Unknown";
-                MelonLogger.Msg($"[AntiIdle] NetConnection status: {statusString}");
+                if (VerboseStatusLogs)
+                    MelonLogger.Msg($"[AntiIdle] NetConnection status: {statusString}");
                 
                 // Handle the same way as main connection status
                 OnConnectionStatusChanged(status);
