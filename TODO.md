@@ -20,25 +20,6 @@
 - Use similar approach to `DisplayActorClass` for shrine types
 - Consider shrine states (active/inactive, buffed/unbuffed)
 
-### 2. Combat Damage Screen Flash
-
-**Status**: 📋 Planned  
-**Complexity**: Medium  
-**Dependencies**: UI hooking system, Drawing system
-
-**Tasks**:
-- [ ] Research UI element hooking for damage indicators
-- [ ] Implement screen flash overlay system
-- [ ] Add damage threshold detection
-- [ ] Create configurable flash intensity/duration
-- [ ] Add toggle for combat-only vs all damage
-- [ ] Test performance impact of overlay rendering
-
-**Implementation Notes**:
-- Extend existing UI hooking in `Patches.cs`
-- Use `Drawing.cs` for overlay rendering
-- Consider using Unity's post-processing or simple overlay
-- Add settings for flash color, duration, intensity
 
 ### 3. Auto Disconnect on Low Health
 
@@ -216,11 +197,10 @@
 ## 🎯 Implementation Priority Order
 
 1. **Shrine Detection** - Extends existing ESP system, moderate complexity
-2. **Combat Screen Flash** - Uses existing UI hooking, good user value
-3. **Auto Disconnect** - Extends AutoPotion, safety feature
-4. **Stash Button** - High user value, but complex UI integration
-5. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
-6. **NPC Minimap Icons** - On hold until DMMap system stabilizes
+2. **Auto Disconnect** - Extends AutoPotion, safety feature
+3. **Stash Button** - High user value, but complex UI integration
+4. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
+5. **NPC Minimap Icons** - On hold until DMMap system stabilizes
 
 ## 🔧 Technical Considerations
 
