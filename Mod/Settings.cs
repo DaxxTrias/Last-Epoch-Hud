@@ -27,7 +27,11 @@ namespace Mod
         public static float sceneChangeSuppressionSeconds = 150f; // Suppress on scene change
         public static float networkActivitySuppressionSeconds = 45f; // Suppress after any outbound message
 
-        //public static bool pickupCrafting = false;
+        // Auto-Disconnect on Low Health (disabled by default)
+        public static bool useAutoDisconnect = false;
+        public static float autoDisconnectHealthPercent = 5f; // Trigger threshold (percent)
+        public static float autoDisconnectCooldownSeconds = 5f; // Debounce window
+        public static bool autoDisconnectConfirm = true; // If true, only logs action until confirmed elsewhere
 
         // Minimap Enemy Circles Settings
         public static bool showMinimapEnemyCircles = true;

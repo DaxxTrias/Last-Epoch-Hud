@@ -20,25 +20,30 @@
 - Use similar approach to `DisplayActorClass` for shrine types
 - Consider shrine states (active/inactive, buffed/unbuffed)
 
+
 ### 2. Auto Disconnect on Low Health
 
-**Status**: 📋 Planned  
+**Status**: 🔄 In Progress (skeleton stub implemented)  
 **Complexity**: Medium  
-**Dependencies**: AutoPotion system, ObjectManager
+**Dependencies**: AutoPotion component cache, ObjectManager, AntiIdleSystem
+
+**What exists now**:
+- [x] `Settings`: flags and thresholds (`useAutoDisconnect`, `autoDisconnectHealthPercent`, `autoDisconnectCooldownSeconds`, `autoDisconnectConfirm`)
+- [x] `Cheats/AutoDisconnect.cs`: skeleton that reads `PlayerHealth.getHealthPercent()`, online-only gate, cooldown debounce, stubbed action (logs by default)
+- [x] Wired into `Mod.OnUpdate` and cache cleared on scene init
 
 **Tasks**:
-- [ ] Extend `AutoPotion.cs` with disconnect logic
-- [ ] Add health threshold setting for auto-disconnect
-- [ ] Implement potion availability check
-- [ ] Add safe disconnect method (quit to menu)
-- [ ] Add confirmation/confirmation bypass setting
-- [ ] Test in both online and offline modes
+- [ ] Implement safe quit-to-menu invocation (prefer native DMap/UI flow if available)
+- [ ] Add suppression window integration (reuse AntiIdle scene-change/network suppression)
+- [ ] Optional confirmation UI or hotkey override to proceed without prompt
+- [ ] Robust state guards (loading screens, invulnerability phases, death)
+- [ ] Finalize logging and add minimal telemetry toggle
+- [ ] Test in both online/offline modes, across scenes, with low FPS
 
 **Implementation Notes**:
-- Reuse existing health monitoring from AutoPotion
-- Add potion inventory checking logic
-- Use `OnApplicationQuit` or similar for safe disconnect
-- Consider adding delay/grace period before disconnect
+- Reuse `AutoPotion.InitializeComponents()` pattern; keep health read guarded against NaN/Inf
+- Execute UI actions on main thread; avoid blocking calls
+- Keep action idempotent under debounce window
 
 ## 🎯 Medium Priority Features
 
@@ -221,7 +226,7 @@
 ## 🎯 Implementation Priority Order
 
 1. **Shrine Detection** - Extends existing ESP system, moderate complexity
-2. **Auto Disconnect** - Extends AutoPotion, safety feature
+2. **Auto Disconnect** - Extends AutoPotion patterns; skeleton in place
 3. **Stash Button** - High user value, but complex UI integration
 4. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
 5. **NPC Minimap Icons** - On hold until DMMap system stabilizes (stopgap overlay deployed)

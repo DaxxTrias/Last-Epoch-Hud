@@ -74,6 +74,7 @@ namespace Mod
 
 				// Inform AntiIdleSystem to suppress synthetic keepalive briefly after scene load
 				AntiIdleSystem.OnSceneChanged();
+				AutoDisconnect.ClearCache();
 			}
 			catch (System.Exception e)
 			{
@@ -95,6 +96,7 @@ namespace Mod
 				Menu.OnUpdate();
                 MinimapEnemyCircles.Update();
 				AntiIdleSystem.OnUpdate(); // Add anti-idle system
+				AutoDisconnect.OnUpdate();
 				if (Settings.timeScale != 1.0f)
 					UnityEngine.Time.timeScale = Settings.timeScale;
 			}
