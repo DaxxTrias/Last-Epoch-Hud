@@ -29,9 +29,9 @@ namespace Mod
 
         // Auto-Disconnect on Low Health (disabled by default)
         public static bool useAutoDisconnect = false;
-        public static float autoDisconnectHealthPercent = 5f; // Trigger threshold (percent)
-        public static float autoDisconnectCooldownSeconds = 5f; // Debounce window
-        public static bool autoDisconnectConfirm = true; // If true, only logs action until confirmed elsewhere
+        public static float autoDisconnectHealthPercent = 35f; // Trigger threshold (percent)
+        public static float autoDisconnectCooldownSeconds = 30f; // Debounce window
+        public static bool autoDisconnectOnlyWhenNoPotions = false; // Require zero potions remaining
 
         // Minimap Enemy Circles Settings
         public static bool showMinimapEnemyCircles = true;

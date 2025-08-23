@@ -2,6 +2,7 @@ using Il2Cpp;
 using Mod.Game;
 using MelonLoader;
 using UnityEngine;
+using Il2CppLE.UI;
 
 namespace Mod.Cheats
 {
@@ -12,6 +13,7 @@ namespace Mod.Cheats
         private static PlayerHealth? _cachedPlayerHealth;
         private static ChangeHealthMaterialDuringLifetime? _cachedReaperCheck;
         private static bool _componentsInitialized = false;
+        private static UIBase? _cachedUIBase;
 
         // Timing / debounce
         private static float _lastAttemptTime = 0f;
@@ -80,6 +82,72 @@ namespace Mod.Cheats
             return true;
         }
 
+        public static void SetUIBase(UIBase? uiBase)
+        {
+            if (uiBase != null)
+                _cachedUIBase = uiBase;
+        }
+
+        private static bool TryEnsureUIBase()
+        {
+            if (_cachedUIBase != null)
+                return true;
+            try
+            {
+                // Fast path: active object in scene
+                var foundActive = UnityEngine.Object.FindObjectOfType<UIBase>();
+                if (foundActive != null)
+                {
+                    _cachedUIBase = foundActive;
+                    return true;
+                }
+
+                // Fallback: include inactive/hidden objects
+                var all = Resources.FindObjectsOfTypeAll<UIBase>();
+                if (all != null && all.Length > 0)
+                {
+                    // Prefer enabled/active if any
+                    foreach (var ui in all)
+                    {
+                        if (ui != null && ui.isActiveAndEnabled)
+                        {
+                            _cachedUIBase = ui;
+                            return true;
+                        }
+                    }
+                    // Otherwise, take the first available instance
+                    _cachedUIBase = all[0];
+                    return _cachedUIBase != null;
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"[AutoDisconnect] Find UIBase failed: {ex.Message}");
+            }
+            return false;
+        }
+
+        private static bool TryExitToLogin()
+        {
+            try
+            {
+                if (!TryEnsureUIBase())
+                    return false;
+
+                var ui = _cachedUIBase;
+                if (ui == null)
+                    return false;
+
+                ui.ExitToLogin();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"[AutoDisconnect] ExitToLogin failed: {ex.Message}");
+                return false;
+            }
+        }
+
         public static void OnUpdate()
         {
             try
@@ -98,17 +166,32 @@ namespace Mod.Cheats
 
                 if (hp <= ThresholdDecimal)
                 {
-                    _lastAttemptTime = Time.time;
-
-                    // Stub: Log only unless confirmation disabled
-                    if (Settings.autoDisconnectConfirm)
+                    // Optional: require no potions remaining
+                    if (Settings.autoDisconnectOnlyWhenNoPotions)
                     {
-                        MelonLogger.Msg($"[AutoDisconnect] Would disconnect now (HP={hp * 100f:F1}% <= {Settings.autoDisconnectHealthPercent:F1}% threshold)");
-                        return;
+                        var remaining = AutoPotion.TryGetRemainingPotions();
+                        if (!remaining.HasValue)
+                        {
+                            // Unknown count: be conservative; do not disconnect
+                            return;
+                        }
+                        if (remaining.Value > 0)
+                        {
+                            // Potions available: let AutoPotion handle it instead
+                            return;
+                        }
                     }
 
-                    // TODO: Implement safe quit-to-menu flow (native call preferred). Placeholder:
-                    MelonLogger.Warning("[AutoDisconnect] Triggered (stub) - implement quit-to-menu invocation here.");
+                    _lastAttemptTime = Time.time;
+
+                    if (TryExitToLogin())
+                    {
+                        MelonLogger.Msg("[AutoDisconnect] ExitToLogin invoked");
+                    }
+                    else
+                    {
+                        MelonLogger.Warning("[AutoDisconnect] UIBase not available; unable to ExitToLogin");
+                    }
                 }
             }
             catch (Exception ex)
@@ -123,6 +206,7 @@ namespace Mod.Cheats
             _cachedPlayerHealth = null;
             _cachedReaperCheck = null;
             _componentsInitialized = false;
+            _cachedUIBase = null;
         }
     }
 } 

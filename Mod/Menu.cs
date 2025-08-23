@@ -192,6 +192,19 @@ namespace Mod
                 }
             }
 
+            // Auto-Disconnect (placed near AutoPotion)
+            Settings.useAutoDisconnect = GUILayout.Toggle(Settings.useAutoDisconnect, "Auto Disconnect on Low HP");
+            if (Settings.useAutoDisconnect)
+            {
+                GUILayout.Label("Auto Disconnect Threshold %: " + Settings.autoDisconnectHealthPercent.ToString("F1"));
+                Settings.autoDisconnectHealthPercent = GUILayout.HorizontalSlider(Settings.autoDisconnectHealthPercent, 0.0f, 100.0f);
+
+                GUILayout.Label("Auto Disconnect Cooldown: " + Settings.autoDisconnectCooldownSeconds.ToString("F0") + "s");
+                Settings.autoDisconnectCooldownSeconds = GUILayout.HorizontalSlider(Settings.autoDisconnectCooldownSeconds, 1f, 60f);
+
+                Settings.autoDisconnectOnlyWhenNoPotions = GUILayout.Toggle(Settings.autoDisconnectOnlyWhenNoPotions, "Only Disconnect When Out of Potions");
+            }
+
             GUILayout.EndVertical();
 
             Rect resizeGripRect = new Rect(

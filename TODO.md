@@ -23,27 +23,27 @@
 
 ### 2. Auto Disconnect on Low Health
 
-**Status**: 🔄 In Progress (skeleton stub implemented)  
+**Status**: ✅ Deployed (UI-based quit; optional gating by potions)  
 **Complexity**: Medium  
 **Dependencies**: AutoPotion component cache, ObjectManager, AntiIdleSystem
 
 **What exists now**:
-- [x] `Settings`: flags and thresholds (`useAutoDisconnect`, `autoDisconnectHealthPercent`, `autoDisconnectCooldownSeconds`, `autoDisconnectConfirm`)
-- [x] `Cheats/AutoDisconnect.cs`: skeleton that reads `PlayerHealth.getHealthPercent()`, online-only gate, cooldown debounce, stubbed action (logs by default)
-- [x] Wired into `Mod.OnUpdate` and cache cleared on scene init
+- [x] `Settings`: flags and thresholds (`useAutoDisconnect`, `autoDisconnectHealthPercent`, `autoDisconnectCooldownSeconds`, `autoDisconnectOnlyWhenNoPotions`)
+- [x] `Cheats/AutoDisconnect.cs`: reads `PlayerHealth.getHealthPercent()`, cooldown debounce, Reaper-form guard, lazy+hooked `UIBase` capture, calls `UIBase.ExitToLogin()`
+- [x] Wired into `Mod.OnUpdate`, cache cleared on scene init with lazy re-discovery
+- [x] Menu wiring next to AutoPotion controls
 
 **Tasks**:
-- [ ] Implement safe quit-to-menu invocation (prefer native DMap/UI flow if available)
-- [ ] Add suppression window integration (reuse AntiIdle scene-change/network suppression)
-- [ ] Optional confirmation UI or hotkey override to proceed without prompt
-- [ ] Robust state guards (loading screens, invulnerability phases, death)
-- [ ] Finalize logging and add minimal telemetry toggle
+- [x] Implement safe quit-to-menu invocation (native `UIBase.ExitToLogin()`)
+- [x] Add toggle: Only disconnect when out of potions (uses `LocalPlayer.healthPotion.currentCharges`)
+- [x] Finalize concise logging
+- [ ] Add suppression window integration (reuse AntiIdle scene/network suppression)
+- [ ] Add robust state guards for loading screens and death
 - [ ] Test in both online/offline modes, across scenes, with low FPS
 
 **Implementation Notes**:
-- Reuse `AutoPotion.InitializeComponents()` pattern; keep health read guarded against NaN/Inf
-- Execute UI actions on main thread; avoid blocking calls
-- Keep action idempotent under debounce window
+- `UIBase` instance obtained via `UIBase.Awake` hook and lazy `FindObjectOfType`/`Resources.FindObjectsOfTypeAll`
+- All calls on main thread; action idempotent under debounce window
 
 ## 🎯 Medium Priority Features
 
@@ -197,9 +197,23 @@
 - [ ] Add settings import/export functionality
 - [ ] Create settings documentation
 
+### 9. Auto Potion Enhancements (Remaining Charges & Logging)
+
+**Status**: ✅ Deployed  
+**Complexity**: Low
+
+**What exists now**:
+- [x] Directly read `LocalPlayer.healthPotion.currentCharges` / `maxCharges` (Il2Cpp.HealthPotionCharges)
+- [x] Log when out of potions; include estimated remaining on use
+- [x] Expose `TryGetRemainingPotions()` for other systems (e.g., AutoDisconnect)
+
+**Next steps**:
+- [ ] Optional overlay/debug display of remaining potions
+- [ ] Consider exposing max charges in Menu and guard for loading states
+
 ## 🧪 Testing & Validation
 
-### 9. Testing Framework
+### 10. Testing Framework
 
 **Status**: 📋 Planned  
 **Complexity**: Medium
@@ -214,7 +228,7 @@
 
 ## 📚 Documentation
 
-### 10. Documentation Updates
+### 11. Documentation Updates
 
 **Status**: 📋 Ongoing  
 **Complexity**: Low
@@ -232,10 +246,11 @@
 ## 🎯 Implementation Priority Order
 
 1. **Shrine Detection** - Extends existing ESP system, moderate complexity
-2. **Auto Disconnect** - Extends AutoPotion patterns; skeleton in place
+2. **Auto Disconnect** - Implemented and optionally gated by potions; add suppress/state guards next
 3. **Stash Button** - High user value, but complex UI integration
 4. **Anti-Idle Prevention** - Completed; add minor config and long-run validation
 5. **NPC Minimap Icons** - On hold until DMMap system stabilizes (stopgap overlay deployed)
+6. **Potion Count Display** - Add overlay/debug display of remaining potions
 
 ## 🔧 Technical Considerations
 
