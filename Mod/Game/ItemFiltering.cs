@@ -3,6 +3,7 @@ using Il2CppInterop.Runtime;
 using Il2CppItemFiltering;
 using MelonLoader;
 using System.Reflection;
+using UnityEngine;
 
 namespace Mod.Game
 {
@@ -47,6 +48,31 @@ namespace Mod.Game
 		//         return *(Rule.RuleOutcome*)IL2CPP.il2cpp_object_unbox(num4);
 		//     }
 
+		private static float s_nextNullFilterReminderAt;
+		private static int s_nullFilterRemindersShown;
+		private const int MaxNullFilterReminders = 3;
+		private const float NullFilterReminderIntervalSeconds = 5f;
+
+		private static void MaybeLogNoFilterSelected()
+		{
+			float now = Time.realtimeSinceStartup;
+			if (s_nullFilterRemindersShown >= MaxNullFilterReminders)
+				return;
+
+			if (now < s_nextNullFilterReminderAt)
+				return;
+
+			s_nextNullFilterReminderAt = now + NullFilterReminderIntervalSeconds;
+			s_nullFilterRemindersShown++;
+			MelonLogger.Warning("ItemFiltering: No item filter is selected. Open the in-game Item Filter menu and select or create a filter. Suppressing further messages temporarily.");
+		}
+
+		private static void ResetNoFilterWarning()
+		{
+			s_nextNullFilterReminderAt = 0f;
+			s_nullFilterRemindersShown = 0;
+		}
+
 		public unsafe static Rule.RuleOutcome Match(ItemDataUnpacked itemData, Il2CppSystem.Nullable<int>? color, Il2CppSystem.Nullable<bool>? emphasize, int matchingRuleNumber, int soundId, int beamId)
 		{
 			// Note: parameters are not out/ref, so assignments here will not propagate to caller.
@@ -60,9 +86,11 @@ namespace Mod.Game
 			var itemFilter = ItemFilterManager.Instance.Filter;
 			if (itemFilter == null)
 			{
-				MelonLogger.Error("ItemFiltering.Match: itemFilter is null");
+				MaybeLogNoFilterSelected();
 				return Rule.RuleOutcome.SHOW;
 			}
+
+			ResetNoFilterWarning();
 
 			// Prepare argument array for il2cpp_runtime_invoke (6 parameters)
 			IntPtr* args = stackalloc IntPtr[6];
