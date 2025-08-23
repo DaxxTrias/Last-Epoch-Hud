@@ -159,13 +159,16 @@ namespace Mod.Cheats
                 if (_lastConnectionStatus != statusString)
                 {
                     if (VerboseStatusLogs)
+#pragma warning disable CS0162 // Unreachable code detected
                         MelonLogger.Msg($"[AntiIdle] Connection status changed from '{_lastConnectionStatus ?? "None"}' to '{statusString}'");
+#pragma warning restore CS0162 // Unreachable code detected
                     _lastConnectionStatus = statusString;
                     _isConnected = string.Equals(statusString, "Connected", StringComparison.OrdinalIgnoreCase);
                     
                     // Also emit a one-time snapshot of key objects on status change only
                     if (VerboseStatusLogs)
                     {
+#pragma warning disable CS0162 // Unreachable code detected
                         if (_netMultiClient != null)
                         {
                             var clientType = _netMultiClient.GetType();
@@ -175,10 +178,12 @@ namespace Mod.Cheats
                         {
                             MelonLogger.Msg("[AntiIdle] NetMultiClient: null");
                         }
+#pragma warning restore CS0162 // Unreachable code detected
                     }
 
                     if (VerboseStatusLogs)
                     {
+#pragma warning disable CS0162 // Unreachable code detected
                         if (_serverConnection != null)
                         {
                             var connType = _serverConnection.GetType();
@@ -188,6 +193,7 @@ namespace Mod.Cheats
                         {
                             MelonLogger.Msg("[AntiIdle] ServerConnection: null");
                         }
+#pragma warning restore CS0162 // Unreachable code detected
                     }
                     
                     // Treat status transitions as activity (short suppression)
@@ -279,7 +285,9 @@ namespace Mod.Cheats
             {
                 var statusString = status?.ToString() ?? "Unknown";
                 if (VerboseStatusLogs)
+#pragma warning disable CS0162 // Unreachable code detected
                     MelonLogger.Msg($"[AntiIdle] NetConnection status: {statusString}");
+#pragma warning restore CS0162 // Unreachable code detected
                 
                 // Handle the same way as main connection status
                 OnConnectionStatusChanged(status);
