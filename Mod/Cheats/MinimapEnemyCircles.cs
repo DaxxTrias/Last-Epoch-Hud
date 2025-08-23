@@ -22,7 +22,7 @@ namespace Mod.Cheats
         public static string lastCreateAttempt = "";
         
         // Store our UI circles for cleanup
-        private static List<GameObject> enemyCircles = new List<GameObject>();
+        private static readonly List<GameObject> enemyCircles = new List<GameObject>();
         private static int debugUpdateCounter = 0; // Add counter to reduce debug frequency
         
         // Target containers discovered from the scene hierarchy (screenshot)
@@ -47,6 +47,14 @@ namespace Mod.Cheats
             }
             
             if (!Initialize(shouldUpdateDebug)) return;
+            
+            // Skip rendering if fullscreen map is open
+            if (IsFullscreenMapOpen())
+            {
+                ClearCircles();
+                if (shouldUpdateDebug) lastDebugInfo = "Fullscreen map OPEN - circles suppressed";
+                return;
+            }
             
             CheckMinimapToggle(shouldUpdateDebug);
             
@@ -76,6 +84,23 @@ namespace Mod.Cheats
                 isMinimapOpen = !isMinimapOpen;
             }
             wasTabPressed = isTabPressed;
+        }
+        
+        private static bool IsFullscreenMapOpen()
+        {
+            // Heuristic: look for an active canvas containing "Map" but not DMMap/minimap/internal containers
+            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
+            {
+                if (canvas == null || !canvas.isActiveAndEnabled) continue;
+                string n = canvas.name;
+                if (string.IsNullOrEmpty(n)) continue;
+                string lower = n.ToLowerInvariant();
+                if (lower.Contains("map") && !lower.Contains("dmmap") && !lower.Contains("mini"))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
         
         public static bool Initialize(bool updateDebug = true)
@@ -228,13 +253,6 @@ namespace Mod.Cheats
                 // Update creation attempt status
                 lastCreateAttempt = $"Successfully created {successfulCircles} circles for {lastEnemyCount} enemies";
                 
-                // If nothing was created, draw a center debug circle to validate visibility
-                if (successfulCircles == 0 && iconsContainer != null)
-                {
-                    var color = new Color(1f, 0f, 1f, 0.9f); // magenta for visibility
-                    CreateDebugCircleAtCenter(color);
-                }
-                
                 // Set final debug info with complete status
                 if (updateDebug) lastDebugInfo = $"ACTIVE | Summary: Visuals: {totalVisuals}, Filtered: {alignmentFiltered}, Enemies: {lastEnemyCount}, Circles: {lastCircleCount}";
             }
@@ -248,16 +266,16 @@ namespace Mod.Cheats
         {
             if (iconsContainer == null)
             {
-                return Settings.minimapScale;
+                return Settings.minimapScale * Settings.minimapScaleFactor;
             }
             if (!Settings.autoScaleMinimap)
             {
-                return Settings.minimapScale;
+                return Settings.minimapScale * Settings.minimapScaleFactor;
             }
             var rect = iconsContainer.rect;
             float radiusPixels = Mathf.Min(rect.width, rect.height) * 0.5f;
-            float radiusMeters = Mathf.Max(1f, Settings.drawDistance);
-            return radiusPixels / radiusMeters;
+            float radiusMeters = Mathf.Max(1f, Settings.minimapWorldRadiusMeters);
+            return (radiusPixels / radiusMeters) * Settings.minimapScaleFactor;
         }
         
         private static float GetMapRotationRadians()
@@ -277,10 +295,26 @@ namespace Mod.Cheats
             return new Vector2(rect.width * 0.5f, rect.height * 0.5f);
         }
         
+        private static float GetBasisRotationRadians()
+        {
+            return Settings.minimapBasisRotationDegrees * Mathf.Deg2Rad;
+        }
+        
         private static Vector2 WorldToMinimapPosition(Vector3 worldPosition, Vector3 playerPosition, float pixelsPerMeter, float rotationRadians)
         {
             // Calculate relative position to player in world XZ plane
             Vector2 rel = new Vector2(worldPosition.x - playerPosition.x, worldPosition.z - playerPosition.z);
+            
+            // Apply basis rotation to align world axes to DMap axes
+            float basisRad = GetBasisRotationRadians();
+            if (basisRad != 0f)
+            {
+                float cosB = Mathf.Cos(basisRad);
+                float sinB = Mathf.Sin(basisRad);
+                float bx = rel.x * cosB - rel.y * sinB;
+                float by = rel.x * sinB + rel.y * cosB;
+                rel = new Vector2(bx, by);
+            }
             
             // Rotate to match map rotation
             if (rotationRadians != 0f)
@@ -291,6 +325,10 @@ namespace Mod.Cheats
                 float ry = rel.x * sin + rel.y * cos;
                 rel = new Vector2(rx, ry);
             }
+            
+            // Optional axis flips to match DMap handedness
+            if (Settings.minimapFlipX) rel.x = -rel.x;
+            if (Settings.minimapFlipY) rel.y = -rel.y;
             
             // Convert to minimap space (Unity UI is typically +Y up). Map convention: x->right, z->forward
             float minimapX = rel.x * pixelsPerMeter + Settings.minimapOffsetX;
@@ -367,21 +405,6 @@ namespace Mod.Cheats
             {
                 lastCreateAttempt = $"Failed to create circle: {e.Message}";
             }
-        }
-        
-        private static void CreateDebugCircleAtCenter(Color color)
-        {
-            if (iconsContainer == null) return;
-            var go = new GameObject("EnemyCircle_DebugCenter");
-            go.transform.SetParent(iconsContainer.transform, false);
-            var rt = go.AddComponent<RectTransform>();
-            rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(Settings.minimapCircleSize * 1.5f, Settings.minimapCircleSize * 1.5f);
-            var img = go.AddComponent<UnityEngine.UI.Image>();
-            var tex = CreateCircleTexture((int)(Settings.minimapCircleSize * 1.5f), color);
-            var spr = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-            img.sprite = spr;
-            enemyCircles.Add(go);
         }
         
         private static Texture2D CreateCircleTexture(int size, Color color)

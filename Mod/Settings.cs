@@ -1,4 +1,4 @@
-using Il2Cpp;
+﻿using Il2Cpp;
 
 namespace Mod
 {
@@ -32,8 +32,13 @@ namespace Mod
         // Minimap Enemy Circles Settings
         public static bool showMinimapEnemyCircles = true;
         public static float minimapCircleSize = 6f;
-        public static float minimapScale = 8.3f; // Fallback scale if autoScaleMinimap is disabled
-        public static bool autoScaleMinimap = true; // Derive pixels-per-meter from Icons rect and draw distance
+        public static float minimapScale = 8.3f; // Fallback pixels-per-meter if autoScaleMinimap is disabled
+        public static bool autoScaleMinimap = true; // Derive pixels-per-meter from Icons rect and world radius
+        public static float minimapScaleFactor = 1.3f; // Additional multiplier on computed pixels-per-meter
+        public static float minimapWorldRadiusMeters = 67f; // Real-world radius represented by the minimap visible radius
+        public static bool minimapFlipX = false; // Flip horizontal axis to match DMap handedness
+        public static bool minimapFlipY = false; // Flip vertical axis if needed
+        public static float minimapBasisRotationDegrees = 90f; // Additional rotation to align axes (applied before map rotation)
         public static bool showMagicMonsters = true;
         public static bool showRareMonsters = true;
         public static bool showWhiteMonsters = false;
