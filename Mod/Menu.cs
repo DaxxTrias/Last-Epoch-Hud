@@ -2,6 +2,8 @@
 using Mod.Game;
 using UnityEngine;
 using static UnityEngine.GUI;
+using MelonLoader;
+using System.Linq;
 
 namespace Mod
 {
@@ -107,10 +109,46 @@ namespace Mod
                 GUILayout.Space(10);
                 #endregion
 
-                Settings.useAnyWaypoint = GUILayout.Toggle(Settings.useAnyWaypoint, "Allow Any Waypoint");
+                if (!ObjectManager.IsOfflineMode())
+                {
+                    GUILayout.Label("Allow Any Waypoint: unavailable in online mode");
+                }
+                else
+                {
+                    Settings.useAnyWaypoint = GUILayout.Toggle(Settings.useAnyWaypoint, "Allow Any Waypoint");
+                }
                 //Settings.pickupCrafting = GUILayout.Toggle(Settings.pickupCrafting, "Pickup Crafting Items");
 
                 // Settings.debugESPNames = GUILayout.Toggle(Settings.debugESPNames, "Debug ESP Names");
+
+                #region spacing
+                GUILayout.Space(10);
+                #endregion
+
+                // Anti-Idle (Synthetic Keepalive)
+                Settings.useAntiIdle = GUILayout.Toggle(Settings.useAntiIdle, "Anti-Idle (Synthetic Keepalive)");
+                if (Settings.useAntiIdle)
+                {
+                    GUILayout.Label("Keepalive Interval (s): " + Settings.keepAliveInterval.ToString("F0"));
+                    Settings.keepAliveInterval = GUILayout.HorizontalSlider(Settings.keepAliveInterval, 10f, 120f);
+
+                    GUILayout.Label("Anti-Idle Action Interval (s): " + Settings.antiIdleInterval.ToString("F0"));
+                    Settings.antiIdleInterval = GUILayout.HorizontalSlider(Settings.antiIdleInterval, 30f, 300f);
+
+                    // Suppression controls
+                    Settings.suppressKeepAliveOnActivity = GUILayout.Toggle(Settings.suppressKeepAliveOnActivity, "Pause Keepalive On Activity");
+                    if (Settings.suppressKeepAliveOnActivity)
+                    {
+                        GUILayout.Label("Activity Suppression (s): " + Settings.activitySuppressionSeconds.ToString("F0"));
+                        Settings.activitySuppressionSeconds = GUILayout.HorizontalSlider(Settings.activitySuppressionSeconds, 30f, 300f);
+
+                        GUILayout.Label("Scene Change Suppression (s): " + Settings.sceneChangeSuppressionSeconds.ToString("F0"));
+                        Settings.sceneChangeSuppressionSeconds = GUILayout.HorizontalSlider(Settings.sceneChangeSuppressionSeconds, 30f, 300f);
+
+                        GUILayout.Label("Network Activity Suppression (s): " + Settings.networkActivitySuppressionSeconds.ToString("F0"));
+                        Settings.networkActivitySuppressionSeconds = GUILayout.HorizontalSlider(Settings.networkActivitySuppressionSeconds, 5f, 120f);
+                    }
+                }
             }
 
             #region spacing
@@ -198,7 +236,7 @@ namespace Mod
             {
                 guiVisible = !guiVisible;
             }
-            
+
             // Debug key for auto-potion system (F12)
             if (Input.GetKeyDown(KeyCode.F12))
             {

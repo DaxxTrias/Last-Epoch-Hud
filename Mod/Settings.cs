@@ -16,6 +16,17 @@ namespace Mod
         public static bool minimapZoomUnlock = true;
         public static bool playerLantern = true;
         public static bool useAnyWaypoint = false;
+        public static bool useAntiIdle = false;
+        public static float antiIdleInterval = 60f; // Anti-idle action interval in seconds
+        public static bool useSyntheticKeepAlive = true; // Send small user message periodically
+        public static float keepAliveInterval = 20f; // Seconds between synthetic keepalive sends
+
+        // Anti-Idle suppression controls
+        public static bool suppressKeepAliveOnActivity = true; // Pause synthetic keepalive when user activity is detected
+        public static float activitySuppressionSeconds = 120f; // How long to suppress after input/activity
+        public static float sceneChangeSuppressionSeconds = 150f; // Suppress on scene change
+        public static float networkActivitySuppressionSeconds = 45f; // Suppress after any outbound message
+
         //public static bool pickupCrafting = false;
 
         // public static bool debugESPNames = false;
