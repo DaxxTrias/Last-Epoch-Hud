@@ -185,7 +185,7 @@
 
 ### 8. Configuration & Settings
 
-**Status**: 📋 Ongoing  
+**Status**: ✅ Deployed (further validation ongoing)
 **Complexity**: Low
 
 **Tasks**:
@@ -213,6 +213,7 @@
 **Next steps**:
 - [ ] Optional overlay/debug display of remaining potions
 - [ ] Consider exposing max charges in Menu and guard for loading states
+- [ ] Enhance associated functionality (e.g., AutoDisconnect)
 
 ## 🧪 Testing & Validation
 
