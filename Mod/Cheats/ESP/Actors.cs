@@ -15,6 +15,8 @@ namespace Mod.Cheats.ESP
         //        FriendlyNeutral: Seems to be neutral NPCs
         //        SummonedCorpse: Necromancer summons
 
+        private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
+
         private static string SanitizeLabel(string? value)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
@@ -68,7 +70,7 @@ namespace Mod.Cheats.ESP
             {
                 if (info.actorClass == DisplayActorClass.Boss) return Color.red;
                 if (info.actorClass == DisplayActorClass.Rare) return Color.yellow;
-                if (info.actorClass == DisplayActorClass.Magic) return Color.blue;
+                if (info.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
                 // Normal/other defaults to white
                 return Color.white;
             }

@@ -35,6 +35,8 @@ namespace Mod.Cheats
         private static Sprite? spriteYellow;
         private static Sprite? spriteBlue;
         private static Sprite? spriteRed;
+
+        private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
         
         public static void Update()
         {
@@ -176,7 +178,7 @@ namespace Mod.Cheats
             const int baseSize = 16;
             if (spriteWhite == null) spriteWhite = BuildCircleSprite(baseSize, Color.white);
             if (spriteYellow == null) spriteYellow = BuildCircleSprite(baseSize, Color.yellow);
-            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, Color.blue);
+            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, MagicLightBlue);
             if (spriteRed == null) spriteRed = BuildCircleSprite(baseSize, Color.red);
         }
         
@@ -368,7 +370,7 @@ namespace Mod.Cheats
             {
                 if (displayInfo.actorClass == DisplayActorClass.Boss) return Color.red;
                 if (displayInfo.actorClass == DisplayActorClass.Rare) return Color.yellow;
-                if (displayInfo.actorClass == DisplayActorClass.Magic) return Color.blue;
+                if (displayInfo.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
             }
             return Color.white;
         }
@@ -378,8 +380,16 @@ namespace Mod.Cheats
             // Map arbitrary input color to the closest cached sprite
             if (color.Equals(Color.red)) return spriteRed;
             if (color.Equals(Color.yellow)) return spriteYellow;
-            if (color.Equals(Color.blue)) return spriteBlue;
+            if (Approximately(color, MagicLightBlue) || color.Equals(Color.blue)) return spriteBlue;
             return spriteWhite;
+        }
+        
+        private static bool Approximately(Color a, Color b)
+        {
+            return Mathf.Abs(a.r - b.r) < 0.02f &&
+                   Mathf.Abs(a.g - b.g) < 0.02f &&
+                   Mathf.Abs(a.b - b.b) < 0.02f &&
+                   Mathf.Abs(a.a - b.a) < 0.02f;
         }
         
         private static bool ShouldShowEnemyType(ActorVisuals enemy)
