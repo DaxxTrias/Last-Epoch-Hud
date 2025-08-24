@@ -44,9 +44,17 @@ The user asks questions about the following:
 - Input/keybinds:
   - Insert toggles the in-game menu; F12 logs AutoPotion debug.
 - Configuration (`SettingsConfig`):
-  - Centralized wrapper over `MelonPreferences` with categories for General, Patches, AutoPotion, AntiIdle, AutoDisconnect, Minimap, NPC, Items.
-  - When adding settings: update `Init()`, `LoadIntoSettings()`, `ApplyToPreferencesFromSettings()`, snapshot DTO and `CreateSnapshot()/ApplySnapshot()`, and ensure `MelonPreferences.Save()` is called.
-  - Standalone JSON mirror under `UserData/LEHud.cfg` is supported for portability; keep in sync on load/save.
+  - Centralized wrapper over MelonPreferences with categories for General, Patches, AutoPotion, AntiIdle, AutoDisconnect, Minimap, NPC, Items.
+  - Use underscore-based category IDs: `LEHud_General`, `LEHud_Patches`, `LEHud_AutoPotion`, `LEHud_AntiIdle`, `LEHud_AutoDisconnect`, `LEHud_Minimap`, `LEHud_NPC`, `LEHud_Items`.
+  - When adding settings, ALWAYS update all of the following:
+    1) `Settings.cs`: add default field.
+    2) `SettingsConfig.Init()`: create entry in the correct category with the default value.
+    3) `SettingsConfig.LoadIntoSettings()`: read/clamp the entry into `Settings`.
+    4) `SettingsConfig.ApplyToPreferencesFromSettings()`: write `Settings` back to entries.
+    5) `Menu.cs`: add UI to read/write `Settings` (avoid allocations in hot paths).
+    6) Ensure persistence on close: closing the menu (Insert) must call `ApplyToPreferencesFromSettings(); Save();` so changes flush to disk.
+  - Initialization guard: `SettingsConfig.IsInitialized` must be true before calling load/apply; `Mod.OnPreferencesLoaded` should early-return until init completes.
+  - Standalone JSON import/export is currently disabled. Prefer MelonPreferences as the single source of truth. If re-enabled in the future, wire Import/Export via the menu and keep both stores in sync only when explicitly invoked.
 - Networking hooks (Anti-Idle/Auto-Disconnect):
   - IL2CPP Lidgren: `NetMultiClient.Connect/Disconnect/SendMessage/get_ConnectionStatus` and `NetConnection.get_Status` are primary hooks.
   - Steam sockets: `SteamNetworkingSockets.ConnectionStatusChanged` may be observed if available.
@@ -57,7 +65,7 @@ The user asks questions about the following:
 - Logging conventions:
   - Use `MelonLogger.Msg/Error`. Prefix messages contextually: `[Mod]` for lifecycle, `[Settings]` for config IO, `[LeHud.Hooks]` for Harmony hooks.
 - Teardown:
-  - On application quit, persist preferences (`SettingsConfig.ApplyToPreferencesFromSettings(); Save(); SaveStandalone();`), clean up sprites/drawing, and unpatch via `s_harmony?.UnpatchSelf()`.
+  - On application quit, persist preferences (`SettingsConfig.ApplyToPreferencesFromSettings(); Save();`), clean up sprites/drawing, and unpatch via `s_harmony?.UnpatchSelf()`.
 - Drawing/Assets:
   - Use `Drawing` for GUI style setup; use `SpriteManager` and base64 sprites from `SpriteBases` for runtime icons; clean them up on quit.
 
