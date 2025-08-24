@@ -189,11 +189,15 @@
 **Complexity**: Low
 
 **Tasks**:
-- [ ] Add MelonPreferences integration for persistent settings
+- [x] Add MelonPreferences integration for persistent settings
+  - Underscore category IDs (`LEHud_General`, etc.) bound to single `LEHud.melon.cfg`
+  - Guarded init via `SettingsConfig.IsInitialized`; early-return in `OnPreferencesLoaded`
+  - Persist on menu close (Insert): `ApplyToPreferencesFromSettings(); Save();`
+  - Explicit category `SaveToFile()` to ensure on-disk writes
 - [ ] Create settings UI for new features
+- [x] Implement settings validation (clamping; safe snapshot IO)
 - [ ] Add hotkey configuration system
-- [ ] Implement settings validation
-- [ ] Add settings import/export functionality
+- [ ] Add settings import/export functionality (helpers implemented; currently disabled – revisit)
 - [ ] Create settings documentation
 
 ### 9. Auto Potion Enhancements (Remaining Charges & Logging)
