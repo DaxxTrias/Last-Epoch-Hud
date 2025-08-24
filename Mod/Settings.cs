@@ -17,6 +17,12 @@ namespace Mod
         public static bool playerLantern = true;
         public static bool useAnyWaypoint = false;
         public static bool useAntiIdle = false;
+        // public static bool debugESPNames = false;
+
+        // Item Pickup
+        public static bool pickupCrafting = false;
+
+        // Anti-Idle
         public static float antiIdleInterval = 60f; // Anti-idle action interval in seconds
         public static bool useSyntheticKeepAlive = true; // Send small user message periodically
         public static float keepAliveInterval = 20f; // Seconds between synthetic keepalive sends
@@ -48,8 +54,6 @@ namespace Mod
         public static bool showWhiteMonsters = false;
         public static float minimapOffsetX = 0f;
         public static float minimapOffsetY = 0f;
-
-        // public static bool debugESPNames = false;
 
         public static Dictionary<string, bool> npcClassifications = new Dictionary<string, bool>
         {

@@ -504,19 +504,19 @@ namespace Mod.Cheats.Patches
             }
 
             //todo: partially working. disabled until can polish (verify it still partially works in new update)
-            //[HarmonyPatch(typeof(GroundItemManager), "dropItemForPlayer", new Type[] { typeof(Actor), typeof(ItemData), typeof(Vector3), typeof(bool) })]
-            //public class GroundItemManager_vacuumNearbyStackableItems
-            //{
-            //	public static void Postfix(ref GroundItemManager __instance, ref int __state, ref Actor player, ref ItemData itemData, ref Vector3 location, ref bool playDropSound)
-            //	{
-            //		MelonLogger.Msg("[Mod] GroundItemManager.dropItemForPlayer hooked");
-            //		if (ItemList.isCraftingItem(itemData.itemType) && Settings.pickupCrafting)
-            //		{
-            //			__instance.TryGetGroundItemList(player, out GroundItemList groundItemList);
-            //			__instance.vacuumNearbyStackableItems(player, groundItemList, location, StackableItemFlags.AllCrafting);
-            //		}
-            //	}
-            //}
+            [HarmonyPatch(typeof(GroundItemManager), "dropItemForPlayer", new Type[] { typeof(Actor), typeof(ItemData), typeof(Vector3), typeof(bool) })]
+            public class GroundItemManager_vacuumNearbyStackableItems
+            {
+            	public static void Postfix(ref GroundItemManager __instance, ref int __state, ref Actor player, ref ItemData itemData, ref Vector3 location, ref bool playDropSound)
+            	{
+            		MelonLogger.Msg("[Mod] GroundItemManager.dropItemForPlayer hooked");
+            		if (ItemList.isCraftingItem(itemData.itemType) && Settings.pickupCrafting)
+            		{
+            			__instance.TryGetGroundItemList(player, out GroundItemList groundItemList);
+            			__instance.vacuumNearbyStackableItems(player, groundItemList, location, StackableItemFlags.AllCrafting);
+            		}
+            	}
+            }
             #endregion
 
             #region investigation hooks
