@@ -15,6 +15,8 @@ namespace Mod.Cheats.ESP
         //        FriendlyNeutral: Seems to be neutral NPCs
         //        SummonedCorpse: Necromancer summons
 
+        private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
+
         private static string SanitizeLabel(string? value)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
@@ -61,6 +63,21 @@ namespace Mod.Cheats.ESP
             return SanitizeLabel(actor.name);
         }
 
+        private static Color GetRarityColor(ActorVisuals actor, string alignmentName)
+        {
+            var info = actor.GetComponent<ActorDisplayInformation>();
+            if (info != null)
+            {
+                if (info.actorClass == DisplayActorClass.Boss) return Color.red;
+                if (info.actorClass == DisplayActorClass.Rare) return Color.yellow;
+                if (info.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
+                // Normal/other defaults to white
+                return Color.white;
+            }
+            // Fallback to alignment color if no display info
+            return Drawing.AlignmentToColor(alignmentName);
+        }
+
         public static void GatherActors()
         {
             if (ActorManager.instance == null) return;
@@ -72,7 +89,7 @@ namespace Mod.Cheats.ESP
             {
                 if (!Settings.ShouldDrawNPCAlignment(visual.alignment.name)) continue;
 
-                var color = Drawing.AlignmentToColor(visual.alignment.name);
+                // var color = Drawing.AlignmentToColor(visual.alignment.name);
 
                 foreach (var actor in visual.visuals._list)
                 {
@@ -107,6 +124,7 @@ namespace Mod.Cheats.ESP
                     var position = actor.GetHealthBarPosition();
                     position.y += 0.5f;
 
+                    var color = GetRarityColor(actor, visual.alignment.name);
                     ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
                     //ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
                     ESP.AddString(name, position, color);

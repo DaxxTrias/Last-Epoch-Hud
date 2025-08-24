@@ -89,29 +89,26 @@ namespace Mod
                 Settings.minimapZoomUnlock = GUILayout.Toggle(Settings.minimapZoomUnlock, "Minimap Zoom Unlock");
                 Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack");
 
+                bool previousPlayerLantern = Settings.playerLantern;
+                Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
+                if (Settings.playerLantern != previousPlayerLantern)
+                    GameMods.playerLantern();
+
                 #region spacing
                 GUILayout.Space(10);
                 #endregion
 
-                // Minimap Enemy Circles Settings
+                #region spacing
+                GUILayout.Space(10);
+                #endregion
+
+                // Minimap Enemy Circles Settings (moved below Lantern)
                 GUI.color = Color.green;
                 GUILayout.Label("Monster Type Filters:");
                 GUI.color = Color.white;
                 Settings.showMagicMonsters = GUILayout.Toggle(Settings.showMagicMonsters, "Show Magic Monsters (Blue)");
                 Settings.showRareMonsters = GUILayout.Toggle(Settings.showRareMonsters, "Show Rare Monsters (Yellow)");
                 Settings.showWhiteMonsters = GUILayout.Toggle(Settings.showWhiteMonsters, "Show White Monsters");
-
-                #region spacing
-                GUILayout.Space(10);
-                #endregion
-
-                GUILayout.Label("Minimap Scale: " + Settings.minimapScale.ToString("F1"));
-                Settings.minimapScale = GUILayout.HorizontalSlider(Settings.minimapScale, 1.0f, 15.0f);
-
-                bool previousPlayerLantern = Settings.playerLantern;
-                Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
-                if (Settings.playerLantern != previousPlayerLantern)
-                    GameMods.playerLantern();
             }
 
             riskyOptionsDropdown = GUILayout.Toggle(riskyOptionsDropdown, "Risky Options:", "button");
@@ -193,6 +190,19 @@ namespace Mod
                     GUILayout.Label("Auto HP Pot Cooldown: " + Settings.autoPotionCooldown.ToString("F1") + "s");
                     Settings.autoPotionCooldown = GUILayout.HorizontalSlider(Settings.autoPotionCooldown, 0.1f, 5.0f);
                 }
+            }
+
+            // Auto-Disconnect (placed near AutoPotion)
+            Settings.useAutoDisconnect = GUILayout.Toggle(Settings.useAutoDisconnect, "Auto Disconnect on Low HP");
+            if (Settings.useAutoDisconnect)
+            {
+                GUILayout.Label("Auto Disconnect Threshold %: " + Settings.autoDisconnectHealthPercent.ToString("F1"));
+                Settings.autoDisconnectHealthPercent = GUILayout.HorizontalSlider(Settings.autoDisconnectHealthPercent, 0.0f, 100.0f);
+
+                GUILayout.Label("Auto Disconnect Cooldown: " + Settings.autoDisconnectCooldownSeconds.ToString("F0") + "s");
+                Settings.autoDisconnectCooldownSeconds = GUILayout.HorizontalSlider(Settings.autoDisconnectCooldownSeconds, 1f, 60f);
+
+                Settings.autoDisconnectOnlyWhenNoPotions = GUILayout.Toggle(Settings.autoDisconnectOnlyWhenNoPotions, "Only Disconnect When Out of Potions");
             }
 
             GUILayout.EndVertical();

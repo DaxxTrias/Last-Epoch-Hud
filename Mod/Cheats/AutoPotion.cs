@@ -82,7 +82,7 @@ namespace Mod.Cheats
                 // In online mode, require both LocalPlayer (for input) and PlayerHealth
                 return _cachedLocalPlayer != null && _cachedPlayerHealth != null;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 MelonLogger.Error($"AutoPotion: Failed to initialize components - {ex.Message}");
                 _componentsInitialized = false;
@@ -116,11 +116,72 @@ namespace Mod.Cheats
                 
                 return true;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 MelonLogger.Error($"AutoPotion: Failed to validate player state - {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Best-effort check for remaining health potions. Returns null if unknown.
+        /// Prefer direct LocalPlayer.healthPotion.currentCharges when available.
+        /// </summary>
+        public static int? TryGetRemainingPotions()
+        {
+            try
+            {
+                if (!_componentsInitialized)
+                    InitializeComponents();
+
+                // Direct path via LocalPlayer.healthPotion (Il2Cpp.HealthPotionCharges)
+                if (_cachedLocalPlayer != null)
+                {
+                    try
+                    {
+                        var charges = _cachedLocalPlayer.healthPotion; // Il2Cpp.HealthPotionCharges
+                        if (charges != null)
+                        {
+                            int current = charges.currentCharges;
+                            // int max = charges.maxCharges; // available if needed later
+                            return current;
+                        }
+                    }
+                    catch { }
+                }
+
+                // Fallback: PlayerHealth introspection
+                if (_cachedPlayerHealth != null)
+                {
+                    var t = _cachedPlayerHealth.GetType();
+                    var prop = t.GetProperty("healthPotionsRemaining") ?? t.GetProperty("HealthPotionsRemaining") ?? t.GetProperty("currentFlasks") ?? t.GetProperty("CurrentFlasks");
+                    if (prop != null)
+                    {
+                        var val = prop.GetValue(_cachedPlayerHealth);
+                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
+                    }
+                    var field = t.GetField("healthPotionsRemaining") ?? t.GetField("HealthPotionsRemaining") ?? t.GetField("currentFlasks") ?? t.GetField("CurrentFlasks");
+                    if (field != null)
+                    {
+                        var val = field.GetValue(_cachedPlayerHealth);
+                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
+                    }
+                }
+
+                // Fallback: LocalPlayer introspection
+                if (_cachedLocalPlayer != null)
+                {
+                    var t = _cachedLocalPlayer.GetType();
+                    var prop = t.GetProperty("HealthPotions") ?? t.GetProperty("Potions") ?? t.GetProperty("Flasks");
+                    if (prop != null)
+                    {
+                        var val = prop.GetValue(_cachedLocalPlayer);
+                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         /// <summary>
@@ -145,13 +206,28 @@ namespace Mod.Cheats
                 // Validate player state
                 if (!IsPlayerStateValid()) return;
 
+                // Optional: log when no potions remain (if we can detect it)
+                var remaining = TryGetRemainingPotions();
+                if (remaining.HasValue && remaining.Value <= 0)
+                {
+                    MelonLogger.Warning("AutoPotion: No health potions remaining");
+                    return;
+                }
+
                 // Use the potion (requires LocalPlayer component -> online mode only)
                 _cachedLocalPlayer?.PotionKeyPressed();
                 _lastUseTime = Time.time;
                 
-                MelonLogger.Msg($"AutoPotion: Health potion used at {Time.time:F2}");
+                if (remaining.HasValue)
+                {
+                    MelonLogger.Msg($"AutoPotion: Health potion used, remaining ~{Mathf.Max(remaining.Value - 1, 0)}");
+                }
+                else
+                {
+                    MelonLogger.Msg($"AutoPotion: Health potion used at {Time.time:F2}");
+                }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 MelonLogger.Error($"AutoPotion: Failed to use health potion - {ex.Message}");
             }
@@ -188,9 +264,9 @@ namespace Mod.Cheats
                     UseHealthPotion();
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                MelonLogger.Error($"AutoPotion: Update failed - {ex.Message}");
+                MelonLoader.MelonLogger.Error($"AutoPotion: Update failed - {ex.Message}");
             }
         }
 
@@ -234,8 +310,11 @@ namespace Mod.Cheats
                 {
                     MelonLogger.Msg($"  Current Health: Unknown (PlayerHealth component not found)");
                 }
+
+                var remaining = TryGetRemainingPotions();
+                MelonLogger.Msg($"  Potions Remaining: {(remaining.HasValue ? remaining.Value.ToString() : "unknown")}\n");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 MelonLogger.Error($"AutoPotion: Failed to log debug info - {ex.Message}");
             }

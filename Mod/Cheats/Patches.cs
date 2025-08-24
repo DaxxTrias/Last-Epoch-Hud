@@ -11,6 +11,7 @@ using Il2CppSystem.Net;
 using Il2CppSteamworks;
 using HarmonyLib;
 using System.Linq;
+using Mod.Cheats;
 
 using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using static MelonLoader.LoaderConfig;
@@ -65,6 +66,8 @@ namespace Mod.Cheats.Patches
                         var bugPanel = __instance.bugReportPanel;
                         if (bugPanel != null)
                             bugPanel.Close();
+
+                        AutoDisconnect.SetUIBase(__instance);
                     }
                 }
             }
@@ -340,7 +343,7 @@ namespace Mod.Cheats.Patches
                     {
                         var t = typeof(WaypointManager);
                         s_target = AccessTools.PropertyGetter(t, "WaypointEnabled")
-                                ?? AccessTools.DeclaredMethod(t, "get_WaypointEnabled");
+                                || AccessTools.DeclaredMethod(t, "get_WaypointEnabled");
                         if (s_target == null)
                         {
                             MelonLogger.Warning("[LeHud.Hooks]  WaypointManager.get_WaypointEnabled not found; skipping patch.");
@@ -983,7 +986,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {byeMessage ?? "No reason provided"}");
+                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {(byeMessage ?? "No reason provided")}");
 
                         // Log disconnect attempt for anti-idle analysis
                         AntiIdleSystem.OnDisconnectAttempted(byeMessage);

@@ -22,12 +22,21 @@ namespace Mod.Cheats
         public static string lastCreateAttempt = "";
         
         // Store our UI circles for cleanup
-        private static List<GameObject> enemyCircles = new List<GameObject>();
+        private static readonly List<GameObject> enemyCircles = new List<GameObject>();
         private static int debugUpdateCounter = 0; // Add counter to reduce debug frequency
         
         // Target containers discovered from the scene hierarchy (screenshot)
         private static RectTransform? iconsContainer; // ".../DMMap Canvas/Icons"
         private static RectTransform? mapContainer;   // ".../DMMap Canvas/Map" (optional for later)
+        private static GameObject? smallMinimapBg;    // "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG"
+        
+        // Prebuilt sprites cache to avoid per-frame texture allocations
+        private static Sprite? spriteWhite;
+        private static Sprite? spriteYellow;
+        private static Sprite? spriteBlue;
+        private static Sprite? spriteRed;
+
+        private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
         
         public static void Update()
         {
@@ -47,6 +56,14 @@ namespace Mod.Cheats
             }
             
             if (!Initialize(shouldUpdateDebug)) return;
+            
+            // Skip rendering if fullscreen map is open (detected via small minimap BG inactive)
+            if (IsFullscreenMapOpen())
+            {
+                ClearCircles();
+                if (shouldUpdateDebug) lastDebugInfo = "Fullscreen map OPEN - circles suppressed";
+                return;
+            }
             
             CheckMinimapToggle(shouldUpdateDebug);
             
@@ -76,6 +93,18 @@ namespace Mod.Cheats
                 isMinimapOpen = !isMinimapOpen;
             }
             wasTabPressed = isTabPressed;
+        }
+        
+        private static bool IsFullscreenMapOpen()
+        {
+            // Explicit sentinel: when small minimap BG is disabled, fullscreen map is likely open
+            if (smallMinimapBg != null)
+            {
+                return !smallMinimapBg.activeInHierarchy;
+            }
+            // If not bound yet, try to find once by explicit path
+            smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
+            return smallMinimapBg != null && !smallMinimapBg.activeInHierarchy;
         }
         
         public static bool Initialize(bool updateDebug = true)
@@ -120,6 +149,12 @@ namespace Mod.Cheats
                     mapContainer = mapGO.GetComponent<RectTransform>();
                 }
                 
+                // Bind small minimap BG sentinel
+                smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
+                
+                // Build sprite cache once
+                EnsureSpriteCache();
+                
                 if (iconsContainer != null)
                 {
                     isInitialized = true;
@@ -135,6 +170,22 @@ namespace Mod.Cheats
                 if (updateDebug) lastDebugInfo = $"Initialize error: {e.Message}";
                 return false;
             }
+        }
+        
+        private static void EnsureSpriteCache()
+        {
+            // Choose a fixed reasonable texture size for cached sprites; scale via RectTransform
+            const int baseSize = 16;
+            if (spriteWhite == null) spriteWhite = BuildCircleSprite(baseSize, Color.white);
+            if (spriteYellow == null) spriteYellow = BuildCircleSprite(baseSize, Color.yellow);
+            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, MagicLightBlue);
+            if (spriteRed == null) spriteRed = BuildCircleSprite(baseSize, Color.red);
+        }
+        
+        private static Sprite BuildCircleSprite(int size, Color color)
+        {
+            var tex = CreateCircleTexture(size, color);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
         
         public static void UpdateEnemyCircles(bool updateDebug = true)
@@ -228,13 +279,6 @@ namespace Mod.Cheats
                 // Update creation attempt status
                 lastCreateAttempt = $"Successfully created {successfulCircles} circles for {lastEnemyCount} enemies";
                 
-                // If nothing was created, draw a center debug circle to validate visibility
-                if (successfulCircles == 0 && iconsContainer != null)
-                {
-                    var color = new Color(1f, 0f, 1f, 0.9f); // magenta for visibility
-                    CreateDebugCircleAtCenter(color);
-                }
-                
                 // Set final debug info with complete status
                 if (updateDebug) lastDebugInfo = $"ACTIVE | Summary: Visuals: {totalVisuals}, Filtered: {alignmentFiltered}, Enemies: {lastEnemyCount}, Circles: {lastCircleCount}";
             }
@@ -248,16 +292,16 @@ namespace Mod.Cheats
         {
             if (iconsContainer == null)
             {
-                return Settings.minimapScale;
+                return Settings.minimapScale * Settings.minimapScaleFactor;
             }
             if (!Settings.autoScaleMinimap)
             {
-                return Settings.minimapScale;
+                return Settings.minimapScale * Settings.minimapScaleFactor;
             }
             var rect = iconsContainer.rect;
             float radiusPixels = Mathf.Min(rect.width, rect.height) * 0.5f;
-            float radiusMeters = Mathf.Max(1f, Settings.drawDistance);
-            return radiusPixels / radiusMeters;
+            float radiusMeters = Mathf.Max(1f, Settings.minimapWorldRadiusMeters);
+            return (radiusPixels / radiusMeters) * Settings.minimapScaleFactor;
         }
         
         private static float GetMapRotationRadians()
@@ -277,10 +321,26 @@ namespace Mod.Cheats
             return new Vector2(rect.width * 0.5f, rect.height * 0.5f);
         }
         
+        private static float GetBasisRotationRadians()
+        {
+            return Settings.minimapBasisRotationDegrees * Mathf.Deg2Rad;
+        }
+        
         private static Vector2 WorldToMinimapPosition(Vector3 worldPosition, Vector3 playerPosition, float pixelsPerMeter, float rotationRadians)
         {
             // Calculate relative position to player in world XZ plane
             Vector2 rel = new Vector2(worldPosition.x - playerPosition.x, worldPosition.z - playerPosition.z);
+            
+            // Apply basis rotation to align world axes to DMap axes
+            float basisRad = GetBasisRotationRadians();
+            if (basisRad != 0f)
+            {
+                float cosB = Mathf.Cos(basisRad);
+                float sinB = Mathf.Sin(basisRad);
+                float bx = rel.x * cosB - rel.y * sinB;
+                float by = rel.x * sinB + rel.y * cosB;
+                rel = new Vector2(bx, by);
+            }
             
             // Rotate to match map rotation
             if (rotationRadians != 0f)
@@ -291,6 +351,10 @@ namespace Mod.Cheats
                 float ry = rel.x * sin + rel.y * cos;
                 rel = new Vector2(rx, ry);
             }
+            
+            // Optional axis flips to match DMap handedness
+            if (Settings.minimapFlipX) rel.x = -rel.x;
+            if (Settings.minimapFlipY) rel.y = -rel.y;
             
             // Convert to minimap space (Unity UI is typically +Y up). Map convention: x->right, z->forward
             float minimapX = rel.x * pixelsPerMeter + Settings.minimapOffsetX;
@@ -306,9 +370,26 @@ namespace Mod.Cheats
             {
                 if (displayInfo.actorClass == DisplayActorClass.Boss) return Color.red;
                 if (displayInfo.actorClass == DisplayActorClass.Rare) return Color.yellow;
-                if (displayInfo.actorClass == DisplayActorClass.Magic) return Color.blue;
+                if (displayInfo.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
             }
             return Color.white;
+        }
+        
+        private static Sprite? GetSpriteForColor(Color color)
+        {
+            // Map arbitrary input color to the closest cached sprite
+            if (color.Equals(Color.red)) return spriteRed;
+            if (color.Equals(Color.yellow)) return spriteYellow;
+            if (Approximately(color, MagicLightBlue) || color.Equals(Color.blue)) return spriteBlue;
+            return spriteWhite;
+        }
+        
+        private static bool Approximately(Color a, Color b)
+        {
+            return Mathf.Abs(a.r - b.r) < 0.02f &&
+                   Mathf.Abs(a.g - b.g) < 0.02f &&
+                   Mathf.Abs(a.b - b.b) < 0.02f &&
+                   Mathf.Abs(a.a - b.a) < 0.02f;
         }
         
         private static bool ShouldShowEnemyType(ActorVisuals enemy)
@@ -348,16 +429,27 @@ namespace Mod.Cheats
                     return;
                 }
                 
+                // Clamp and unify size to avoid zero/invalid textures
+                int size = Mathf.Max(2, Mathf.RoundToInt(Settings.minimapCircleSize));
+                Vector2 sizeDelta = new Vector2(size, size);
+                
+                // Resolve sprite from cache; build on-demand fallback if needed
+                Sprite? sprite = GetSpriteForColor(color);
+                if (sprite == null)
+                {
+                    sprite = BuildCircleSprite(Mathf.Max(8, size), color);
+                }
+                
+                // Create object only after we have a valid sprite
                 var circleObj = new GameObject($"EnemyCircle_{enemy.name}");
                 circleObj.transform.SetParent(iconsContainer.transform, false);
                 
                 var rectTransform = circleObj.AddComponent<RectTransform>();
                 rectTransform.anchoredPosition = position;
-                rectTransform.sizeDelta = new Vector2(Settings.minimapCircleSize, Settings.minimapCircleSize);
+                rectTransform.sizeDelta = sizeDelta;
                 
                 var image = circleObj.AddComponent<UnityEngine.UI.Image>();
-                var texture = CreateCircleTexture((int)Settings.minimapCircleSize, color);
-                var sprite = Sprite.Create(texture, new Rect(0, 0, Settings.minimapCircleSize, Settings.minimapCircleSize), new Vector2(0.5f, 0.5f));
+                image.raycastTarget = false;
                 image.sprite = sprite;
                 
                 enemyCircles.Add(circleObj);
@@ -369,23 +461,9 @@ namespace Mod.Cheats
             }
         }
         
-        private static void CreateDebugCircleAtCenter(Color color)
-        {
-            if (iconsContainer == null) return;
-            var go = new GameObject("EnemyCircle_DebugCenter");
-            go.transform.SetParent(iconsContainer.transform, false);
-            var rt = go.AddComponent<RectTransform>();
-            rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(Settings.minimapCircleSize * 1.5f, Settings.minimapCircleSize * 1.5f);
-            var img = go.AddComponent<UnityEngine.UI.Image>();
-            var tex = CreateCircleTexture((int)(Settings.minimapCircleSize * 1.5f), color);
-            var spr = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-            img.sprite = spr;
-            enemyCircles.Add(go);
-        }
-        
         private static Texture2D CreateCircleTexture(int size, Color color)
         {
+            size = Mathf.Max(2, size);
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
             var center = new Vector2(size / 2f, size / 2f);
@@ -419,7 +497,7 @@ namespace Mod.Cheats
             {
                 if (circle != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(circle);
+                    UnityEngine.Object.Destroy(circle);
                 }
             }
             enemyCircles.Clear();
