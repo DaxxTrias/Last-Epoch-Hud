@@ -572,6 +572,7 @@ namespace Mod
 		}
 
 		// Added manual import/export helpers for JSON
+		/*
 		public static bool ImportFromStandalone()
 		{
 			var path = GetStandaloneConfigPath();
@@ -595,5 +596,6 @@ namespace Mod
 			SaveStandalone();
 			return File.Exists(path);
 		}
+		*/
 	}
 } 

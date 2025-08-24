@@ -210,6 +210,7 @@ namespace Mod
             #endregion
 
             // Manual settings import/export (JSON)
+            /*
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Import Settings (JSON)"))
             {
@@ -233,6 +234,7 @@ namespace Mod
                 }
             }
             GUILayout.EndHorizontal();
+            */
 
             GUILayout.EndVertical();
 
