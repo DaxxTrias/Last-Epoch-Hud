@@ -313,8 +313,42 @@ namespace Mod.Cheats
                 MelonLogger.Error($"AntiIdleSystem.OnSteamConnectionStatusChanged error: {e.Message}");
             }
         }
-        
-        #endregion
+		
+		/// <summary>
+		/// Called when the in-game settings menu is opened to register user presence.
+		/// </summary>
+		public static void OnMenuOpened()
+		{
+			try
+			{
+				if (!Settings.suppressKeepAliveOnActivity)
+					return;
+				RegisterActivity(Settings.activitySuppressionSeconds);
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"AntiIdleSystem.OnMenuOpened error: {e.Message}");
+			}
+		}
+		
+		/// <summary>
+		/// Called when the in-game settings menu is closed to register user presence.
+		/// </summary>
+		public static void OnMenuClosed()
+		{
+			try
+			{
+				if (!Settings.suppressKeepAliveOnActivity)
+					return;
+				RegisterActivity(Settings.activitySuppressionSeconds);
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"AntiIdleSystem.OnMenuClosed error: {e.Message}");
+			}
+		}
+		
+		#endregion
         
         #region Patch Integration Methods
         

@@ -302,6 +302,13 @@ namespace Mod
                     SettingsConfig.ApplyToPreferencesFromSettings();
                     SettingsConfig.Save();
                     MelonLogger.Msg("[LEHud] Preferences Saved!");
+                    // Notify Anti-Idle suppression of user presence
+                    AntiIdleSystem.OnMenuClosed();
+                }
+                else if (!wasVisible && guiVisible)
+                {
+                    // Notify Anti-Idle suppression of user presence
+                    AntiIdleSystem.OnMenuOpened();
                 }
             }
 
