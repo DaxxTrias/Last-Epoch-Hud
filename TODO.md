@@ -20,7 +20,6 @@
 - Use similar approach to `DisplayActorClass` for shrine types
 - Consider shrine states (active/inactive, buffed/unbuffed)
 
-
 ### 2. Auto Disconnect on Low Health
 
 **Status**: ✅ Deployed (UI-based quit; optional gating by potions)  

@@ -32,6 +32,10 @@ namespace Mod
 		{
 			try
 			{
+				// Initialize preferences and load into Settings before applying patches
+				SettingsConfig.Init();
+				SettingsConfig.LoadIntoSettings();
+
 				s_harmony = new HarmonyLib.Harmony(HarmonyId);
 				s_harmony.PatchAll(typeof(Mod).Assembly);
 				MelonLogger.Msg("[Mod] Harmony patches applied");
@@ -144,6 +148,10 @@ namespace Mod
 			Drawing.Cleanup();
 			try
 			{
+				// Persist current runtime settings to preferences on quit
+				SettingsConfig.ApplyToPreferencesFromSettings();
+				SettingsConfig.Save();
+
 				s_harmony?.UnpatchSelf();
 				MelonLogger.Msg("[Mod] Harmony patches unpatched on quit");
 			}
@@ -160,7 +168,15 @@ namespace Mod
 
 		public override void OnPreferencesLoaded() // Runs when Melon Preferences get loaded.
 		{
-			//MelonLogger.Msg("OnPreferencesLoaded");
+			try
+			{
+				SettingsConfig.LoadIntoSettings();
+				MelonLogger.Msg("[Mod] Preferences loaded into Settings");
+			}
+			catch (System.Exception e)
+			{
+				MelonLogger.Error($"[Mod] Preferences load error: {e.Message}");
+			}
 		}
 
 		private static void VerifyNetworkingTargets()
