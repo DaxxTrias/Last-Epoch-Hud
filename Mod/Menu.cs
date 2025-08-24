@@ -205,6 +205,35 @@ namespace Mod
                 Settings.autoDisconnectOnlyWhenNoPotions = GUILayout.Toggle(Settings.autoDisconnectOnlyWhenNoPotions, "Only Disconnect When Out of Potions");
             }
 
+            #region spacing
+            GUILayout.Space(10);
+            #endregion
+
+            // Manual settings import/export (JSON)
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Import Settings (JSON)"))
+            {
+                if (SettingsConfig.ImportFromStandalone())
+                {
+                    MelonLogger.Msg("[Settings] Imported settings from JSON");
+                    // Apply immediate effects for certain patches
+                    GameMods.FogRemover();
+                    GameMods.playerLantern();
+                }
+                else
+                {
+                    MelonLogger.Msg("[Settings] No JSON config found to import");
+                }
+            }
+            if (GUILayout.Button("Export Settings (JSON)"))
+            {
+                if (SettingsConfig.ExportToStandalone())
+                {
+                    MelonLogger.Msg("[Settings] Exported settings to JSON");
+                }
+            }
+            GUILayout.EndHorizontal();
+
             GUILayout.EndVertical();
 
             Rect resizeGripRect = new Rect(
@@ -263,7 +292,15 @@ namespace Mod
         {
             if (Input.GetKeyDown(KeyCode.Insert))
             {
+                bool wasVisible = guiVisible;
                 guiVisible = !guiVisible;
+                // If closing the menu, immediately persist current settings to MelonPreferences
+                if (wasVisible && !guiVisible)
+                {
+                    SettingsConfig.ApplyToPreferencesFromSettings();
+                    SettingsConfig.Save();
+                    MelonLogger.Msg("[LEHud] Preferences Saved!");
+                }
             }
 
             // Debug key for auto-potion system (F12)

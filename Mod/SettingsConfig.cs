@@ -8,14 +8,14 @@ namespace Mod
 {
 	internal static class SettingsConfig
 	{
-		private const string CatGeneral = "LEHud.General";
-		private const string CatPatches = "LEHud.Patches";
-		private const string CatAutoPotion = "LEHud.AutoPotion";
-		private const string CatAntiIdle = "LEHud.AntiIdle";
-		private const string CatAutoDisconnect = "LEHud.AutoDisconnect";
-		private const string CatMinimap = "LEHud.Minimap";
-		private const string CatNPC = "LEHud.NPC";
-		private const string CatItems = "LEHud.Items";
+		private const string CatGeneral = "LEHud_General";
+		private const string CatPatches = "LEHud_Patches";
+		private const string CatAutoPotion = "LEHud_AutoPotion";
+		private const string CatAntiIdle = "LEHud_AntiIdle";
+		private const string CatAutoDisconnect = "LEHud_AutoDisconnect";
+		private const string CatMinimap = "LEHud_Minimap";
+		private const string CatNPC = "LEHud_NPC";
+		private const string CatItems = "LEHud_Items";
 
 		// Categories
 		private static MelonPreferences_Category? _general;
@@ -82,8 +82,13 @@ namespace Mod
 		private static readonly Dictionary<string, MelonPreferences_Entry<bool>> _npcDrawingEntries = new();
 		private static readonly Dictionary<string, MelonPreferences_Entry<bool>> _itemDrawingEntries = new();
 
+		// Initialization guard against early OnPreferencesLoaded callbacks
+		private static bool _isInitialized;
+		public static bool IsInitialized => _isInitialized;
+
 		public static void Init()
 		{
+			_isInitialized = false;
 			_general = MelonPreferences.CreateCategory(CatGeneral, "LEHud - General");
 			_patches = MelonPreferences.CreateCategory(CatPatches, "LEHud - Patches");
 			_autoPotion = MelonPreferences.CreateCategory(CatAutoPotion, "LEHud - AutoPotion");
@@ -155,11 +160,12 @@ namespace Mod
 			EnsureDictionaryEntries(Settings.itemDrawings, _itemDrawingEntries, _items, prefix: "Draw_");
 
 			// Removed premature save; saving occurs after loads or on user changes
+			_isInitialized = true;
 		}
 
 		public static void LoadIntoSettings()
 		{
-			if (_general == null)
+			if (_general == null || !_isInitialized)
 				return;
 
 			Settings.mapHack = _mapHack!.Value;
@@ -214,7 +220,7 @@ namespace Mod
 
 		public static void ApplyToPreferencesFromSettings()
 		{
-			if (_general == null)
+			if (_general == null || !_isInitialized)
 				return;
 
 			_mapHack!.Value = Settings.mapHack;
@@ -270,6 +276,21 @@ namespace Mod
 		public static void Save()
 		{
 			MelonPreferences.Save();
+			try
+			{
+				_general?.SaveToFile();
+				_patches?.SaveToFile();
+				_autoPotion?.SaveToFile();
+				_antiIdle?.SaveToFile();
+				_autoDisconnect?.SaveToFile();
+				_minimap?.SaveToFile();
+				_npc?.SaveToFile();
+				_items?.SaveToFile();
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"[Settings] Explicit category save error: {e.Message}");
+			}
 		}
 
 		// Standalone file (JSON) import/export under UserData/LEHud.cfg
@@ -548,6 +569,31 @@ namespace Mod
 			{
 				target[kv.Key] = kv.Value;
 			}
+		}
+
+		// Added manual import/export helpers for JSON
+		public static bool ImportFromStandalone()
+		{
+			var path = GetStandaloneConfigPath();
+			if (!File.Exists(path))
+			{
+				MelonLogger.Msg($"[Settings] Standalone config not found: {path}");
+				return false;
+			}
+			var loaded = LoadStandaloneIfExists();
+			if (loaded)
+			{
+				ApplyToPreferencesFromSettings();
+				Save();
+			}
+			return loaded;
+		}
+
+		public static bool ExportToStandalone()
+		{
+			var path = GetStandaloneConfigPath();
+			SaveStandalone();
+			return File.Exists(path);
 		}
 	}
 } 
