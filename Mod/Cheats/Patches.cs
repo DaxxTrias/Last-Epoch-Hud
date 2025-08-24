@@ -509,7 +509,7 @@ namespace Mod.Cheats.Patches
             {
             	public static void Postfix(ref GroundItemManager __instance, ref int __state, ref Actor player, ref ItemData itemData, ref Vector3 location, ref bool playDropSound)
             	{
-            		MelonLogger.Msg("[Mod] GroundItemManager.dropItemForPlayer hooked");
+            		MelonLogger.Msg("[LEHud] GroundItemManager.dropItemForPlayer hooked");
             		if (ItemList.isCraftingItem(itemData.itemType) && Settings.pickupCrafting)
             		{
             			__instance.TryGetGroundItemList(player, out GroundItemList groundItemList);

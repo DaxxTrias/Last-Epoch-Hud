@@ -93,6 +93,18 @@ namespace Mod
 			_npc = MelonPreferences.CreateCategory(CatNPC, "LEHud - NPC");
 			_items = MelonPreferences.CreateCategory(CatItems, "LEHud - Items");
 
+			// Bind categories to a single prefs file and autoload existing values before creating entries
+			var prefsDir = System.IO.Path.GetDirectoryName(GetStandaloneConfigPath())!;
+			var prefsPath = System.IO.Path.Combine(prefsDir, "LEHud.melon.cfg");
+			_general.SetFilePath(prefsPath, autoload: true);
+			_patches.SetFilePath(prefsPath, autoload: true);
+			_autoPotion.SetFilePath(prefsPath, autoload: true);
+			_antiIdle.SetFilePath(prefsPath, autoload: true);
+			_autoDisconnect.SetFilePath(prefsPath, autoload: true);
+			_minimap.SetFilePath(prefsPath, autoload: true);
+			_npc.SetFilePath(prefsPath, autoload: true);
+			_items.SetFilePath(prefsPath, autoload: true);
+
 			_mapHack = _general.CreateEntry("MapHack", Settings.mapHack);
 			_drawDistance = _general.CreateEntry("DrawDistance", Settings.drawDistance);
 			_timeScale = _general.CreateEntry("TimeScale", Settings.timeScale);
@@ -142,8 +154,7 @@ namespace Mod
 			EnsureDictionaryEntries(Settings.npcDrawings, _npcDrawingEntries, _npc, prefix: "Draw_");
 			EnsureDictionaryEntries(Settings.itemDrawings, _itemDrawingEntries, _items, prefix: "Draw_");
 
-			// Materialize entries on disk so users see them immediately on first run
-			MelonPreferences.Save();
+			// Removed premature save; saving occurs after loads or on user changes
 		}
 
 		public static void LoadIntoSettings()
