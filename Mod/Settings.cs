@@ -23,7 +23,7 @@ namespace Mod
 
         // Anti-Idle suppression controls
         public static bool suppressKeepAliveOnActivity = true; // Pause synthetic keepalive when user activity is detected
-        public static float activitySuppressionSeconds = 120f; // How long to suppress after input/activity
+        public static float activitySuppressionSeconds = 60f; // How long to suppress after input/activity
         public static float sceneChangeSuppressionSeconds = 150f; // Suppress on scene change
         public static float networkActivitySuppressionSeconds = 45f; // Suppress after any outbound message
 
