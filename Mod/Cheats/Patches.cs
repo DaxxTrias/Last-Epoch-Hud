@@ -946,22 +946,22 @@ namespace Mod.Cheats.Patches
                 }
             }
 
-			[HarmonyPatch(typeof(NetMultiClient), "Connect")]
+			[HarmonyPatch(typeof(NetMultiClient), "Connect", new Type[] { typeof(IPEndPoint), typeof(NetOutgoingMessage) })]
 			public class NetMultiClient_Connect
 			{
-				private static void Prefix(NetMultiClient __instance, IPEndPoint endPoint, NetOutgoingMessage hailMessage)
-                {
-                    try
-                    {
-                        // Reduced: no verbose prefix log
-                    }
-                    catch (Exception e)
-                    {
-                        MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Prefix error: {e.Message}");
-                    }
-                }
+				private static void Prefix(NetMultiClient __instance)
+				{
+					try
+					{
+						// Reduced: no verbose prefix log
+					}
+					catch (Exception e)
+					{
+						MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Prefix error: {e.Message}");
+					}
+				}
 
-                private static void Postfix(NetMultiClient __instance, IPEndPoint endPoint, NetOutgoingMessage hailMessage, NetConnection __result)
+				private static void Postfix(NetMultiClient __instance, NetConnection __result)
 				// private static void Postfix(Il2CppLidgren.Network.NetMultiClient __instance, Il2CppLidgren.Network.NetConnection __result)
 				{
 					try
@@ -973,9 +973,9 @@ namespace Mod.Cheats.Patches
 						}
 					}
 					catch (Exception e)
-                    {
-                        MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Postfix error: {e.Message}");
-                    }
+					{
+						MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Connect Postfix error: {e.Message}");
+					}
 				}
 			}
 
