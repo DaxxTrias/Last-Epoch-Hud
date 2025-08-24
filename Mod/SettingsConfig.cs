@@ -1,5 +1,8 @@
 using MelonLoader;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System;
 
 namespace Mod
 {
@@ -258,6 +261,81 @@ namespace Mod
 			MelonPreferences.Save();
 		}
 
+		// Standalone file (JSON) import/export under UserData/LEHud.cfg
+		public static bool LoadStandaloneIfExists()
+		{
+			try
+			{
+				var path = GetStandaloneConfigPath();
+				if (!File.Exists(path))
+					return false;
+
+				var json = File.ReadAllText(path);
+				var snapshot = JsonSerializer.Deserialize<SettingsSnapshot>(json);
+				if (snapshot == null)
+					return false;
+
+				ApplySnapshot(snapshot);
+				MelonLogger.Msg($"[Settings] Loaded standalone config: {path}");
+				return true;
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"[Settings] LoadStandaloneIfExists error: {e.Message}");
+				return false;
+			}
+		}
+
+		public static void SaveStandalone()
+		{
+			try
+			{
+				var path = GetStandaloneConfigPath();
+				Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+				var snapshot = CreateSnapshot();
+				var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+				File.WriteAllText(path, json);
+				MelonLogger.Msg($"[Settings] Saved standalone config: {path}");
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"[Settings] SaveStandalone error: {e.Message}");
+			}
+		}
+
+		public static string GetStandaloneConfigPath()
+		{
+			// Resolve UserData directory from MelonEnvironment (new) or MelonUtils (old) via reflection to avoid obsolete warnings
+			try
+			{
+				var envType = Type.GetType("MelonLoader.MelonEnvironment, MelonLoader");
+				if (envType != null)
+				{
+					var prop = envType.GetProperty("UserDataDirectory", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+					if (prop != null)
+					{
+						var dir = prop.GetValue(null) as string;
+						if (!string.IsNullOrEmpty(dir))
+							return Path.Combine(dir!, "LEHud.cfg");
+					}
+				}
+				var utilsType = Type.GetType("MelonLoader.MelonUtils, MelonLoader");
+				if (utilsType != null)
+				{
+					var prop = utilsType.GetProperty("UserDataDirectory", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+					if (prop != null)
+					{
+						var dir = prop.GetValue(null) as string;
+						if (!string.IsNullOrEmpty(dir))
+							return Path.Combine(dir!, "LEHud.cfg");
+					}
+				}
+			}
+			catch { }
+			var fallbackDir = Path.Combine(AppContext.BaseDirectory, "UserData");
+			return Path.Combine(fallbackDir, "LEHud.cfg");
+		}
+
 		private static float Clamp(float value, float min, float max)
 		{
 			if (value < min) return min;
@@ -310,6 +388,154 @@ namespace Mod
 				{
 					entry.Value = kv.Value;
 				}
+			}
+		}
+
+		// Snapshot DTO for JSON IO
+		private sealed class SettingsSnapshot
+		{
+			public bool mapHack { get; set; }
+			public float drawDistance { get; set; }
+			public float autoHealthPotion { get; set; }
+			public float autoPotionCooldown { get; set; }
+			public float timeScale { get; set; }
+			public bool useAutoPot { get; set; }
+			public bool useLootFilter { get; set; }
+			public bool removeFog { get; set; }
+			public bool cameraZoomUnlock { get; set; }
+			public bool minimapZoomUnlock { get; set; }
+			public bool playerLantern { get; set; }
+			public bool useAnyWaypoint { get; set; }
+			public bool useAntiIdle { get; set; }
+			public float antiIdleInterval { get; set; }
+			public bool useSyntheticKeepAlive { get; set; }
+			public float keepAliveInterval { get; set; }
+			public bool suppressKeepAliveOnActivity { get; set; }
+			public float activitySuppressionSeconds { get; set; }
+			public float sceneChangeSuppressionSeconds { get; set; }
+			public float networkActivitySuppressionSeconds { get; set; }
+			public bool useAutoDisconnect { get; set; }
+			public float autoDisconnectHealthPercent { get; set; }
+			public float autoDisconnectCooldownSeconds { get; set; }
+			public bool autoDisconnectOnlyWhenNoPotions { get; set; }
+			public bool showMinimapEnemyCircles { get; set; }
+			public float minimapCircleSize { get; set; }
+			public float minimapScale { get; set; }
+			public bool autoScaleMinimap { get; set; }
+			public float minimapScaleFactor { get; set; }
+			public float minimapWorldRadiusMeters { get; set; }
+			public bool minimapFlipX { get; set; }
+			public bool minimapFlipY { get; set; }
+			public float minimapBasisRotationDegrees { get; set; }
+			public bool showMagicMonsters { get; set; }
+			public bool showRareMonsters { get; set; }
+			public bool showWhiteMonsters { get; set; }
+			public float minimapOffsetX { get; set; }
+			public float minimapOffsetY { get; set; }
+			public Dictionary<string, bool> npcClassifications { get; set; } = new();
+			public Dictionary<string, bool> npcDrawings { get; set; } = new();
+			public Dictionary<string, bool> itemDrawings { get; set; } = new();
+		}
+
+		private static SettingsSnapshot CreateSnapshot()
+		{
+			return new SettingsSnapshot
+			{
+				mapHack = Settings.mapHack,
+				drawDistance = Settings.drawDistance,
+				autoHealthPotion = Settings.autoHealthPotion,
+				autoPotionCooldown = Settings.autoPotionCooldown,
+				timeScale = Settings.timeScale,
+				useAutoPot = Settings.useAutoPot,
+				useLootFilter = Settings.useLootFilter,
+				removeFog = Settings.removeFog,
+				cameraZoomUnlock = Settings.cameraZoomUnlock,
+				minimapZoomUnlock = Settings.minimapZoomUnlock,
+				playerLantern = Settings.playerLantern,
+				useAnyWaypoint = Settings.useAnyWaypoint,
+				useAntiIdle = Settings.useAntiIdle,
+				antiIdleInterval = Settings.antiIdleInterval,
+				useSyntheticKeepAlive = Settings.useSyntheticKeepAlive,
+				keepAliveInterval = Settings.keepAliveInterval,
+				suppressKeepAliveOnActivity = Settings.suppressKeepAliveOnActivity,
+				activitySuppressionSeconds = Settings.activitySuppressionSeconds,
+				sceneChangeSuppressionSeconds = Settings.sceneChangeSuppressionSeconds,
+				networkActivitySuppressionSeconds = Settings.networkActivitySuppressionSeconds,
+				useAutoDisconnect = Settings.useAutoDisconnect,
+				autoDisconnectHealthPercent = Settings.autoDisconnectHealthPercent,
+				autoDisconnectCooldownSeconds = Settings.autoDisconnectCooldownSeconds,
+				autoDisconnectOnlyWhenNoPotions = Settings.autoDisconnectOnlyWhenNoPotions,
+				showMinimapEnemyCircles = Settings.showMinimapEnemyCircles,
+				minimapCircleSize = Settings.minimapCircleSize,
+				minimapScale = Settings.minimapScale,
+				autoScaleMinimap = Settings.autoScaleMinimap,
+				minimapScaleFactor = Settings.minimapScaleFactor,
+				minimapWorldRadiusMeters = Settings.minimapWorldRadiusMeters,
+				minimapFlipX = Settings.minimapFlipX,
+				minimapFlipY = Settings.minimapFlipY,
+				minimapBasisRotationDegrees = Settings.minimapBasisRotationDegrees,
+				showMagicMonsters = Settings.showMagicMonsters,
+				showRareMonsters = Settings.showRareMonsters,
+				showWhiteMonsters = Settings.showWhiteMonsters,
+				minimapOffsetX = Settings.minimapOffsetX,
+				minimapOffsetY = Settings.minimapOffsetY,
+				npcClassifications = new Dictionary<string, bool>(Settings.npcClassifications),
+				npcDrawings = new Dictionary<string, bool>(Settings.npcDrawings),
+				itemDrawings = new Dictionary<string, bool>(Settings.itemDrawings)
+			};
+		}
+
+		private static void ApplySnapshot(SettingsSnapshot s)
+		{
+			Settings.mapHack = s.mapHack;
+			Settings.drawDistance = Clamp(s.drawDistance, 0f, 1000f);
+			Settings.autoHealthPotion = Clamp(s.autoHealthPotion, 0f, 100f);
+			Settings.autoPotionCooldown = Clamp(s.autoPotionCooldown, 0.1f, 30f);
+			Settings.timeScale = Clamp(s.timeScale, 0.1f, 10f);
+			Settings.useAutoPot = s.useAutoPot;
+			Settings.useLootFilter = s.useLootFilter;
+			Settings.removeFog = s.removeFog;
+			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
+			Settings.minimapZoomUnlock = s.minimapZoomUnlock;
+			Settings.playerLantern = s.playerLantern;
+			Settings.useAnyWaypoint = s.useAnyWaypoint;
+			Settings.useAntiIdle = s.useAntiIdle;
+			Settings.antiIdleInterval = Clamp(s.antiIdleInterval, 10f, 600f);
+			Settings.useSyntheticKeepAlive = s.useSyntheticKeepAlive;
+			Settings.keepAliveInterval = Clamp(s.keepAliveInterval, 5f, 300f);
+			Settings.suppressKeepAliveOnActivity = s.suppressKeepAliveOnActivity;
+			Settings.activitySuppressionSeconds = Clamp(s.activitySuppressionSeconds, 0f, 600f);
+			Settings.sceneChangeSuppressionSeconds = Clamp(s.sceneChangeSuppressionSeconds, 0f, 600f);
+			Settings.networkActivitySuppressionSeconds = Clamp(s.networkActivitySuppressionSeconds, 0f, 600f);
+			Settings.useAutoDisconnect = s.useAutoDisconnect;
+			Settings.autoDisconnectHealthPercent = Clamp(s.autoDisconnectHealthPercent, 0f, 100f);
+			Settings.autoDisconnectCooldownSeconds = Clamp(s.autoDisconnectCooldownSeconds, 1f, 300f);
+			Settings.autoDisconnectOnlyWhenNoPotions = s.autoDisconnectOnlyWhenNoPotions;
+			Settings.showMinimapEnemyCircles = s.showMinimapEnemyCircles;
+			Settings.minimapCircleSize = Clamp(s.minimapCircleSize, 1f, 64f);
+			Settings.minimapScale = Clamp(s.minimapScale, 0.1f, 100f);
+			Settings.autoScaleMinimap = s.autoScaleMinimap;
+			Settings.minimapScaleFactor = Clamp(s.minimapScaleFactor, 0.1f, 20f);
+			Settings.minimapWorldRadiusMeters = Clamp(s.minimapWorldRadiusMeters, 10f, 10000f);
+			Settings.minimapFlipX = s.minimapFlipX;
+			Settings.minimapFlipY = s.minimapFlipY;
+			Settings.minimapBasisRotationDegrees = Clamp(s.minimapBasisRotationDegrees, -360f, 360f);
+			Settings.showMagicMonsters = s.showMagicMonsters;
+			Settings.showRareMonsters = s.showRareMonsters;
+			Settings.showWhiteMonsters = s.showWhiteMonsters;
+			Settings.minimapOffsetX = Clamp(s.minimapOffsetX, -1000f, 1000f);
+			Settings.minimapOffsetY = Clamp(s.minimapOffsetY, -1000f, 1000f);
+
+			ApplyDictionarySafely(Settings.npcClassifications, s.npcClassifications);
+			ApplyDictionarySafely(Settings.npcDrawings, s.npcDrawings);
+			ApplyDictionarySafely(Settings.itemDrawings, s.itemDrawings);
+		}
+
+		private static void ApplyDictionarySafely(Dictionary<string, bool> target, Dictionary<string, bool> source)
+		{
+			foreach (var kv in source)
+			{
+				target[kv.Key] = kv.Value;
 			}
 		}
 	}

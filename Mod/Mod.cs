@@ -34,7 +34,16 @@ namespace Mod
 			{
 				// Initialize preferences and load into Settings before applying patches
 				SettingsConfig.Init();
-				SettingsConfig.LoadIntoSettings();
+				if (SettingsConfig.LoadStandaloneIfExists())
+				{
+					// Push standalone values into MelonPreferences and save so both stores are in sync
+					SettingsConfig.ApplyToPreferencesFromSettings();
+					SettingsConfig.Save();
+				}
+				else
+				{
+					SettingsConfig.LoadIntoSettings();
+				}
 
 				s_harmony = new HarmonyLib.Harmony(HarmonyId);
 				s_harmony.PatchAll(typeof(Mod).Assembly);
@@ -151,6 +160,7 @@ namespace Mod
 				// Persist current runtime settings to preferences on quit
 				SettingsConfig.ApplyToPreferencesFromSettings();
 				SettingsConfig.Save();
+				SettingsConfig.SaveStandalone();
 
 				s_harmony?.UnpatchSelf();
 				MelonLogger.Msg("[Mod] Harmony patches unpatched on quit");
