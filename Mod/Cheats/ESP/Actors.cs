@@ -104,26 +104,7 @@ namespace Mod.Cheats.ESP
                 return true;
             }
 
-            // Display info fallbacks
-            var info = go.GetComponent<ActorDisplayInformation>();
-            if (info != null)
-            {
-                try
-                {
-                    var localized = info.GetLocalizedName();
-                    if (!string.IsNullOrEmpty(localized) && localized.IndexOf("Lizard", ic) >= 0)
-                        return true;
-                }
-                catch (Exception)
-                {
-                }
-
-                if (!string.IsNullOrEmpty(info.displayName) && info.displayName.IndexOf("Lizard", ic) >= 0)
-                {
-                    return true;
-                }
-            }
-
+            // Intentionally avoid display/localized name checks to prevent false positives
             return false;
         }
 
