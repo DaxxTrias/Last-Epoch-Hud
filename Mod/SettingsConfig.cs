@@ -48,12 +48,12 @@ namespace Mod
 		// Entries - AntiIdle
 		private static MelonPreferences_Entry<bool>? _useAntiIdle;
 		private static MelonPreferences_Entry<float>? _antiIdleInterval;
-		private static MelonPreferences_Entry<bool>? _useSyntheticKeepAlive;
-		private static MelonPreferences_Entry<float>? _keepAliveInterval;
 		private static MelonPreferences_Entry<bool>? _suppressKeepAliveOnActivity;
 		private static MelonPreferences_Entry<float>? _activitySuppressionSeconds;
 		private static MelonPreferences_Entry<float>? _sceneChangeSuppressionSeconds;
-		private static MelonPreferences_Entry<float>? _networkActivitySuppressionSeconds;
+		// private static MelonPreferences_Entry<float>? _networkActivitySuppressionSeconds;
+		private static MelonPreferences_Entry<bool>? _useSimpleAntiIdle;
+		private static MelonPreferences_Entry<float>? _simpleAntiIdleInterval;
 
 		// Entries - AutoDisconnect
 		private static MelonPreferences_Entry<bool>? _useAutoDisconnect;
@@ -127,12 +127,12 @@ namespace Mod
 
 			_useAntiIdle = _antiIdle.CreateEntry("UseAntiIdle", Settings.useAntiIdle);
 			_antiIdleInterval = _antiIdle.CreateEntry("AntiIdleIntervalSeconds", Settings.antiIdleInterval);
-			_useSyntheticKeepAlive = _antiIdle.CreateEntry("UseSyntheticKeepAlive", Settings.useSyntheticKeepAlive);
-			_keepAliveInterval = _antiIdle.CreateEntry("KeepAliveIntervalSeconds", Settings.keepAliveInterval);
+			_useSimpleAntiIdle = _antiIdle.CreateEntry("UseSimpleAntiIdle", Settings.useSimpleAntiIdle);
+			_simpleAntiIdleInterval = _antiIdle.CreateEntry("SimpleAntiIdleIntervalSeconds", Settings.simpleAntiIdleInterval);
 			_suppressKeepAliveOnActivity = _antiIdle.CreateEntry("SuppressKeepAliveOnActivity", Settings.suppressKeepAliveOnActivity);
 			_activitySuppressionSeconds = _antiIdle.CreateEntry("ActivitySuppressionSeconds", Settings.activitySuppressionSeconds);
 			_sceneChangeSuppressionSeconds = _antiIdle.CreateEntry("SceneChangeSuppressionSeconds", Settings.sceneChangeSuppressionSeconds);
-			_networkActivitySuppressionSeconds = _antiIdle.CreateEntry("NetworkActivitySuppressionSeconds", Settings.networkActivitySuppressionSeconds);
+			// _networkActivitySuppressionSeconds = _antiIdle.CreateEntry("NetworkActivitySuppressionSeconds", Settings.networkActivitySuppressionSeconds);
 
 			_useAutoDisconnect = _autoDisconnect.CreateEntry("UseAutoDisconnect", Settings.useAutoDisconnect);
 			_autoDisconnectHealthPercent = _autoDisconnect.CreateEntry("AutoDisconnectHealthPercent", Settings.autoDisconnectHealthPercent);
@@ -185,12 +185,12 @@ namespace Mod
 
 			Settings.useAntiIdle = _useAntiIdle!.Value;
 			Settings.antiIdleInterval = Clamp(_antiIdleInterval!.Value, 10f, 600f);
-			Settings.useSyntheticKeepAlive = _useSyntheticKeepAlive!.Value;
-			Settings.keepAliveInterval = Clamp(_keepAliveInterval!.Value, 5f, 300f);
+			Settings.useSimpleAntiIdle = _useSimpleAntiIdle!.Value;
+			Settings.simpleAntiIdleInterval = Clamp(_simpleAntiIdleInterval!.Value, 60f, 1800f);
 			Settings.suppressKeepAliveOnActivity = _suppressKeepAliveOnActivity!.Value;
 			Settings.activitySuppressionSeconds = Clamp(_activitySuppressionSeconds!.Value, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(_sceneChangeSuppressionSeconds!.Value, 0f, 600f);
-			Settings.networkActivitySuppressionSeconds = Clamp(_networkActivitySuppressionSeconds!.Value, 0f, 600f);
+			// Settings.networkActivitySuppressionSeconds = Clamp(_networkActivitySuppressionSeconds!.Value, 0f, 600f);
 
 			Settings.useAutoDisconnect = _useAutoDisconnect!.Value;
 			Settings.autoDisconnectHealthPercent = Clamp(_autoDisconnectHealthPercent!.Value, 0f, 100f);
@@ -240,12 +240,12 @@ namespace Mod
 
 			_useAntiIdle!.Value = Settings.useAntiIdle;
 			_antiIdleInterval!.Value = Settings.antiIdleInterval;
-			_useSyntheticKeepAlive!.Value = Settings.useSyntheticKeepAlive;
-			_keepAliveInterval!.Value = Settings.keepAliveInterval;
+			_useSimpleAntiIdle!.Value = Settings.useSimpleAntiIdle;
+			_simpleAntiIdleInterval!.Value = Settings.simpleAntiIdleInterval;
 			_suppressKeepAliveOnActivity!.Value = Settings.suppressKeepAliveOnActivity;
 			_activitySuppressionSeconds!.Value = Settings.activitySuppressionSeconds;
 			_sceneChangeSuppressionSeconds!.Value = Settings.sceneChangeSuppressionSeconds;
-			_networkActivitySuppressionSeconds!.Value = Settings.networkActivitySuppressionSeconds;
+			// _networkActivitySuppressionSeconds!.Value = Settings.networkActivitySuppressionSeconds;
 
 			_useAutoDisconnect!.Value = Settings.useAutoDisconnect;
 			_autoDisconnectHealthPercent!.Value = Settings.autoDisconnectHealthPercent;
@@ -440,8 +440,6 @@ namespace Mod
 			public bool useAnyWaypoint { get; set; }
 			public bool useAntiIdle { get; set; }
 			public float antiIdleInterval { get; set; }
-			public bool useSyntheticKeepAlive { get; set; }
-			public float keepAliveInterval { get; set; }
 			public bool suppressKeepAliveOnActivity { get; set; }
 			public float activitySuppressionSeconds { get; set; }
 			public float sceneChangeSuppressionSeconds { get; set; }
@@ -467,6 +465,8 @@ namespace Mod
 			public Dictionary<string, bool> npcClassifications { get; set; } = new();
 			public Dictionary<string, bool> npcDrawings { get; set; } = new();
 			public Dictionary<string, bool> itemDrawings { get; set; } = new();
+			public bool useSimpleAntiIdle { get; set; }
+			public float simpleAntiIdleInterval { get; set; }
 		}
 
 		private static SettingsSnapshot CreateSnapshot()
@@ -487,12 +487,10 @@ namespace Mod
 				useAnyWaypoint = Settings.useAnyWaypoint,
 				useAntiIdle = Settings.useAntiIdle,
 				antiIdleInterval = Settings.antiIdleInterval,
-				useSyntheticKeepAlive = Settings.useSyntheticKeepAlive,
-				keepAliveInterval = Settings.keepAliveInterval,
 				suppressKeepAliveOnActivity = Settings.suppressKeepAliveOnActivity,
 				activitySuppressionSeconds = Settings.activitySuppressionSeconds,
 				sceneChangeSuppressionSeconds = Settings.sceneChangeSuppressionSeconds,
-				networkActivitySuppressionSeconds = Settings.networkActivitySuppressionSeconds,
+				// networkActivitySuppressionSeconds = Settings.networkActivitySuppressionSeconds,
 				useAutoDisconnect = Settings.useAutoDisconnect,
 				autoDisconnectHealthPercent = Settings.autoDisconnectHealthPercent,
 				autoDisconnectCooldownSeconds = Settings.autoDisconnectCooldownSeconds,
@@ -513,7 +511,9 @@ namespace Mod
 				minimapOffsetY = Settings.minimapOffsetY,
 				npcClassifications = new Dictionary<string, bool>(Settings.npcClassifications),
 				npcDrawings = new Dictionary<string, bool>(Settings.npcDrawings),
-				itemDrawings = new Dictionary<string, bool>(Settings.itemDrawings)
+				itemDrawings = new Dictionary<string, bool>(Settings.itemDrawings),
+				useSimpleAntiIdle = Settings.useSimpleAntiIdle,
+				simpleAntiIdleInterval = Settings.simpleAntiIdleInterval
 			};
 		}
 
@@ -533,12 +533,10 @@ namespace Mod
 			Settings.useAnyWaypoint = s.useAnyWaypoint;
 			Settings.useAntiIdle = s.useAntiIdle;
 			Settings.antiIdleInterval = Clamp(s.antiIdleInterval, 10f, 600f);
-			Settings.useSyntheticKeepAlive = s.useSyntheticKeepAlive;
-			Settings.keepAliveInterval = Clamp(s.keepAliveInterval, 5f, 300f);
 			Settings.suppressKeepAliveOnActivity = s.suppressKeepAliveOnActivity;
 			Settings.activitySuppressionSeconds = Clamp(s.activitySuppressionSeconds, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(s.sceneChangeSuppressionSeconds, 0f, 600f);
-			Settings.networkActivitySuppressionSeconds = Clamp(s.networkActivitySuppressionSeconds, 0f, 600f);
+			// Settings.networkActivitySuppressionSeconds = Clamp(s.networkActivitySuppressionSeconds, 0f, 600f);
 			Settings.useAutoDisconnect = s.useAutoDisconnect;
 			Settings.autoDisconnectHealthPercent = Clamp(s.autoDisconnectHealthPercent, 0f, 100f);
 			Settings.autoDisconnectCooldownSeconds = Clamp(s.autoDisconnectCooldownSeconds, 1f, 300f);
@@ -557,6 +555,8 @@ namespace Mod
 			Settings.showWhiteMonsters = s.showWhiteMonsters;
 			Settings.minimapOffsetX = Clamp(s.minimapOffsetX, -1000f, 1000f);
 			Settings.minimapOffsetY = Clamp(s.minimapOffsetY, -1000f, 1000f);
+			Settings.useSimpleAntiIdle = s.useSimpleAntiIdle;
+			Settings.simpleAntiIdleInterval = Clamp(s.simpleAntiIdleInterval, 60f, 1800f);
 
 			ApplyDictionarySafely(Settings.npcClassifications, s.npcClassifications);
 			ApplyDictionarySafely(Settings.npcDrawings, s.npcDrawings);

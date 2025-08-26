@@ -68,6 +68,7 @@ namespace Mod.Cheats.Patches
                             bugPanel.Close();
 
                         AutoDisconnect.SetUIBase(__instance);
+                        // AntiIdleSystem.SetUIBase(__instance); // UI pulse disabled; keep for future use
                     }
                 }
             }
@@ -251,6 +252,8 @@ namespace Mod.Cheats.Patches
                         isPatched = true;
                         MelonLogger.Msg("[LeHud.Hooks]  minimap max zoom patched ()");
                         // zoomdefault: 37.5
+                        // zoommin: 12.5
+                        // step size: 5
                     }
                     else if (isPatched && !Settings.minimapZoomUnlock)
                     {
@@ -264,6 +267,18 @@ namespace Mod.Cheats.Patches
             #endregion
 
             #region waypoint patches
+            [HarmonyPatch(typeof(UIWaypointStandard), "OnPointerEnter", new Type[] { typeof(UnityEngine.EventSystems.PointerEventData) })]
+            internal class WayPointUnlock
+            {
+                public static void Prefix(UIWaypointStandard __instance, UnityEngine.EventSystems.PointerEventData eventData)
+                {
+                    //MelonLogger.Msg("[Mod] UIWaypointStandard.OnPointerEnter hooked");
+
+                    if (Settings.useAnyWaypoint && ObjectManager.IsOfflineMode())
+                        __instance.isActive = true;
+                }
+            }
+
             /*
             [HarmonyPatch]
             public class WaypointManager_WaypointsEnabled_Any : MelonMod
@@ -491,19 +506,6 @@ namespace Mod.Cheats.Patches
             #endregion
 
             #region risky game patches
-            [HarmonyPatch(typeof(UIWaypointStandard), "OnPointerEnter", new Type[] { typeof(UnityEngine.EventSystems.PointerEventData) })]
-            internal class WayPointUnlock
-            {
-                public static void Prefix(UIWaypointStandard __instance, UnityEngine.EventSystems.PointerEventData eventData)
-                {
-                    //MelonLogger.Msg("[Mod] UIWaypointStandard.OnPointerEnter hooked");
-
-                    if (Settings.useAnyWaypoint && ObjectManager.IsOfflineMode())
-                        __instance.isActive = true;
-                }
-            }
-
-            //todo: partially working. disabled until can polish (verify it still partially works in new update)
             [HarmonyPatch(typeof(GroundItemManager), "dropItemForPlayer", new Type[] { typeof(Actor), typeof(ItemData), typeof(Vector3), typeof(bool) })]
             public class GroundItemManager_vacuumNearbyStackableItems
             {
@@ -649,7 +651,7 @@ namespace Mod.Cheats.Patches
             //[HarmonyPostfix]
             //private static void UpdateIconSpritePostfix(BaseDMMapIcon __instance)
             //{
-            //	if (__instance == null) return;
+            //	//if (__instance == null) return;
             //
             //	//MelonLogger.Msg($"[Mod] BaseDMMapIcon.UpdateIconSprite: {__instance}");
             //}
@@ -756,6 +758,63 @@ namespace Mod.Cheats.Patches
             #endregion
 
             #region networking / anti-idle patches
+
+            // Force game idle flags to false when Simple Anti-Idle is enabled
+            [HarmonyPatch(typeof(ClientStateController), "get_IsIdle")]
+            public class ClientStateController_IsIdle
+            {
+                private static bool s_logged;
+                public static void Postfix(ref bool __result)
+                {
+                    try
+                    {
+                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        {
+                            if (__result)
+                            {
+                                __result = false;
+                                if (!s_logged)
+                                {
+                                    s_logged = true;
+                                    MelonLogger.Msg("[AntiIdle] ClientStateController.IsIdle forced FALSE");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  ClientStateController.get_IsIdle Postfix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch(typeof(StateController), "get_IsIdle")]
+            public class StateController_IsIdle
+            {
+                private static bool s_logged;
+                public static void Postfix(ref bool __result)
+                {
+                    try
+                    {
+                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        {
+                            if (__result)
+                            {
+                                __result = false;
+                                if (!s_logged)
+                                {
+                                    s_logged = true;
+                                    MelonLogger.Msg("[AntiIdle] StateController.IsIdle forced FALSE");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  StateController.get_IsIdle Postfix error: {e.Message}");
+                    }
+                }
+            }
 
             // NetPeer heartbeat hooks disabled: fields do not expose IL2CPP accessors
             /*
@@ -1081,6 +1140,162 @@ namespace Mod.Cheats.Patches
                     {
                         MelonLogger.Error($"[LeHud.Hooks]  SteamNetworking.ConnectionStatusChanged Prefix error: {e.Message}");
                     }
+                }
+            }
+
+            // Supplementary hook: ClientNetworkService (game wrapper over networking)
+            [HarmonyPatch]
+            public class ClientNetworkService_SendClientMessage
+            {
+                private static System.Reflection.MethodBase? s_target;
+                private static bool s_loggedSkip;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+                        // Generic method: SendClientMessage<T>(T message, NetDeliveryMethod deliveryMethod, int sequenceChannel)
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => m.Name == "SendClientMessage" && m.GetParameters().Length == 3);
+                        if (s_target == null)
+                            return false;
+
+                        // IL2CPP generic methods are unsafe to patch with Harmony here; skip to avoid IL compile errors
+                        var mi = s_target as System.Reflection.MethodInfo;
+                        if (mi != null && (mi.IsGenericMethodDefinition || mi.ContainsGenericParameters))
+                        {
+                            if (!s_loggedSkip)
+                            {
+                                s_loggedSkip = true;
+                                MelonLogger.Warning("[LeHud.Hooks]  Skipping ClientNetworkService.SendClientMessage<T> patch (generic IL2CPP method)");
+                            }
+                            return false;
+                        }
+                        return true;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, [HarmonyArgument(0)] object message, [HarmonyArgument(1)] object deliveryMethod, [HarmonyArgument(2)] int sequenceChannel)
+                {
+                    try
+                    {
+                        AntiIdleSystem.SetClientNetworkService(__instance);
+                        AntiIdleSystem.OnMessageSent(message, deliveryMethod, sequenceChannel);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  ClientNetworkService.SendClientMessage Prefix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class ClientNetworkService_SendMessageBuffer
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+                        // SendMessageBuffer(MessageKey key, ReadOnlySpan<byte> data, NetDeliveryMethod method, int channel)
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => m.Name == "SendMessageBuffer" && m.GetParameters().Length == 4);
+                        if (s_target != null)
+                        {
+                            // Log the parameter type for messageKey for diagnostics
+                            var param = s_target.GetParameters().FirstOrDefault();
+                            if (param != null)
+                            {
+                                MelonLogger.Msg($"[LeHud.Hooks]  ClientNetworkService.SendMessageBuffer: messageKey param type: {param.ParameterType.FullName}");
+                            }
+                            else
+                            {
+                                MelonLogger.Msg("[LeHud.Hooks]  ClientNetworkService.SendMessageBuffer: messageKey param not found.");
+                            }
+                        }
+
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, [HarmonyArgument(0)] object key, [HarmonyArgument(2)] object method, [HarmonyArgument(3)] int channel)
+                {
+                    try
+                    {
+                        AntiIdleSystem.SetClientNetworkService(__instance);
+                        AntiIdleSystem.OnMessageSent(key, method, channel);
+                        AntiIdleSystem.OnWrapperBufferSent(key, method, channel);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  ClientNetworkService.SendMessageBuffer Prefix error: {e.Message}");
+                    }
+                }
+            }
+
+            // Observe wrapper receive paths, if available
+            [HarmonyPatch]
+            public class ClientNetworkService_OnReceiveNetworkMessage
+            {
+                private static System.Reflection.MethodBase? s_target;
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => m.Name.IndexOf("Receive", StringComparison.OrdinalIgnoreCase) >= 0 && m.GetParameters().Length >= 1);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+                public static void Prefix(object __instance, object __0)
+                {
+                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                }
+            }
+
+            [HarmonyPatch]
+            public class ClientNetworkService_OnProcessedIncomingMessage
+            {
+                private static System.Reflection.MethodBase? s_target;
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => m.Name.IndexOf("Processed", StringComparison.OrdinalIgnoreCase) >= 0 && m.Name.IndexOf("IncomingMessage", StringComparison.OrdinalIgnoreCase) >= 0);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+                public static void Prefix(object __instance, object __0)
+                {
+                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
                 }
             }
             #endregion

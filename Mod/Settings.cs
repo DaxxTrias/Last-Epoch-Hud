@@ -23,15 +23,17 @@ namespace Mod
         public static bool pickupCrafting = false;
 
         // Anti-Idle
-        public static float antiIdleInterval = 60f; // Anti-idle action interval in seconds
-        public static bool useSyntheticKeepAlive = true; // Send small user message periodically
-        public static float keepAliveInterval = 20f; // Seconds between synthetic keepalive sends
+        public static float antiIdleInterval = 120f; // Anti-idle action interval in seconds
+
+        // Simple Anti-Idle (UI pulse)
+        public static bool useSimpleAntiIdle = false; // Invoke UI key handlers instead of crafting packets
+        public static float simpleAntiIdleInterval = 300f; // Default 5 minutes
 
         // Anti-Idle suppression controls
         public static bool suppressKeepAliveOnActivity = true; // Pause synthetic keepalive when user activity is detected
         public static float activitySuppressionSeconds = 60f; // How long to suppress after input/activity
-        public static float sceneChangeSuppressionSeconds = 150f; // Suppress on scene change
-        public static float networkActivitySuppressionSeconds = 45f; // Suppress after any outbound message
+        public static float sceneChangeSuppressionSeconds = 60f; // Suppress on scene change
+        // public static float networkActivitySuppressionSeconds = 0f; // Suppress after any outbound message (0 disables)
 
         // Auto-Disconnect on Low Health (disabled by default)
         public static bool useAutoDisconnect = false;
