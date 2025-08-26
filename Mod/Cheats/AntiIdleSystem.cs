@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
+using HarmonyLib;
+using Il2Cpp;
 
 namespace Mod.Cheats
 {
@@ -14,25 +16,54 @@ namespace Mod.Cheats
     {
         private const bool VerboseHeartbeatLogs = false; // Toggle to re-enable detailed heartbeat write logs
         private const bool VerboseStatusLogs = false; // Toggle to re-enable status/info logs
+        private const bool VerboseKeepaliveLogs = false; // Toggle to log successful synthetic keepalives
+        private const bool VerboseActionLogs = false; // Toggle to log legacy action start/complete messages
+        private const bool VerboseSuppressionLogs = false; // Toggle to log activity suppression and suppressed notifies
         #region Fields and Properties
         
         // Networking references (will be set by patches)
         private static object? _netMultiClient;
         private static object? _serverConnection;
         private static object? _netPeer;
+        private static object? _clientNetworkService;
+        private static object? _uiBaseObj;
+        private static MethodInfo? _miSettingsKeyDown;
+        private static MethodInfo? _miMapKeyDown;
+        private static MethodInfo? _miControllerCloseAllKeyDown;
+        // private static readonly bool _loggedNoUi;
+        private static bool _loggedNoTarget;
         
         // State tracking
         private static bool _isInitialized = false;
         private static float _lastStatusCheck = 0f;
         private static float _lastHeartbeat = 0f;
         private static float _lastAntiIdleAction = 0f;
-        private static float _lastSyntheticKeepAlive = 0f;
+        // private static float _lastSyntheticKeepAlive = 0f;
+        private static float _nextSimplePulseAt = 0f;
+        private static float _nextInputNotifyAt = 0f;
+        private static MethodInfo? _miSendInputPerformed;
+        private static bool _loggedNoSendMethod;
+        
+        // Cache last observed delivery + channel from real traffic
+        private static object? _lastDeliveryMethodObj;
+        private static int _lastSequenceChannel = 0;
+        private static float _lastDeliveryCaptureTime = 0f;
+#pragma warning disable CS0414 // Naming Styles
+        private static bool _isSendingSyntheticKeepalive = false; // TODO: Remove this
+#pragma warning restore CS0414 // Naming Styles
+
+        // Wrapper traffic observation
+        private static float _lastWrapperSendTime = 0f;
+        private static float _lastWrapperReceiveTime = 0f;
+        private static readonly Dictionary<string, int> _wrapperKeyCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static float _lastWrapperKeySummaryTime = 0f;
         
         // Configuration
         private const float STATUS_CHECK_INTERVAL = 5f;    // Check connection status every 5 seconds
         private const float HEARTBEAT_INTERVAL = 30f;      // Send heartbeat every 30 seconds
-        private const float ANTI_IDLE_ACTION_INTERVAL = 60f; // Perform anti-idle action every 60 seconds
+        private const float ANTI_IDLE_ACTION_INTERVAL = 120f; // Perform anti-idle action every 60 seconds
         private const float SYNTHETIC_KEEPALIVE_MIN_INTERVAL = 15f; // Safety floor
+        private const float SYNTHETIC_SUPPRESSION_CAP = 60f; // Max time we will honor suppression without sending a keepalive
         
         // Status tracking
         private static string? _lastConnectionStatus;
@@ -43,15 +74,23 @@ namespace Mod.Cheats
 
         // Activity suppression
         private static float _suppressSyntheticUntil = 0f;
-        private static bool _wasSuppressedLastTick = false;
+#pragma warning disable CS0414 // Naming Styles
+        private static readonly bool _wasSuppressedLastTick = false; // TODO: Remove this if not needed by server notif invoke
+#pragma warning restore CS0414 // Naming Styles
         private static float _lastInputCheck = 0f;
         private const float INPUT_CHECK_INTERVAL = 0.25f; // 4x per second
         private static Vector3 _lastMousePos;
         private static bool _lastMousePosInitialized = false;
+        private static string _lastSuppressionReason = "unknown"; // TODO: Remove this
         
         #endregion
         
         #region Public Interface
+        
+        /// <summary>
+        /// Returns true when only the Simple Anti-Idle (server input notify) mode is active.
+        /// </summary>
+        private static bool IsSimpleOnly => Settings.useSimpleAntiIdle && !Settings.useAntiIdle;
         
         /// <summary>
         /// Called from the mod's OnUpdate to perform anti-idle checks and actions
@@ -59,7 +98,7 @@ namespace Mod.Cheats
         public static void OnUpdate()
         {
             // Check if anti-idle is enabled
-            if (!Settings.useAntiIdle)
+            if (!Settings.useAntiIdle && !Settings.useSimpleAntiIdle)
                 return;
                 
             if (!_isInitialized)
@@ -73,56 +112,92 @@ namespace Mod.Cheats
                 // Lightweight input/activity detection (suppresses synthetic keepalive only)
                 DetectUserActivity();
 
-                // Check connection status periodically
-                if (Time.time - _lastStatusCheck >= STATUS_CHECK_INTERVAL)
+                // Simple Anti-Idle UI pulse/notify
+                if (Settings.useSimpleAntiIdle)
                 {
-                    CheckConnectionStatus();
-                    _lastStatusCheck = Time.time;
-                }
-                
-                // Send periodic heartbeat to prevent idle
-                if (Time.time - _lastHeartbeat >= HEARTBEAT_INTERVAL)
-                {
-                    SendHeartbeat();
-                    _lastHeartbeat = Time.time;
-                }
-                
-                // Perform periodic anti-idle action (window open/close)
-                var interval = Mathf.Max(Settings.antiIdleInterval, 10f); // Minimum 10 seconds
-                if (Time.time - _lastAntiIdleAction >= interval)
-                {
-                    PerformAntiIdleAction();
-                    _lastAntiIdleAction = Time.time;
-                }
+                    if (_nextSimplePulseAt <= 0f)
+                        ScheduleNextPulse();
 
-                // Optionally send a synthetic keepalive user message to server
-                if (Settings.useSyntheticKeepAlive)
-                {
-                    if (_isConnected)
+                    if (_nextInputNotifyAt <= 0f)
+                        ScheduleNextInputNotify();
+
+                    // UI pulse currently disabled
+
+                    if (Time.time >= _nextInputNotifyAt)
                     {
-                        // Suppress synthetic keepalive when user is active
-                        bool isSuppressed = Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil;
-                        if (isSuppressed)
+                        if (IsInputNotifyAllowed())
                         {
-                            if (!_wasSuppressedLastTick)
-                                MelonLogger.Msg($"[AntiIdle] Suppressing synthetic keepalive for {(Mathf.Max(0f, _suppressSyntheticUntil - Time.time)):F0}s");
-                            _wasSuppressedLastTick = true;
+                            TryServerInputNotify();
+                            ScheduleNextInputNotify();
                         }
                         else
                         {
-                            if (_wasSuppressedLastTick)
-                                MelonLogger.Msg("[AntiIdle] Resuming synthetic keepalive");
-                            _wasSuppressedLastTick = false;
-
-                            var jitterSeconds = UnityEngine.Random.Range(-2f, 2f);
-                            var effectiveInterval = Mathf.Max(Settings.keepAliveInterval + jitterSeconds, SYNTHETIC_KEEPALIVE_MIN_INTERVAL);
-                            if (Time.time - _lastSyntheticKeepAlive >= effectiveInterval)
+                            // If suppressed, push next attempt beyond suppression window; otherwise short backoff
+                            float remaining = GetSuppressionSecondsRemaining();
+                            if (remaining > 0f)
                             {
-                                SendSyntheticKeepAlive();
-                                _lastSyntheticKeepAlive = Time.time;
+                                if (VerboseSuppressionLogs)
+                                    MelonLogger.Msg($"[AntiIdle] Input notify suppressed ({_lastSuppressionReason}), remaining {remaining:F0}s");
+                                _nextInputNotifyAt = Time.time + Mathf.Max(5f, remaining + UnityEngine.Random.Range(1f, 3f));
+                            }
+                            else
+                            {
+                                // Not allowed for another reason (feature disabled mid-flight); back off a bit
+                                _nextInputNotifyAt = Time.time + 15f;
                             }
                         }
                     }
+                }
+
+                // Skip legacy heartbeat/status/action when in Simple-only mode
+                if (!IsSimpleOnly)
+                {
+                    // Check connection status periodically
+                    if (Time.time - _lastStatusCheck >= STATUS_CHECK_INTERVAL)
+                    {
+                        CheckConnectionStatus();
+                        _lastStatusCheck = Time.time;
+                    }
+                    
+                    // Quiet heartbeat probe (local timer reset only)
+                    if (Time.time - _lastHeartbeat >= HEARTBEAT_INTERVAL)
+                    {
+                        SendHeartbeat();
+                        _lastHeartbeat = Time.time;
+                    }
+                    
+                    // Perform periodic anti-idle action (legacy heartbeat reset path)
+                    if (Settings.useAntiIdle)
+                    {
+                        var interval = Mathf.Max(Settings.antiIdleInterval, 10f); // Minimum 10 seconds
+                        if (Time.time - _lastAntiIdleAction >= interval)
+                        {
+                            PerformAntiIdleAction();
+                            _lastAntiIdleAction = Time.time;
+                        }
+                    }
+                }
+
+                // Legacy synthetic keepalive SENDER disabled.
+                // The suppression window and read-only observation hooks remain for future research.
+                // if (Settings.useSyntheticKeepAlive && !Settings.useSimpleAntiIdle) { /* disabled */ }
+
+                // Periodic wrapper key usage summary (every ~60s)
+                if (Time.time - _lastWrapperKeySummaryTime >= 60f && _wrapperKeyCounts.Count > 0)
+                {
+                    _lastWrapperKeySummaryTime = Time.time;
+                    try
+                    {
+                        var top = _wrapperKeyCounts.OrderByDescending(kv => kv.Value).First();
+                        
+                        if (VerboseKeepaliveLogs)
+#pragma warning disable CS0162 // Unreachable code detected
+                            MelonLogger.Msg($"[AntiIdle] Wrapper traffic: top={top.Key} count={top.Value} (window ~60s)");
+#pragma warning restore CS0162 // Unreachable code detected
+
+                        _wrapperKeyCounts.Clear();
+                    }
+                    catch { }
                 }
             }
             catch (Exception e)
@@ -138,11 +213,33 @@ namespace Mod.Cheats
         {
             try
             {
-                RegisterActivity(Settings.sceneChangeSuppressionSeconds);
+                RegisterActivity(Settings.sceneChangeSuppressionSeconds, "scene-change");
             }
             catch (Exception e)
             {
                 MelonLogger.Error($"AntiIdleSystem.OnSceneChanged error: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Called by wrapper when a MessageBuffer is sent
+        /// </summary>
+        public static void OnWrapperBufferSent(object messageKey, object method, int channel)
+        {
+            try
+            {
+                string keyName = messageKey?.ToString() ?? "<null>";
+                string methodName = method?.ToString() ?? "<null>";
+                string composite = $"key={keyName}|method={methodName}|ch={channel}";
+                if (_wrapperKeyCounts.TryGetValue(composite, out var count))
+                    _wrapperKeyCounts[composite] = count + 1;
+                else
+                    _wrapperKeyCounts[composite] = 1;
+                _lastWrapperSendTime = Time.time;
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.OnWrapperBufferSent error: {e.Message}");
             }
         }
         
@@ -153,6 +250,15 @@ namespace Mod.Cheats
         {
             try
             {
+                if (IsSimpleOnly)
+                {
+                    // In Simple-only mode we do not engage legacy status-based actions
+                    var statusStringSimple = status?.ToString() ?? "Unknown";
+                    _lastConnectionStatus = statusStringSimple;
+                    _isConnected = string.Equals(statusStringSimple, "Connected", StringComparison.OrdinalIgnoreCase);
+                    return;
+                }
+
                 var statusString = status?.ToString() ?? "Unknown";
                 
                 // Only log if status actually changed
@@ -197,8 +303,8 @@ namespace Mod.Cheats
                     }
                     
                     // Treat status transitions as activity (short suppression)
-                    if (_isConnected)
-                        RegisterActivity(Mathf.Min(Settings.networkActivitySuppressionSeconds, 30f));
+                    // if (_isConnected)
+                    //     RegisterActivity(Mathf.Min(Settings.networkActivitySuppressionSeconds, 30f), "status-change");
                     
                     // Check if this is a concerning status
                     if (IsConcerningStatus(statusString))
@@ -229,6 +335,9 @@ namespace Mod.Cheats
         {
             try
             {
+                if (IsSimpleOnly)
+                    return;
+
                 MelonLogger.Warning($"[AntiIdle] Disconnect attempted - Reason: {reason ?? "No reason provided"}");
                 
                 // Track recent disconnect reasons for analysis
@@ -268,11 +377,35 @@ namespace Mod.Cheats
                 }
 
                 // Network traffic implies activity; suppress synthetic keepalive briefly
-                RegisterActivity(Settings.networkActivitySuppressionSeconds);
+                // if (!_isSendingSyntheticKeepalive)
+                //     RegisterActivity(Settings.networkActivitySuppressionSeconds, "network-send");
+
+                // Capture delivery + channel to reuse for synthetic keepalive
+                _lastDeliveryMethodObj = deliveryMethod;
+                _lastSequenceChannel = sequenceChannel;
+                _lastDeliveryCaptureTime = Time.time;
+
+                // Timestamp wrapper send
+                _lastWrapperSendTime = Time.time;
             }
             catch (Exception e)
             {
                 MelonLogger.Error($"AntiIdleSystem.OnMessageSent error: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Called by wrapper when a network message is received.
+        /// </summary>
+        public static void OnWrapperReceive(object incomingMessage)
+        {
+            try
+            {
+                _lastWrapperReceiveTime = Time.time;
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.OnWrapperReceive error: {e.Message}");
             }
         }
         
@@ -311,6 +444,40 @@ namespace Mod.Cheats
             catch (Exception e)
             {
                 MelonLogger.Error($"AntiIdleSystem.OnSteamConnectionStatusChanged error: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Called when the in-game settings menu is opened to register user presence.
+        /// </summary>
+        public static void OnMenuOpened()
+        {
+            try
+            {
+                if (!Settings.suppressKeepAliveOnActivity)
+                    return;
+                RegisterActivity(Settings.activitySuppressionSeconds, "menu");
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.OnMenuOpened error: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Called when the in-game settings menu is closed to register user presence.
+        /// </summary>
+        public static void OnMenuClosed()
+        {
+            try
+            {
+                if (!Settings.suppressKeepAliveOnActivity)
+                    return;
+                RegisterActivity(Settings.activitySuppressionSeconds, "menu");
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.OnMenuClosed error: {e.Message}");
             }
         }
         
@@ -357,6 +524,42 @@ namespace Mod.Cheats
         }
         
         /// <summary>
+        /// Set the ClientNetworkService wrapper (called by patches)
+        /// </summary>
+        public static void SetClientNetworkService(object service)
+        {
+            try
+            {
+                if (_clientNetworkService != service)
+                {
+                    _clientNetworkService = service;
+                    MelonLogger.Msg("[AntiIdle] ClientNetworkService set");
+                }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.SetClientNetworkService error: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Provided from UIBase.Awake patch; enables simple anti-idle pulses.
+        /// </summary>
+        public static void SetUIBase(object ui)
+        {
+            try
+            {
+                _uiBaseObj = ui;
+                if (ui != null)
+                    CacheUiDelegates(ui.GetType());
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"AntiIdleSystem.SetUIBase error: {e.Message}");
+            }
+        }
+        
+        /// <summary>
         /// Clear stored connections (called by patches)
         /// </summary>
         public static void ClearConnections()
@@ -389,6 +592,18 @@ namespace Mod.Cheats
                 _lastHeartbeat = Time.time;
                 _lastAntiIdleAction = Time.time;
                 _lastMousePosInitialized = false;
+                if (Settings.useSimpleAntiIdle)
+                {
+                    // First pulse sooner to verify behavior quickly
+                    _nextSimplePulseAt = Time.time + UnityEngine.Random.Range(20f, 40f);
+                    MelonLogger.Msg("[AntiIdle] Simple pulse scheduled shortly (~20-40s)");
+                    _nextInputNotifyAt = Time.time + UnityEngine.Random.Range(25f, 45f);
+                    MelonLogger.Msg("[AntiIdle] Server input notify scheduled shortly (~25-45s)");
+                }
+                else
+                {
+                    ScheduleNextPulse();
+                }
             }
             catch (Exception e)
             {
@@ -447,6 +662,8 @@ namespace Mod.Cheats
         {
             try
             {
+                if (IsSimpleOnly)
+                    return;
                 // Lightweight periodic check
                 
                 // Parse networking state during status check
@@ -470,6 +687,8 @@ namespace Mod.Cheats
         {
             try
             {
+                if (IsSimpleOnly)
+                    return;
                 // Quiet heartbeat call
                 
                 // Try to reset the heartbeat timer
@@ -485,14 +704,19 @@ namespace Mod.Cheats
         {
             try
             {
-                MelonLogger.Msg("[AntiIdle] Action: heartbeat reset + status snapshot");
+                if (!Settings.useAntiIdle)
+                    return;
+
+                if (VerboseActionLogs)
+                    MelonLogger.Msg("[AntiIdle] Action: heartbeat reset + status snapshot");
                 
                 // Try to reset the heartbeat timer by calling the game's internal heartbeat method
                 ResetHeartbeatTimer();
                 
                 // Brief networking snapshot
                 ParseNetworkingState();
-                MelonLogger.Msg("[AntiIdle] Action complete");
+                if (VerboseActionLogs)
+                    MelonLogger.Msg("[AntiIdle] Action complete");
             }
             catch (Exception e)
             {
@@ -540,14 +764,133 @@ namespace Mod.Cheats
             return $"[AntiIdle] Status: Initialized={_isInitialized}, " +
                    $"NetMultiClient={_netMultiClient != null}, " +
                    $"ServerConnection={_serverConnection != null}, " +
+                   $"ClientNetworkService={_clientNetworkService != null}, " +
                    $"LastStatus={_lastConnectionStatus ?? "None"}, " +
                    $"IdleDetections={_consecutiveIdleDetections}, " +
                    $"RecentDisconnects={_recentDisconnectReasons.Count}, " +
-                   $"Suppressed={(Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil)}";
+                   $"Suppressed={(Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil)}, " +
+                   $"LastWrapperSend={(Time.time - _lastWrapperSendTime):F1}s ago, LastWrapperRecv={(Time.time - _lastWrapperReceiveTime):F1}s ago";
         }
         
         #endregion
         
+        #region Simple UI Pulse
+
+        private static void ScheduleNextPulse()
+        {
+            var baseInterval = Mathf.Max(Settings.simpleAntiIdleInterval, 60f);
+            var jitter = UnityEngine.Random.Range(-10f, 10f);
+            _nextSimplePulseAt = Time.time + Mathf.Max(30f, baseInterval + jitter);
+            MelonLogger.Msg($"[AntiIdle] Next simple pulse scheduled in {(_nextSimplePulseAt - Time.time):F0}s");
+        }
+
+        private static void ScheduleNextInputNotify()
+        {
+            // Tie to the same interval but allow independent jitter; minimum 30s
+            var baseInterval = Mathf.Max(Settings.simpleAntiIdleInterval, 60f);
+            var jitter = UnityEngine.Random.Range(-8f, 8f);
+            _nextInputNotifyAt = Time.time + Mathf.Max(30f, baseInterval * 0.75f + jitter);
+            MelonLogger.Msg($"[AntiIdle] Next server input notify in {(_nextInputNotifyAt - Time.time):F0}s");
+        }
+
+        private static bool IsSimplePulseAllowed()
+        {
+            if (!Settings.useSimpleAntiIdle) return false;
+            // Allow pulses regardless of OS window focus
+            // if (!Application.isFocused) return false;
+            
+            if (Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil) return false;
+            return true; // Allow pulses regardless of network and focus; UI activity is harmless
+        }
+
+        private static bool IsInputNotifyAllowed()
+        {
+            if (!Settings.useSimpleAntiIdle) return false;
+            if (Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil) return false;
+            return true;
+        }
+
+        private static float GetSuppressionSecondsRemaining()
+        {
+            if (!Settings.suppressKeepAliveOnActivity) return 0f;
+            return Mathf.Max(0f, _suppressSyntheticUntil - Time.time);
+        }
+
+        private static void CacheUiDelegates(Type uiType)
+        {
+            try
+            {
+                _miSettingsKeyDown ??= AccessTools.Method(uiType, "SettingsKeyDown");
+                _miMapKeyDown ??= AccessTools.Method(uiType, "MapKeyDown");
+                _miControllerCloseAllKeyDown ??= AccessTools.Method(uiType, "ControllerCloseAllKeyDown");
+                if (_miSettingsKeyDown == null && _miMapKeyDown == null && _miControllerCloseAllKeyDown == null && !_loggedNoTarget)
+                {
+                    _loggedNoTarget = true;
+                    MelonLogger.Warning("[AntiIdle] Simple pulse: no UIBase *KeyDown targets found");
+                }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"[AntiIdle] CacheUiDelegates error: {e.Message}");
+            }
+        }
+
+        private static void TrySimplePulse()
+        {
+            try
+            {
+                // Disabled; kept for future experiments
+                // var ui = _uiBaseObj;
+                // if (ui == null)
+                // {
+                //     if (!_loggedNoUi)
+                //     {
+                //         _loggedNoUi = true;
+                //         MelonLogger.Warning("[AntiIdle] Simple pulse skipped: UIBase not set yet");
+                //     }
+                //     return;
+                // }
+                // CacheUiDelegates(ui.GetType());
+                // if (_miSettingsKeyDown != null) { _miSettingsKeyDown.Invoke(ui, null); _miSettingsKeyDown.Invoke(ui, null); }
+                // else if (_miMapKeyDown != null) { _miMapKeyDown.Invoke(ui, null); _miMapKeyDown.Invoke(ui, null); }
+                // else if (_miControllerCloseAllKeyDown != null) { _miControllerCloseAllKeyDown.Invoke(ui, null); }
+                // RegisterActivity(Settings.activitySuppressionSeconds, "ui-pulse");
+                // if (VerboseKeepaliveLogs) MelonLogger.Msg("[AntiIdle] Simple UI pulse invoked");
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"[AntiIdle] SimplePulse error: {e.Message}");
+            }
+        }
+
+        private static void TryServerInputNotify()
+        {
+            try
+            {
+                if (_miSendInputPerformed == null)
+                {
+                    var t = typeof(PlayerSync);
+                    _miSendInputPerformed = AccessTools.Method(t, "SendInputActionPerformedNotificationToServer");
+                    if (_miSendInputPerformed == null && !_loggedNoSendMethod)
+                    {
+                        _loggedNoSendMethod = true;
+                        MelonLogger.Warning("[AntiIdle] PlayerSync.SendInputActionPerformedNotificationToServer not found");
+                        return;
+                    }
+                }
+
+                _miSendInputPerformed?.Invoke(null, null); // static, parameterless
+                // if (VerboseKeepaliveLogs)
+                    MelonLogger.Msg("[AntiIdle] Server input notify invoked");
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"[AntiIdle] ServerInputNotify error: {e.Message}");
+            }
+        }
+
+        #endregion
+
         #region Heartbeat Management
         
         private static void ResetHeartbeatTimer()
@@ -933,7 +1276,8 @@ namespace Mod.Cheats
                 bool sent = false;
                 string? lastError = null;
 
-                // Preferred delivery: ReliableUnordered; fallback to Unreliable
+                // Preferred delivery: use last observed if compatible; else ReliableUnordered; fallback to Unreliable
+                object? deliveryPreferred = _lastDeliveryMethodObj;
                 object? deliveryReliable = null;
                 object? deliveryUnreliable = null;
                 try
@@ -947,6 +1291,11 @@ namespace Mod.Cheats
                             if (name.Equals("ReliableUnordered", StringComparison.OrdinalIgnoreCase)) deliveryReliable = Enum.Parse(deliveryEnum, name);
                             if (name.Equals("Unreliable", StringComparison.OrdinalIgnoreCase)) deliveryUnreliable = Enum.Parse(deliveryEnum, name);
                         }
+                        if (deliveryPreferred != null && deliveryPreferred.GetType() != deliveryEnum)
+                        {
+                            // Incompatible cached enum: ignore
+                            deliveryPreferred = null;
+                        }
                     }
                 }
                 catch { }
@@ -954,6 +1303,7 @@ namespace Mod.Cheats
                 // Try direct NetConnection.SendMessage first, if available
                 try
                 {
+                    _isSendingSyntheticKeepalive = true;
                     if (_serverConnection != null)
                     {
                         var connType = _serverConnection.GetType();
@@ -963,8 +1313,10 @@ namespace Mod.Cheats
                         {
                             var ps = connSend.GetParameters();
                             var deliveryType = ps[1].ParameterType;
-                            object delivery = deliveryReliable ?? (deliveryType.IsEnum ? Enum.Parse(deliveryType, "ReliableUnordered") : (object)0);
-                            var channel = 0;
+                            object delivery = (deliveryPreferred != null && deliveryPreferred.GetType() == deliveryType)
+                                ? deliveryPreferred
+                                : (deliveryReliable ?? (deliveryType.IsEnum ? Enum.Parse(deliveryType, "ReliableUnordered") : (object)0));
+                            var channel = (_lastDeliveryCaptureTime > 0f) ? _lastSequenceChannel : 0;
                             var result = connSend.Invoke(_serverConnection, new object[] { msg, delivery, channel });
                             var ok = result?.ToString()?.Contains("Sent", StringComparison.OrdinalIgnoreCase) == true || result?.ToString()?.Contains("Queued", StringComparison.OrdinalIgnoreCase) == true;
                             sent = ok;
@@ -977,17 +1329,22 @@ namespace Mod.Cheats
                 {
                     lastError = $"ConnSend error: {ex.Message}";
                 }
+                finally { _isSendingSyntheticKeepalive = false; }
 
                 // Try 4-arg overload first: SendMessage(msg, connection, method, channel)
                 try
                 {
+                    _isSendingSyntheticKeepalive = true;
                     var send4 = clientType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                         .FirstOrDefault(m => m.Name == "SendMessage" && m.GetParameters().Length == 4 && m.GetParameters()[1].ParameterType.Name.Contains("NetConnection"));
                     if (!sent && send4 != null && _serverConnection != null)
                     {
                         var ps = send4.GetParameters();
-                        var channel = 0;
-                        var delivery = deliveryReliable ?? deliveryUnreliable ?? ps[2].ParameterType.GetEnumValues().GetValue(0);
+                        var channel = (_lastDeliveryCaptureTime > 0f) ? _lastSequenceChannel : 0;
+                        var paramDeliveryType = ps[2].ParameterType;
+                        var delivery = (deliveryPreferred != null && deliveryPreferred.GetType() == paramDeliveryType)
+                            ? deliveryPreferred
+                            : (deliveryReliable ?? deliveryUnreliable ?? paramDeliveryType.GetEnumValues().GetValue(0));
                         var result = send4.Invoke(_netMultiClient, new object[] { msg, _serverConnection, delivery!, channel });
                         var ok = result?.ToString()?.Contains("Sent", StringComparison.OrdinalIgnoreCase) == true || result?.ToString()?.Contains("Queued", StringComparison.OrdinalIgnoreCase) == true;
                         sent = ok;
@@ -999,19 +1356,24 @@ namespace Mod.Cheats
                 {
                     lastError = $"Send4 error: {ex.Message}";
                 }
+                finally { _isSendingSyntheticKeepalive = false; }
 
                 // Try 3-arg overload: SendMessage(msg, method, channel)
                 if (!sent)
                 {
                     try
                     {
+                        _isSendingSyntheticKeepalive = true;
                         var send3 = clientType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                             .FirstOrDefault(m => m.Name == "SendMessage" && m.GetParameters().Length == 3);
                         if (send3 != null)
                         {
                             var ps = send3.GetParameters();
-                            var channel = 0;
-                            var delivery = deliveryReliable ?? deliveryUnreliable ?? ps[1].ParameterType.GetEnumValues().GetValue(0);
+                            var channel = (_lastDeliveryCaptureTime > 0f) ? _lastSequenceChannel : 0;
+                            var paramDeliveryType = ps[1].ParameterType;
+                            var delivery = (deliveryPreferred != null && deliveryPreferred.GetType() == paramDeliveryType)
+                                ? deliveryPreferred
+                                : (deliveryReliable ?? deliveryUnreliable ?? paramDeliveryType.GetEnumValues().GetValue(0));
                             var result = send3.Invoke(_netMultiClient, new object[] { msg, delivery!, channel });
                             var ok = result?.ToString()?.Contains("Sent", StringComparison.OrdinalIgnoreCase) == true || result?.ToString()?.Contains("Queued", StringComparison.OrdinalIgnoreCase) == true;
                             sent = ok;
@@ -1023,6 +1385,7 @@ namespace Mod.Cheats
                     {
                         lastError = $"Send3 error: {ex.Message}";
                     }
+                    finally { _isSendingSyntheticKeepalive = false; }
                 }
 
                 // Peer-level send as last resort
@@ -1030,6 +1393,7 @@ namespace Mod.Cheats
                 {
                     try
                     {
+                        _isSendingSyntheticKeepalive = true;
                         var peerField = clientType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                             .FirstOrDefault(f => f.FieldType.Name.Contains("NetPeer"));
                         var peer = peerField?.GetValue(_netMultiClient);
@@ -1041,8 +1405,12 @@ namespace Mod.Cheats
                             if (sendPeer != null)
                             {
                                 var ps = sendPeer.GetParameters();
-                                object delivery = ps[1].ParameterType.IsEnum ? Enum.Parse(ps[1].ParameterType, "ReliableUnordered") : (object)0;
-                                int channel = 0;
+                                object delivery;
+                                if (_lastDeliveryCaptureTime > 0f && _lastDeliveryMethodObj != null && ps[1].ParameterType.IsEnum && _lastDeliveryMethodObj.GetType() == ps[1].ParameterType)
+                                    delivery = _lastDeliveryMethodObj;
+                                else
+                                    delivery = ps[1].ParameterType.IsEnum ? Enum.Parse(ps[1].ParameterType, "ReliableUnordered") : (object)0;
+                                int channel = (_lastDeliveryCaptureTime > 0f) ? _lastSequenceChannel : 0;
                                 object? result;
                                 if (ps.Length == 3)
                                     result = sendPeer.Invoke(peer, new object[] { msg, delivery, channel });
@@ -1062,11 +1430,44 @@ namespace Mod.Cheats
                     {
                         lastError = $"SendPeer error: {ex.Message}";
                     }
+                    finally { _isSendingSyntheticKeepalive = false; }
+                }
+
+                // As a final fallback, try invoking Ping/KeepAlive methods on connection or peer
+                if (!sent)
+                {
+                    try
+                    {
+                        bool invoked = false;
+                        if (_serverConnection != null)
+                        {
+                            var ct = _serverConnection.GetType();
+                            var ping = ct.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                .FirstOrDefault(m => m.Name.IndexOf("ping", StringComparison.OrdinalIgnoreCase) >= 0 || m.Name.IndexOf("keepalive", StringComparison.OrdinalIgnoreCase) >= 0);
+                            if (ping != null)
+                            {
+                                ping.Invoke(_serverConnection, null);
+                                invoked = true;
+                            }
+                        }
+                        if (!invoked && _netPeer != null)
+                        {
+                            var pt = _netPeer.GetType();
+                            var ping = pt.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                .FirstOrDefault(m => m.Name.IndexOf("ping", StringComparison.OrdinalIgnoreCase) >= 0 || m.Name.IndexOf("keepalive", StringComparison.OrdinalIgnoreCase) >= 0);
+                            ping?.Invoke(_netPeer, null);
+                        }
+                    }
+                    catch { }
                 }
 
                 if (!sent && lastError != null)
                 {
                     MelonLogger.Warning($"[AntiIdle] Keepalive send failed: {lastError}");
+                }
+                else if (sent && VerboseKeepaliveLogs)
+                {
+                    MelonLogger.Msg("[AntiIdle] Keepalive sent successfully");
                 }
 
                 // Also reset heartbeat right after
@@ -1175,6 +1576,7 @@ namespace Mod.Cheats
             try
             {
                 if (!Settings.suppressKeepAliveOnActivity) return;
+                if (!Application.isFocused) return;
 
                 if (!_lastMousePosInitialized)
                 {
@@ -1189,7 +1591,7 @@ namespace Mod.Cheats
                 bool activityDetected = false;
 
                 // Any key or mouse button this frame
-                if (Input.anyKey)
+                if (Input.anyKeyDown)
                     activityDetected = true;
                 else if (Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2))
                     activityDetected = true;
@@ -1197,14 +1599,14 @@ namespace Mod.Cheats
                 {
                     // Mouse moved significantly
                     var pos = Input.mousePosition;
-                    if ((_lastMousePos - pos).sqrMagnitude > 0.5f)
+                    if ((_lastMousePos - pos).sqrMagnitude > 4f)
                         activityDetected = true;
                     _lastMousePos = pos;
                 }
 
                 if (activityDetected)
                 {
-                    RegisterActivity(Settings.activitySuppressionSeconds);
+                    RegisterActivity(Settings.activitySuppressionSeconds, "input");
                 }
             }
             catch (Exception e)
@@ -1214,12 +1616,20 @@ namespace Mod.Cheats
         }
 
         // Extends suppression window for synthetic keepalive
-        private static void RegisterActivity(float seconds)
+        private static void RegisterActivity(float seconds, string reason = "activity")
         {
             if (seconds <= 0f) return;
             var until = Time.time + seconds;
             if (until > _suppressSyntheticUntil)
+            {
                 _suppressSyntheticUntil = until;
+                _lastSuppressionReason = reason;
+                if (VerboseSuppressionLogs)
+                {
+                    var remaining = _suppressSyntheticUntil - Time.time;
+                    MelonLogger.Msg($"[AntiIdle] Suppression registered: reason={reason}, duration={seconds:F0}s, remaining={remaining:F0}s");
+                }
+            }
         }
         
         #endregion

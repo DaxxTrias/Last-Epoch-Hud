@@ -16,6 +16,7 @@ namespace Mod.Cheats
         // Timing and state management
         private static float _lastUseTime = 0f;
         private static bool _componentsInitialized = false;
+        private static int _lastKnownRemainingPotions = -1; // -1 unknown, >=0 known
         
         // Configuration constants
         private const float DEFAULT_COOLDOWN_SECONDS = 1.0f;
@@ -208,10 +209,17 @@ namespace Mod.Cheats
 
                 // Optional: log when no potions remain (if we can detect it)
                 var remaining = TryGetRemainingPotions();
-                if (remaining.HasValue && remaining.Value <= 0)
+                if (remaining.HasValue)
                 {
-                    MelonLogger.Warning("AutoPotion: No health potions remaining");
-                    return;
+                    int rem = remaining.Value;
+                    if (rem <= 0)
+                    {
+                        if (_lastKnownRemainingPotions != 0)
+                            MelonLogger.Warning("AutoPotion: No health potions remaining");
+                        _lastKnownRemainingPotions = 0;
+                        return;
+                    }
+                    _lastKnownRemainingPotions = rem;
                 }
 
                 // Use the potion (requires LocalPlayer component -> online mode only)
@@ -280,6 +288,7 @@ namespace Mod.Cheats
             _cachedReaperCheck = null;
             _cachedPlayerObject = null;
             _componentsInitialized = false;
+            _lastKnownRemainingPotions = -1;
             MelonLogger.Msg("AutoPotion: Component cache cleared");
         }
 

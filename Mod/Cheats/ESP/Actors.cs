@@ -1,6 +1,7 @@
 ﻿using Il2Cpp;
 using Mod.Game;
 using UnityEngine;
+using System;
 
 namespace Mod.Cheats.ESP
 {
@@ -16,6 +17,7 @@ namespace Mod.Cheats.ESP
         //        SummonedCorpse: Necromancer summons
 
         private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
+        private static readonly Color BloodOrange = new Color(0.90f, 0.30f, 0.00f, 1f);
 
         private static string SanitizeLabel(string? value)
         {
@@ -78,6 +80,53 @@ namespace Mod.Cheats.ESP
             return Drawing.AlignmentToColor(alignmentName);
         }
 
+        private static bool IsLootLizard(ActorVisuals actor)
+        {
+            // Component-based detection first (if available in this build)
+            if (actor.gameObject.GetComponent<LootLizardFleeing>() != null
+                || actor.gameObject.GetComponentInParent<LootLizardFleeing>() != null
+                || actor.gameObject.GetComponentInChildren<LootLizardFleeing>() != null)
+            {
+                return true;
+            }
+
+            // Name-based fallbacks (seen in screenshots: "v_LootLizard Blue (Clone)" and parent "sync v_LootLizard ...")
+            const StringComparison ic = StringComparison.OrdinalIgnoreCase;
+            var go = actor.gameObject;
+            if (!string.IsNullOrEmpty(go.name) && go.name.IndexOf("LootLizard", ic) >= 0)
+            {
+                return true;
+            }
+
+            var parent = go.transform != null ? go.transform.parent : null;
+            if (parent != null && !string.IsNullOrEmpty(parent.name) && parent.name.IndexOf("LootLizard", ic) >= 0)
+            {
+                return true;
+            }
+
+            // Display info fallbacks
+            var info = go.GetComponent<ActorDisplayInformation>();
+            if (info != null)
+            {
+                try
+                {
+                    var localized = info.GetLocalizedName();
+                    if (!string.IsNullOrEmpty(localized) && localized.IndexOf("Lizard", ic) >= 0)
+                        return true;
+                }
+                catch (Exception)
+                {
+                }
+
+                if (!string.IsNullOrEmpty(info.displayName) && info.displayName.IndexOf("Lizard", ic) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static void GatherActors()
         {
             if (ActorManager.instance == null) return;
@@ -87,34 +136,30 @@ namespace Mod.Cheats.ESP
 
             foreach (var visual in ActorManager.instance.visuals)
             {
-                if (!Settings.ShouldDrawNPCAlignment(visual.alignment.name)) continue;
-
-                // var color = Drawing.AlignmentToColor(visual.alignment.name);
-
                 foreach (var actor in visual.visuals._list)
                 {
                     if (!actor.gameObject.activeInHierarchy) continue;
 
-                    //if (actor.GetComponent<ActorDisplayInformation>() != null && 
-                    //    !Settings.ShouldDrawNPCClassification(actor.GetComponent<ActorDisplayInformation>()
-                    //    .actorClass)) continue;
+                    // Detect loot lizards using multiple signals
+                    bool isLizard = IsLootLizard(actor);
 
-                    var actorDisplayInfo = actor.GetComponent<ActorDisplayInformation>();
-                    // var displayInfo = actor.GetComponent<DisplayInformation>();
-                    if (actorDisplayInfo != null)
+                    // Non-lizard actors respect alignment/classification filters
+                    if (!isLizard)
                     {
-                        if (actor.gameObject.GetComponent<LootLizardFleeing>() != null ||
-                            actor.gameObject.GetComponentInParent<LootLizardFleeing>() != null ||
-                            actor.gameObject.GetComponentInChildren<LootLizardFleeing>() != null)
+                        if (!Settings.ShouldDrawNPCAlignment(visual.alignment.name)) continue;
+
+                        var actorDisplayInfo = actor.GetComponent<ActorDisplayInformation>();
+                        if (actorDisplayInfo != null)
                         {
-                            goto skip1;
-                        }
-                        if (!Settings.ShouldDrawNPCClassification(actorDisplayInfo.actorClass))
-                        {
-                            continue;
+                            // in 1.2 in offline mode, we could find the lizards reliably by the LootLizardFleeing component
+                            // TODO: verify if this is still the case in 1.3
+                            if (!Settings.ShouldDrawNPCClassification(actorDisplayInfo.actorClass))
+                            {
+                                continue;
+                            }
                         }
                     }
-                skip1:
+
                     float distance = Vector3.Distance(
                         actor.transform.position, localPlayer.transform.position);
 
@@ -124,11 +169,10 @@ namespace Mod.Cheats.ESP
                     var position = actor.GetHealthBarPosition();
                     position.y += 0.5f;
 
-                    var color = GetRarityColor(actor, visual.alignment.name);
+                    var color = isLizard ? BloodOrange : GetRarityColor(actor, visual.alignment.name);
                     ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
                     //ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
                     ESP.AddString(name, position, color);
-
                 }
             }
         }

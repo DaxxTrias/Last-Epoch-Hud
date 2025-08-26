@@ -32,14 +32,18 @@ namespace Mod
 		{
 			try
 			{
+				// Initialize preferences and load into Settings before applying patches
+				SettingsConfig.Init();
+				SettingsConfig.LoadIntoSettings();
+
 				s_harmony = new HarmonyLib.Harmony(HarmonyId);
 				s_harmony.PatchAll(typeof(Mod).Assembly);
-				MelonLogger.Msg("[Mod] Harmony patches applied");
+				MelonLogger.Msg("[LEHud] Harmony patches applied");
 				VerifyNetworkingTargets();
 			}
 			catch (System.Exception e)
 			{
-				MelonLogger.Error($"[Mod] Harmony init failed: {e.Message}");
+				MelonLogger.Error($"[LEHud] Harmony init failed: {e.Message}");
 			}
 		}
 
@@ -144,12 +148,16 @@ namespace Mod
 			Drawing.Cleanup();
 			try
 			{
+				// Persist current runtime settings to preferences on quit
+				SettingsConfig.ApplyToPreferencesFromSettings();
+				SettingsConfig.Save();
+
 				s_harmony?.UnpatchSelf();
-				MelonLogger.Msg("[Mod] Harmony patches unpatched on quit");
+				MelonLogger.Msg("[LEHud] Harmony patches unpatched on quit");
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				MelonLogger.Error($"[Mod] Harmony unpatch failed: {e.Message}");
+				MelonLogger.Error($"[LEHud] Harmony unpatch failed: {e.Message}");
 			}
 		}
 
@@ -160,7 +168,17 @@ namespace Mod
 
 		public override void OnPreferencesLoaded() // Runs when Melon Preferences get loaded.
 		{
-			//MelonLogger.Msg("OnPreferencesLoaded");
+			try
+			{
+				if (!SettingsConfig.IsInitialized)
+					return;
+				SettingsConfig.LoadIntoSettings();
+				MelonLogger.Msg("[LEHud] Preferences loaded into Settings");
+			}
+			catch (Exception e)
+			{
+				MelonLogger.Error($"[LEHud] Preferences load error: {e.Message}");
+			}
 		}
 
 		private static void VerifyNetworkingTargets()
@@ -169,22 +187,22 @@ namespace Mod
 			{
 				var nmcType = typeof(NetMultiClient);
 				var npType = typeof(NetPeer);
-				MelonLogger.Msg($"[Mod] Verify: NetMultiClient type = {nmcType.Name}, NetPeer type = {npType.Name}");
+				MelonLogger.Msg($"[LEHud] Verify: NetMultiClient type = {nmcType.Name}, NetPeer type = {npType.Name}");
 
 				var connect = AccessTools.Method(nmcType, "Connect", new[] { typeof(IPEndPoint), typeof(NetOutgoingMessage) });
-				MelonLogger.Msg($"[Mod] Verify: NetMultiClient.Connect found = {connect != null}");
+				MelonLogger.Msg($"[LEHud] Verify: NetMultiClient.Connect found = {connect != null}");
 
 				var disconnect = AccessTools.Method(nmcType, "Disconnect", new[] { typeof(string) });
-				MelonLogger.Msg($"[Mod] Verify: NetMultiClient.Disconnect found = {disconnect != null}");
+				MelonLogger.Msg($"[LEHud] Verify: NetMultiClient.Disconnect found = {disconnect != null}");
 
 				var sendMessage = AccessTools.Method(nmcType, "SendMessage", new[] { typeof(NetOutgoingMessage), typeof(NetDeliveryMethod), typeof(int) });
-				MelonLogger.Msg($"[Mod] Verify: NetMultiClient.SendMessage found = {sendMessage != null}");
+				MelonLogger.Msg($"[LEHud] Verify: NetMultiClient.SendMessage found = {sendMessage != null}");
 
 				var getConnStatus = AccessTools.Method(nmcType, "get_ConnectionStatus");
-				MelonLogger.Msg($"[Mod] Verify: NetMultiClient.get_ConnectionStatus found = {getConnStatus != null}");
+				MelonLogger.Msg($"[LEHud] Verify: NetMultiClient.get_ConnectionStatus found = {getConnStatus != null}");
 
 				var heartbeatField = AccessTools.Field(npType, "m_lastHeartbeat");
-				MelonLogger.Msg($"[Mod] Verify: NetPeer.m_lastHeartbeat field found = {heartbeatField != null}");
+				MelonLogger.Msg($"[LEHud] Verify: NetPeer.m_lastHeartbeat field found = {heartbeatField != null}");
 
 				// NetTime verification
 				try
@@ -195,21 +213,21 @@ namespace Mod
 						var nowProp = netTimeType.GetProperty("Now", BindingFlags.Public | BindingFlags.Static) ?? netTimeType.GetProperty("get_Now", BindingFlags.Public | BindingFlags.Static);
 						var nowMethod = nowProp == null ? netTimeType.GetMethod("get_Now", BindingFlags.Public | BindingFlags.Static) : null;
 						bool found = nowProp != null || nowMethod != null;
-						MelonLogger.Msg($"[Mod] Verify: NetTime.Now found = {found} ({netTimeType.FullName})");
+						MelonLogger.Msg($"[LEHud] Verify: NetTime.Now found = {found} ({netTimeType.FullName})");
 					}
 					else
 					{
-						MelonLogger.Msg("[Mod] Verify: NetTime type not found");
+						MelonLogger.Msg("[LEHud] Verify: NetTime type not found");
 					}
 				}
 				catch (System.Exception ex)
 				{
-					MelonLogger.Error($"[Mod] Verify: NetTime check error: {ex.Message}");
+					MelonLogger.Error($"[LEHud] Verify: NetTime check error: {ex.Message}");
 				}
 			}
 			catch (System.Exception e)
 			{
-				MelonLogger.Error($"[Mod] VerifyNetworkingTargets error: {e.Message}");
+				MelonLogger.Error($"[LEHud] VerifyNetworkingTargets error: {e.Message}");
 			}
 		}
 	}

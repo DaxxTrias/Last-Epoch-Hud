@@ -23,34 +23,80 @@ The user asks questions about the following:
 - Diagnostics & tools: DNSpy/ILSpy, Il2CppDumper/Inspector, logs, simple overlay toggles
 - Packaging & deployment: assembly attributes, mod folder layout, references
 
+### Repository-Specific Conventions (LEHud)
+
+- Mod name: `LEHud`; entry class: `Mod.Mod` in `Mod/Mod.cs`; assembly attributes declared in the same file.
+- Single-project layout rooted at `Mod/` with key folders:
+  - `Mod/Cheats/` (gameplay patches/features; e.g., `Patches.cs`, `AutoPotion.cs`, `AntiIdleSystem.cs`, `MapHack.cs`)
+  - `Mod/Cheats/ESP/` (ESP-related drawing & logic)
+  - `Mod/Game/` (game-facing helpers; e.g., `ObjectManager.cs`, item filtering)
+  - `Mod/Utils/` (sprites and helpers), `Mod/Drawing.cs` (styles, GUI setup), `Mod/Menu.cs` (IMGUI)
+- Harmony:
+  - Harmony ID is `LEHud.Patches`; patches are applied in `OnInitializeMelon()` via `PatchAll(typeof(Mod).Assembly)`.
+  - Place new patches under `Mod.Cheats.Patches` (often in `Mod/Cheats/Patches.cs`). Prefer static nested classes per-target with explicit `Prefix/Postfix`.
+  - Target explicit overloads using `HarmonyPatch` attributes with argument types. Cache `MethodInfo`/`FieldInfo` once at init when reflection is necessary.
+- Lifecycle & threading:
+  - `OnInitializeMelon()` initializes preferences via `SettingsConfig` then applies Harmony patches and verifies IL2CPP targets.
+  - `OnLateInitializeMelon()` initializes `Drawing`.
+  - `OnUpdate()` is hot-path: calls `ESP.OnUpdate()`, `AutoPotion.OnUpdate()`, `Menu.OnUpdate()`, `MinimapEnemyCircles.Update()`, `AntiIdleSystem.OnUpdate()`, `AutoDisconnect.OnUpdate()`; avoid allocations and LINQ here.
+  - `OnGUI()` guards reentrancy with a boolean; call `Drawing.SetupGuiStyle()` once per GUI pass; keep allocations minimal.
+  - All Unity API calls must occur on the main thread.
+- Input/keybinds:
+  - Insert toggles the in-game menu; F12 logs AutoPotion debug.
+- Configuration (`SettingsConfig`):
+  - Centralized wrapper over MelonPreferences with categories for General, Patches, AutoPotion, AntiIdle, AutoDisconnect, Minimap, NPC, Items.
+  - Use underscore-based category IDs: `LEHud_General`, `LEHud_Patches`, `LEHud_AutoPotion`, `LEHud_AntiIdle`, `LEHud_AutoDisconnect`, `LEHud_Minimap`, `LEHud_NPC`, `LEHud_Items`.
+  - When adding settings, ALWAYS update all of the following:
+    1) `Settings.cs`: add default field.
+    2) `SettingsConfig.Init()`: create entry in the correct category with the default value.
+    3) `SettingsConfig.LoadIntoSettings()`: read/clamp the entry into `Settings`.
+    4) `SettingsConfig.ApplyToPreferencesFromSettings()`: write `Settings` back to entries.
+    5) `Menu.cs`: add UI to read/write `Settings` (avoid allocations in hot paths).
+    6) Ensure persistence on close: closing the menu (Insert) must call `ApplyToPreferencesFromSettings(); Save();` so changes flush to disk.
+  - Initialization guard: `SettingsConfig.IsInitialized` must be true before calling load/apply; `Mod.OnPreferencesLoaded` should early-return until init completes.
+  - Standalone JSON import/export is currently disabled. Prefer MelonPreferences as the single source of truth. If re-enabled in the future, wire Import/Export via the menu and keep both stores in sync only when explicitly invoked.
+- Networking hooks (Anti-Idle/Auto-Disconnect):
+  - IL2CPP Lidgren: `NetMultiClient.Connect/Disconnect/SendMessage/get_ConnectionStatus` and `NetConnection.get_Status` are primary hooks.
+  - Steam sockets: `SteamNetworkingSockets.ConnectionStatusChanged` may be observed if available.
+  - Use narrow logging; prefer one-time or stateful logs to avoid spam.
+- Runtime guards:
+  - Use `ObjectManager.IsOfflineMode()` to gate features like `useAnyWaypoint`.
+  - Respect settings toggles in all patches; bail out early when disabled.
+- Logging conventions:
+  - Use `MelonLogger.Msg/Error`. Prefix messages contextually: `[Mod]` for lifecycle, `[Settings]` for config IO, `[LeHud.Hooks]` for Harmony hooks.
+- Teardown:
+  - On application quit, persist preferences (`SettingsConfig.ApplyToPreferencesFromSettings(); Save();`), clean up sprites/drawing, and unpatch via `s_harmony?.UnpatchSelf()`.
+- Drawing/Assets:
+  - Use `Drawing` for GUI style setup; use `SpriteManager` and base64 sprites from `SpriteBases` for runtime icons; clean them up on quit.
+
 ### Code Implementation Guidelines
 
 - **Targeting & Tooling**
-  - `net6.0` library; `LangVersion=preview`; `<Nullable>enable</Nullable>`; `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`.
-  - If the game is Mono-only, consider multi-targeting (`net6.0;net48`) or provide a `net48` fallback.
-  - Reference Harmony via NuGet; reference MelonLoader/UnityEngine via game-local assemblies (HintPath).
+  - `net6.0` library; `LangVersion=preview`; `<Nullable>enable</Nullable>`; `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` where feasible.
+  - Windows only; IL2CPP target; `<RuntimeIdentifier>win-x64</RuntimeIdentifier>`.
+  - Reference Harmony and Unity/MelonLoader/Il2Cpp assemblies via HintPath to the game install (no NuGet for Unity/MelonLoader). Keep paths developer-overridable.
   - Deterministic builds; optimize code but prioritize clarity in hot paths.
 
 - **Project Structure**
-  - Projects: `Game.Mod` (entry, MelonMod), `Game.Mod.Core` (abstractions/contracts), `Game.Mod.Patches` (Harmony patches), `Game.Mod.Runtime` (interop, services, utilities).
-  - Composition root: a single Patcher that registers/unregisters all patches with a unique Harmony ID.
-  - Feature flags: central registry for enabling/disabling groups of patches at runtime (e.g., via config/hotkeys).
+  - Single project: `Mod/Mod.csproj` with source under `Mod/` matching current layout.
+  - Composition root is `Mod.Mod` which initializes config, patches, and services.
+  - Group features by domain in `Mod/Cheats/`, with optional subfolders (e.g., `ESP`).
 
 - **MelonLoader Lifecycle**
-  - Use `OnInitializeMelon` to: load & validate config, create Harmony instance, register patches, probe IL2CPP/Mono mode.
-  - Use `OnUpdate` for lightweight polling and input handling; avoid heavy work on the main thread.
-  - Use `OnGUI` minimally; pre-allocate GUIContent and styles to avoid GC spikes.
-  - Ensure clean teardown in `OnDeinitializeMelon`: unpatch by Harmony ID, dispose singletons, stop coroutines.
+  - Use `OnInitializeMelon` to: load & validate config (`SettingsConfig.Init/Load...`), create Harmony instance with `LEHud.Patches`, register patches, verify IL2CPP targets.
+  - Use `OnUpdate` for lightweight polling and input handling; keep per-frame work allocation-free.
+  - Use `OnGUI` minimally; reuse styles and `GUIContent` where applicable.
+  - Ensure clean teardown in `OnApplicationQuit`: unpatch by Harmony ID, dispose singletons, stop coroutines, persist config.
 
 - **Harmony Patching**
   - Prefer narrow, explicit patches: target specific overloads with `MethodType`/argument types.
   - Cache `MethodInfo`/`FieldInfo` using `AccessTools` at init time; avoid reflection in `Update`.
-  - Prefix returns `bool` to optionally skip original; use `ref` parameters and `__state` for contextual data.
+  - Prefix returns `bool` to optionally skip original; use `ref` parameters and `__state` for contextual data where needed.
   - Postfix for result adjustments; Transpiler only when unavoidable — document IL intent and include guards.
   - Guard clauses: fast checks to bail out for disabled features or null/invalid states.
 
 - **IL2CPP Considerations**
-  - Use generated/interop types for Unity classes; avoid boxing/unboxing in hot paths.
+  - Use Il2CppInterop types; avoid boxing/unboxing in hot paths.
   - Create delegates once; reuse function pointers; avoid per-frame `Marshal` calls.
   - Validate method/field names against dumped metadata at init; fail fast with clear logs if missing.
   - When crossing threads, marshal back to main thread for Unity API via an `Action` queue or coroutine.
@@ -59,41 +105,43 @@ The user asks questions about the following:
   - Unity APIs must run on main thread; offload IO/CPU to background tasks and rejoin via a main-thread dispatcher.
   - Minimize allocations in `Update`/render loops; avoid LINQ in hot paths; use pooled collections.
   - Prefer `static readonly` caches; micro-opt only with evidence (logs or profiler data).
-  - Add simple frame budgeters (Stopwatch-based) for periodic tasks to avoid stutter.
+  - Add simple frame budgeters (Stopwatch-based) for periodic tasks to avoid stutter where applicable.
 
 - **Configuration & Telemetry**
-  - Use `MelonPreferences` with strong wrappers; default-safe values; hot-reload support.
-  - Structured logging with `MelonLogger`; include feature/patch name and correlation IDs where helpful.
-  - Optional lightweight overlay to show mod/feature status and perf counters (toggle on a keybind).
+  - Use `SettingsConfig` with MelonPreferences-backed categories; default-safe values; hot-reload support via `OnPreferencesLoaded`.
+  - Structured logging with `MelonLogger`; include feature/patch name and correlation hints when helpful.
+  - Optional lightweight overlay to show mod/feature status and perf counters (toggle with Insert).
 
 - **Safety & Recovery**
   - Wrap patch bodies with narrow try/catch; log once per fault type; implement circuit-breaker toggles for unstable features.
-  - Expose a unified “Disable All Patches” hotkey; always unpatch on exceptions during init.
+  - Expose a unified “Disable All Patches” behavior by honoring settings at patch entry points; always unpatch on exceptions during init.
 
 - **Testing & Validation**
-  - Out-of-process sanity tests for patch discovery and signature binding.
-  - In-game smoke toggle: keybind cycles feature states and logs expected hook order.
-  - If possible, add a tiny demo scene or sanity checks (e.g., verify Update order with a counter).
+  - Out-of-process sanity checks for patch discovery and signature binding (ensure AccessTools finds targets).
+  - In-game smoke toggle: log expected hook order; keep logging low-volume.
 
 - **Code Style & C# 11 Usage**
-  - File-scoped namespaces; `required` members for options; pattern matching & list patterns where clear; raw string literals for IL notes.
-  - Suffix async methods with `Async`; small focused methods; XML docs for public APIs.
+  - Match existing style and formatting; keep names descriptive; avoid deep nesting; prefer guard clauses.
+  - Use file-scoped namespaces where consistent with the codebase; otherwise keep braces style consistent with current files.
+  - Suffix async methods with `Async`; keep functions small and focused; add XML docs for public APIs.
 
 - **Security & Ethics**
   - Do not exfiltrate user data; avoid interacting with multiplayer/anticheat-sensitive code unless explicitly allowed.
+  - Patches that disable telemetry/bug reporting should remain minimal and well-scoped.
 
 ### Output & Delivery Rules
 
-- Present a step-by-step plan (pseudocode/architecture) first.
-- Then deliver code in chunks (small, logically grouped sections): `.csproj` with preview setup → assembly attributes → MelonMod bootstrap → config wrapper → Harmony patcher → example prefix/postfix → optional transpiler with safeguards → main-thread dispatcher → teardown/unpatch logic.
-- Include exact CLI/build steps and reference wiring (NuGet for Harmony; HintPath for MelonLoader/UnityEngine).
-- Provide targeted performance/stability notes (GC, hot-path allocations, IL2CPP marshaling) alongside the relevant chunk.
+- Present a step-by-step plan (pseudocode/architecture) first for code changes.
+- Deliver code in small, logically grouped sections: config updates in `SettingsConfig.cs` → patch classes in `Mod/Cheats/Patches.cs` → menu/UI in `Mod/Menu.cs` → lifecycle glue in `Mod/Mod.cs`.
+- Include exact CLI/build notes tailored to this repo:
+  - `dotnet build Mod/Mod.csproj -c Release`
+  - Copy the built DLL to the game `Mods` folder (per your install path).
+  - Ensure `HintPath` references in `Mod.csproj` match your local game path.
+- Provide targeted performance/stability notes (GC, hot-path allocations, IL2CPP marshaling) alongside the relevant changes.
 - Keep explanations concise and focused on tradeoffs and best practices.
 
-### Example Build/Setup Notes (to adapt per game)
+### Example Build/Setup Notes (for this repo)
 
-- CLI: `dotnet new classlib -n Game.Mod -f net6.0`
-- Set `LangVersion` to `preview`, enable nullable & analyzers in `.csproj`.
-- Add NuGet: `dotnet add package HarmonyLib`
-- Add references: `<Reference Include="MelonLoader"><HintPath>..\GameFolder\MelonLoader\MelonLoader.dll</HintPath></Reference>` and UnityEngine assemblies via HintPath.
-- Output: copy built DLL to `GameFolder\Mods\`.
+- Project: `Mod/Mod.csproj` (`net6.0`, `LangVersion=preview`, `Nullable=enable`, `AllowUnsafeBlocks=true`, `RuntimeIdentifier=win-x64`).
+- References via HintPath to game install: `MelonLoader.dll`, `0Harmony.dll`, `Il2CppInterop.*.dll`, `UnityEngine.*.dll`, `Il2CppLE*.dll`, `Il2CppLidgren.Network.dll`, `Il2CppSteamworks`.
+- Output: copy built DLL to the game `Mods` directory. Ensure paths align with your Steam install.

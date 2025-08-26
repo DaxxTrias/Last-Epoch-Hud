@@ -20,7 +20,6 @@
 - Use similar approach to `DisplayActorClass` for shrine types
 - Consider shrine states (active/inactive, buffed/unbuffed)
 
-
 ### 2. Auto Disconnect on Low Health
 
 **Status**: ✅ Deployed (UI-based quit; optional gating by potions)  
@@ -186,15 +185,19 @@
 
 ### 8. Configuration & Settings
 
-**Status**: 📋 Ongoing  
+**Status**: ✅ Deployed (further validation ongoing)
 **Complexity**: Low
 
 **Tasks**:
-- [ ] Add MelonPreferences integration for persistent settings
+- [x] Add MelonPreferences integration for persistent settings
+  - Underscore category IDs (`LEHud_General`, etc.) bound to single `LEHud.melon.cfg`
+  - Guarded init via `SettingsConfig.IsInitialized`; early-return in `OnPreferencesLoaded`
+  - Persist on menu close (Insert): `ApplyToPreferencesFromSettings(); Save();`
+  - Explicit category `SaveToFile()` to ensure on-disk writes
 - [ ] Create settings UI for new features
+- [x] Implement settings validation (clamping; safe snapshot IO)
 - [ ] Add hotkey configuration system
-- [ ] Implement settings validation
-- [ ] Add settings import/export functionality
+- [ ] Add settings import/export functionality (helpers implemented; currently disabled – revisit)
 - [ ] Create settings documentation
 
 ### 9. Auto Potion Enhancements (Remaining Charges & Logging)
@@ -210,6 +213,7 @@
 **Next steps**:
 - [ ] Optional overlay/debug display of remaining potions
 - [ ] Consider exposing max charges in Menu and guard for loading states
+- [ ] Enhance associated functionality (e.g., AutoDisconnect)
 
 ## 🧪 Testing & Validation
 
