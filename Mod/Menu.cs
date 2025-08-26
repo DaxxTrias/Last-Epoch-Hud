@@ -155,8 +155,8 @@ namespace Mod
 				GUI.color = Color.green;
 				GUILayout.Label("Radar Monster Type Filters:");
 				GUI.color = Color.white;
-				Settings.showMagicMonsters = GUILayout.Toggle(Settings.showMagicMonsters, "Show Magic Monsters (Blue)");
-				Settings.showRareMonsters = GUILayout.Toggle(Settings.showRareMonsters, "Show Rare Monsters (Yellow)");
+				Settings.showMagicMonsters = GUILayout.Toggle(Settings.showMagicMonsters, "Show Magic Monsters");
+				Settings.showRareMonsters = GUILayout.Toggle(Settings.showRareMonsters, "Show Rare Monsters");
 				Settings.showWhiteMonsters = GUILayout.Toggle(Settings.showWhiteMonsters, "Show White Monsters");
 			}
 
