@@ -54,8 +54,22 @@ namespace Mod
         public static bool showMagicMonsters = true;
         public static bool showRareMonsters = true;
         public static bool showWhiteMonsters = false;
+        public static bool showBossMonsters = true;
         public static float minimapOffsetX = 0f;
         public static float minimapOffsetY = 0f;
+
+        // ESP: Per-element visibility
+        public static bool showESPLines = false;
+        public static bool showESPLabels = true;
+
+        public static float espVerticalCullMeters = 35f; // Max vertical difference for ESP objects
+
+        // ESP: Per-special toggles
+        public static bool espShowChests = true;
+        public static bool espShowShrines = true;
+        public static bool espShowRunePrisons = true;
+        public static bool espShowChampions = true;
+        public static bool espShowLootLizards = true;
 
         public static Dictionary<string, bool> npcClassifications = new Dictionary<string, bool>
         {

@@ -13,6 +13,8 @@ namespace Mod
 		// private static int debugLogsThisFrame = 0;
 		// private const int DebugMaxLogsPerFrame = 8;
 
+		public static readonly Color BloodOrange = new Color(1.00f, 0.50f, 0.00f, 1f);
+
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
 			if (vecIn.z < 0)
@@ -34,11 +36,17 @@ namespace Mod
 				StringStyle = new GUIStyle(GUI.skin.label);
 				StringStyle.clipping = TextClipping.Overflow;
 				StringStyle.wordWrap = false;
+				// Ensure default text color is neutral; specific draws will override
+				StringStyle.normal.textColor = Color.white;
 			}
 		}
 
 		public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var cam = Camera.main;
 			if (cam == null) return;
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
@@ -71,15 +79,37 @@ namespace Mod
 
 		public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var style = StringStyle ?? new GUIStyle();
-			var backup = style.normal.textColor;
+			// Backup colors to avoid leaking state across GUI calls
+			var backupTextColor = style.normal.textColor;
+			var prevContentColor = GUI.contentColor;
+			var prevGuiColor = GUI.color;
+
+			// Neutralize any global GUI tint; rely solely on style text color
+			GUI.contentColor = Color.white;
+			GUI.color = Color.white;
+
+			// Apply the requested color for this draw only via style
 			style.normal.textColor = color;
+
 			DrawString(worldPosition, label, centered);
-			style.normal.textColor = backup;
+
+			// Restore previous colors
+			style.normal.textColor = backupTextColor;
+			GUI.contentColor = prevContentColor;
+			GUI.color = prevGuiColor;
 		}
 
 		public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var cam = Camera.main;
 			if (cam == null) return;
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
@@ -119,6 +149,10 @@ namespace Mod
 
 		public static void DrawLine(Vector3 worldA, Vector3 worldB, Color color, float width)
 		{
+			// Respect line visibility toggle
+			if (!Settings.showESPLines)
+				return;
+
 			if (lineTex == null)
 			{
 				lineTex = new Texture2D(1, 1);

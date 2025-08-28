@@ -164,6 +164,7 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(Il2CppSystem.Exception exception, UnityEngine.Object context)
                 {
+                    // TODO: this goes absolutely nuts on the soreth'ka level for some reason. needs to be investigated
                     MelonLogger.Msg("[LeHud.Hooks]  ClientLogHandler.LogException hooked and blocked.");
 
                     // Log all elements
@@ -1296,6 +1297,40 @@ namespace Mod.Cheats.Patches
                 public static void Prefix(object __instance, object __0)
                 {
                     try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                }
+            }
+            #endregion
+
+            #region chest visuals registration
+            [HarmonyPatch(typeof(ChestVisualsCreator), "Awake")]
+            public class ChestVisualsCreator_Awake
+            {
+                public static void Postfix(ChestVisualsCreator __instance)
+                {
+                    try
+                    {
+                        if (__instance != null && __instance.gameObject != null)
+                            global::Mod.Cheats.ESP.Chests.Register(__instance.gameObject);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+            }
+
+            [HarmonyPatch(typeof(ChestVisualsCreator), "OnDestroy")]
+            public class ChestVisualsCreator_OnDestroy
+            {
+                public static void Prefix(ChestVisualsCreator __instance)
+                {
+                    try
+                    {
+                        if (__instance != null && __instance.gameObject != null)
+                            global::Mod.Cheats.ESP.Chests.Unregister(__instance.gameObject);
+                    }
+                    catch (Exception)
+                    {
+                    }
                 }
             }
             #endregion

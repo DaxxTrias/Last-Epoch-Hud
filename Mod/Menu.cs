@@ -1,9 +1,9 @@
-﻿using Mod.Cheats;
-using Mod.Game;
+﻿using System.Linq;
 using UnityEngine;
 using static UnityEngine.GUI;
 using MelonLoader;
-using System.Linq;
+using Mod.Cheats;
+using Mod.Game;
 
 namespace Mod
 {
@@ -12,7 +12,6 @@ namespace Mod
 		private static bool guiVisible = false;
 		private const float resizeGripSize = 20.0f;
 		private static bool isResizing = false;
-
 		public static bool npcDrawingsDropdown = false;
 		public static bool npcClassificationsDropdown = false;
 		public static bool itemDrawingsDropdown = false;
@@ -22,6 +21,7 @@ namespace Mod
 		public static bool automationDropdown = false;
 		public static bool antiIdleSubDropdown = false;
 		public static bool espDropdown = false;
+		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
 
 		public static void DrawModWindow(int windowID)
 		{
@@ -31,6 +31,25 @@ namespace Mod
 			espDropdown = GUILayout.Toggle(espDropdown, "ESP:", "button");
 			if (espDropdown)
 			{
+				// Specials sub-selection
+				specialsSubDropdown = GUILayout.Toggle(specialsSubDropdown, "Specials", "button");
+				if (specialsSubDropdown)
+				{
+					// Per-special toggles
+					Settings.espShowLootLizards = GUILayout.Toggle(Settings.espShowLootLizards, "Show Loot Lizards");
+					Settings.espShowChampions = GUILayout.Toggle(Settings.espShowChampions, "Show Champions");
+					Settings.espShowChests = GUILayout.Toggle(Settings.espShowChests, "Show Chests");
+					Settings.espShowShrines = GUILayout.Toggle(Settings.espShowShrines, "Show Shrines");
+					Settings.espShowRunePrisons = GUILayout.Toggle(Settings.espShowRunePrisons, "Show Rune Prisons");
+					
+					GUILayout.Space(6);
+					Settings.showESPLines = GUILayout.Toggle(Settings.showESPLines, "Show ESP Lines");
+					Settings.showESPLabels = GUILayout.Toggle(Settings.showESPLabels, "Show ESP Labels");
+					
+					GUILayout.Label("Chest ESP Vertical Cull (m): " + Settings.espVerticalCullMeters.ToString("F0"));
+					Settings.espVerticalCullMeters = GUILayout.HorizontalSlider(Settings.espVerticalCullMeters, 0f, 200f);
+				}
+
 				npcDrawingsDropdown = GUILayout.Toggle(npcDrawingsDropdown, "NPC Alignment:", "button");
 				if (npcDrawingsDropdown)
 				{
@@ -155,21 +174,24 @@ namespace Mod
 				GUI.color = Color.green;
 				GUILayout.Label("Radar Monster Type Filters:");
 				GUI.color = Color.white;
+				Settings.showWhiteMonsters = GUILayout.Toggle(Settings.showWhiteMonsters, "Show White Monsters");
 				Settings.showMagicMonsters = GUILayout.Toggle(Settings.showMagicMonsters, "Show Magic Monsters");
 				Settings.showRareMonsters = GUILayout.Toggle(Settings.showRareMonsters, "Show Rare Monsters");
-				Settings.showWhiteMonsters = GUILayout.Toggle(Settings.showWhiteMonsters, "Show White Monsters");
+				Settings.showBossMonsters = GUILayout.Toggle(Settings.showBossMonsters, "Show Boss Monsters");
 			}
 
 			riskyOptionsDropdown = GUILayout.Toggle(riskyOptionsDropdown, "Risky Options:", "button");
 			if (riskyOptionsDropdown)
 			{
 				GUILayout.Label("These options are provided at your own risk.");
+
 				#region spacing
 				GUILayout.Space(10);
 				#endregion
 
 				GUILayout.Label("TimeScale: " + Settings.timeScale.ToString("F1"));
 				Settings.timeScale = GUILayout.HorizontalSlider(Settings.timeScale, 0.1f, 6.0f);
+
 				#region spacing
 				GUILayout.Space(10);
 				#endregion
@@ -226,9 +248,9 @@ namespace Mod
 
 			Rect resizeGripRect = new Rect(
 				windowRect.width - resizeGripSize, windowRect.height - resizeGripSize, resizeGripSize, resizeGripSize);
-			GUI.Box(resizeGripRect, "");
+			Box(resizeGripRect, "");
 
-			GUI.DragWindow(new Rect(0, 0, 10000, 20));
+			DragWindow(new Rect(0, 0, 10000, 20));
 
 			ProcessResizing(resizeGripRect, windowID);
 		}

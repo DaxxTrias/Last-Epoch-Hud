@@ -79,6 +79,9 @@ namespace Mod
 				// Inform AntiIdleSystem to suppress synthetic keepalive briefly after scene load
 				AntiIdleSystem.OnSceneChanged();
 				AutoDisconnect.ClearCache();
+				Shrines.OnSceneChanged();
+				RunePrisons.OnSceneChanged();
+				Chests.OnSceneChanged();
 			}
 			catch (System.Exception e)
 			{

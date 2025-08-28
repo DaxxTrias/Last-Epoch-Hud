@@ -17,7 +17,7 @@ namespace Mod.Cheats.ESP
 		//        SummonedCorpse: Necromancer summons
 
 		private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
-		private static readonly Color BloodOrange = new Color(0.90f, 0.30f, 0.00f, 1f);
+		private static readonly Color BloodOrange = Drawing.BloodOrange;
 
 		private static string SanitizeLabel(string? value)
 		{
@@ -85,8 +85,7 @@ namespace Mod.Cheats.ESP
 		{
 			None = 0,
 			LootLizard = 1,
-			Champion = 2,
-			Chest = 3
+			Champion = 2
 		}
 		
 		private static bool IsLootLizard(ActorVisuals actor)
@@ -117,59 +116,40 @@ namespace Mod.Cheats.ESP
 			return false;
 		}
 
-		private static bool IsChest(ActorVisuals actor)
+		private static bool IsChampion(ActorVisuals actor)
 		{
-			var go = actor.gameObject;
-			if (go.GetComponent<ChestVisualsCreator>() != null
-				|| go.GetComponentInParent<ChestVisualsCreator>() != null
-				|| go.GetComponentInChildren<ChestVisualsCreator>() != null)
+			var info = actor.GetComponent<ActorDisplayInformation>();
+			if (info == null) return false;
+			try
 			{
-				return true;
+				// Certain IL2CPP variants may throw on missing bindings; guard accordingly
+				return info.IsChampion();
 			}
-			return false;
+			catch (Exception)
+			{
+				return false;
+			}
 		}
- 
- 		private static bool IsChampion(ActorVisuals actor)
- 		{
- 			var info = actor.GetComponent<ActorDisplayInformation>();
- 			if (info == null) return false;
- 			try
- 			{
- 				// Certain IL2CPP variants may throw on missing bindings; guard accordingly
- 				return info.IsChampion();
- 			}
- 			catch (Exception)
- 			{
- 				return false;
- 			}
- 		}
- 
- 		internal static SpecialEntityType DetectSpecialEntity(ActorVisuals actor)
- 		{
- 			// Loot Lizards are unique entities; detect them first
- 			if (IsLootLizard(actor))
- 			{
- 				return SpecialEntityType.LootLizard;
- 			}
 
-			// Chests via visuals creator component
-			if (IsChest(actor))
+		internal static SpecialEntityType DetectSpecialEntity(ActorVisuals actor)
+		{
+			// Loot Lizards are unique entities; detect them first
+			if (IsLootLizard(actor))
 			{
-				return SpecialEntityType.Chest;
+				return SpecialEntityType.LootLizard;
 			}
- 
- 			// Champion NPCs (super rares)
- 			if (IsChampion(actor))
- 			{
- 				return SpecialEntityType.Champion;
- 			}
- 
- 			return SpecialEntityType.None;
- 		}
+
+			// Champion NPCs (super rares)
+			if (IsChampion(actor))
+			{
+				return SpecialEntityType.Champion;
+			}
+
+			return SpecialEntityType.None;
+		}
 
 		// Convenience exposure for later use by other systems
 		internal static bool IsChampionActor(ActorVisuals actor) => DetectSpecialEntity(actor) == SpecialEntityType.Champion;
-		internal static bool IsChestActor(ActorVisuals actor) => DetectSpecialEntity(actor) == SpecialEntityType.Chest;
 
 		public static void GatherActors()
 		{
@@ -187,6 +167,7 @@ namespace Mod.Cheats.ESP
 					// Detect special entities (loot lizards, champions, etc.)
 					var special = DetectSpecialEntity(actor);
 					bool isLizard = special == SpecialEntityType.LootLizard;
+					bool isAnySpecial = isLizard || special == SpecialEntityType.Champion;
 
 					// Non-lizard actors respect alignment/classification filters
 					if (!isLizard)
@@ -214,14 +195,27 @@ namespace Mod.Cheats.ESP
 					var position = actor.GetHealthBarPosition();
 					position.y += 0.5f;
 
-					var color = (isLizard || special == SpecialEntityType.Champion || special == SpecialEntityType.Chest) ? BloodOrange : GetRarityColor(actor, visual.alignment.name);
-					ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
+					// Prefix label for confirmed champions
+					if (special == SpecialEntityType.Champion)
+					{
+						name = "Champion " + name;
+					}
+					
+					// Per-special gating
+					if (isAnySpecial)
+					{
+						if (special == SpecialEntityType.Champion && !Settings.espShowChampions) continue;
+						if (special == SpecialEntityType.LootLizard && !Settings.espShowLootLizards) continue;
+					}
+					
+					var color = (isAnySpecial) ? BloodOrange : GetRarityColor(actor, visual.alignment.name);
+					if (Settings.showESPLines) ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
 					//ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
-					ESP.AddString(name, position, color);
+					if (Settings.showESPLabels) ESP.AddString(name, position, color);
 				}
 			}
 		}
-
+		
 		public static void OnUpdate()
 		{
 			if (ObjectManager.HasPlayer())

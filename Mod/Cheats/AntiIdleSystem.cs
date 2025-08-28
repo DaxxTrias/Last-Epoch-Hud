@@ -137,7 +137,9 @@ namespace Mod.Cheats
                             if (remaining > 0f)
                             {
                                 if (VerboseSuppressionLogs)
+#pragma warning disable CS0162 // Unreachable code detected
                                     MelonLogger.Msg($"[AntiIdle] Input notify suppressed ({_lastSuppressionReason}), remaining {remaining:F0}s");
+#pragma warning restore CS0162 // Unreachable code detected
                                 _nextInputNotifyAt = Time.time + Mathf.Max(5f, remaining + UnityEngine.Random.Range(1f, 3f));
                             }
                             else
@@ -708,15 +710,19 @@ namespace Mod.Cheats
                     return;
 
                 if (VerboseActionLogs)
+#pragma warning disable CS0162 // Unreachable code detected
                     MelonLogger.Msg("[AntiIdle] Action: heartbeat reset + status snapshot");
-                
+#pragma warning restore CS0162 // Unreachable code detected
+
                 // Try to reset the heartbeat timer by calling the game's internal heartbeat method
                 ResetHeartbeatTimer();
                 
                 // Brief networking snapshot
                 ParseNetworkingState();
                 if (VerboseActionLogs)
+#pragma warning disable CS0162 // Unreachable code detected
                     MelonLogger.Msg("[AntiIdle] Action complete");
+#pragma warning restore CS0162 // Unreachable code detected
             }
             catch (Exception e)
             {
@@ -1626,8 +1632,10 @@ namespace Mod.Cheats
                 _lastSuppressionReason = reason;
                 if (VerboseSuppressionLogs)
                 {
+#pragma warning disable CS0162 // Unreachable code detected
                     var remaining = _suppressSyntheticUntil - Time.time;
                     MelonLogger.Msg($"[AntiIdle] Suppression registered: reason={reason}, duration={seconds:F0}s, remaining={remaining:F0}s");
+#pragma warning restore CS0162 // Unreachable code detected
                 }
             }
         }
