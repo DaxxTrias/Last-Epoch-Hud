@@ -52,27 +52,23 @@ namespace Mod.Cheats.ESP
 				var visuals = go.GetComponent<RunePrisonVisuals>();
 				if (visuals != null && go.activeInHierarchy)
 				{
-					// Only include if there is an active MinimapIconTrigger child (unused prison)
-					bool hasActiveTrigger = false;
-					for (int j = 0; j < child.childCount; j++)
+					// Skip if already triggered/consumed when the API is available
+					if (s_visualsTriggeredProperty != null)
 					{
-						var sub = child.GetChild(j);
-						if (sub == null) continue;
-						var subGo = sub.gameObject;
-						if (subGo == null) continue;
-						if (sub.name != null && sub.name.IndexOf("MinimapIconTrigger", StringComparison.OrdinalIgnoreCase) >= 0)
-						{
-							if (subGo.activeSelf) hasActiveTrigger = true;
-							break;
-						}
+						object? val = null;
+						try { val = s_visualsTriggeredProperty.GetValue(visuals); }
+						catch { /* ignore reflection issues */ }
+						if (val is bool b && b)
+							continue;
 					}
-					if (hasActiveTrigger)
-						s_runePrisonTransforms.Add(child);
+
+					s_runePrisonTransforms.Add(child);
 				}
 			}
 
-			// Only scan once per scene unless ZoneManager missing, then retry occasionally
-			s_needsScan = false;
+			// Schedule periodic rescans to catch late activations or dynamic spawns
+			s_nextScanTime = Time.unscaledTime + RetryScanInterval;
+			s_needsScan = true;
 		}
 
 		public static void OnUpdate()
@@ -94,7 +90,7 @@ namespace Mod.Cheats.ESP
 				var go = tr.gameObject;
 				if (go == null || !go.activeInHierarchy) { s_runePrisonTransforms.RemoveAt(i); continue; }
 
-				// If MinimapIconTrigger child is no longer active, it has been consumed
+				// If visuals report triggered, remove
 				if (s_visualsTriggeredProperty != null)
 				{
 					var visuals = go.GetComponent<RunePrisonVisuals>();
