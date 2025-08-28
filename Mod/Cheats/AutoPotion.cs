@@ -12,6 +12,7 @@ namespace Mod.Cheats
         private static PlayerHealth? _cachedPlayerHealth;
         private static ChangeHealthMaterialDuringLifetime? _cachedReaperCheck;
         private static GameObject? _cachedPlayerObject;
+        private static HealthPotion? _cachedHealthPotion;
         
         // Timing and state management
         private static float _lastUseTime = 0f;
@@ -69,6 +70,7 @@ namespace Mod.Cheats
                     _cachedLocalPlayer = localPlayer.GetComponent<LocalPlayer>();
                     _cachedPlayerHealth = localPlayer.GetComponent<PlayerHealth>();
                     _cachedReaperCheck = localPlayer.GetComponentInChildren<ChangeHealthMaterialDuringLifetime>();
+                    _cachedHealthPotion = localPlayer.GetComponent<HealthPotion>();
                     _componentsInitialized = true;
                     
                     MelonLogger.Msg("AutoPotion: Components cached successfully");
@@ -195,9 +197,6 @@ namespace Mod.Cheats
                 // Early exit if auto-potion is disabled
                 if (!Settings.useAutoPot) return;
                 
-                // Skip entirely in offline mode because LocalPlayer input component is not present
-                if (ObjectManager.IsOfflineMode()) return;
-                
                 // Check cooldown
                 if (!IsCooldownExpired()) return;
                 
@@ -206,6 +205,44 @@ namespace Mod.Cheats
                 
                 // Validate player state
                 if (!IsPlayerStateValid()) return;
+
+                // Offline path: use HealthPotion component directly (no LocalPlayer component available)
+                if (ObjectManager.IsOfflineMode())
+                {
+                    if (_cachedHealthPotion == null)
+                    {
+                        if (_lastKnownRemainingPotions != 0)
+                            MelonLogger.Warning("AutoPotion: HealthPotion component not found (offline)");
+                        return;
+                    }
+
+                    var remainingOffline = TryGetRemainingPotions();
+                    if (remainingOffline.HasValue)
+                    {
+                        int rem = remainingOffline.Value;
+                        if (rem <= 0)
+                        {
+                            if (_lastKnownRemainingPotions != 0)
+                                MelonLogger.Warning("AutoPotion: No health potions remaining (offline)");
+                            _lastKnownRemainingPotions = 0;
+                            return;
+                        }
+                        _lastKnownRemainingPotions = rem;
+                    }
+
+                    _cachedHealthPotion.UsePotion(true, true);
+                    _lastUseTime = Time.time;
+
+                    if (remainingOffline.HasValue)
+                    {
+                        MelonLogger.Msg($"AutoPotion: Health potion used (offline), remaining ~{Mathf.Max(remainingOffline.Value - 1, 0)}");
+                    }
+                    else
+                    {
+                        MelonLogger.Msg($"AutoPotion: Health potion used (offline) at {Time.time:F2}");
+                    }
+                    return;
+                }
 
                 // Optional: log when no potions remain (if we can detect it)
                 var remaining = TryGetRemainingPotions();
@@ -251,9 +288,6 @@ namespace Mod.Cheats
                 // Early exit if auto-potion is disabled or no player exists
                 if (!Settings.useAutoPot || !ObjectManager.HasPlayer()) return;
 
-                // If offline, disable behavior entirely
-                if (ObjectManager.IsOfflineMode()) return;
-
                 // Initialize components if needed
                 if (!InitializeComponents()) return;
 
@@ -287,6 +321,7 @@ namespace Mod.Cheats
             _cachedPlayerHealth = null;
             _cachedReaperCheck = null;
             _cachedPlayerObject = null;
+            _cachedHealthPotion = null;
             _componentsInitialized = false;
             _lastKnownRemainingPotions = -1;
             MelonLogger.Msg("AutoPotion: Component cache cleared");
