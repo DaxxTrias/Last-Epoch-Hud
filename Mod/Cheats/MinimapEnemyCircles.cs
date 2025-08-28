@@ -402,8 +402,10 @@ namespace Mod.Cheats
                     return false;
                 if (displayInfo.actorClass == DisplayActorClass.Rare && !Settings.showRareMonsters)
                     return false;
-                if (displayInfo.actorClass == DisplayActorClass.Boss) // Always show bosses (they're red)
-                    return true;
+                				if (displayInfo.actorClass == DisplayActorClass.Boss && !Settings.showBossMonsters)
+					return false;
+				if (displayInfo.actorClass == DisplayActorClass.Boss)
+					return true;
                 
                 // For normal/white monsters
                 if (displayInfo.actorClass == DisplayActorClass.Normal && !Settings.showWhiteMonsters)

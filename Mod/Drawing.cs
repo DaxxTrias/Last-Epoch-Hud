@@ -13,6 +13,8 @@ namespace Mod
 		// private static int debugLogsThisFrame = 0;
 		// private const int DebugMaxLogsPerFrame = 8;
 
+		public static readonly Color BloodOrange = new Color(1.00f, 0.50f, 0.00f, 1f);
+
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
 			if (vecIn.z < 0)
@@ -26,6 +28,14 @@ namespace Mod
 							 );
 		}
 
+		// Ensures a rectangle defined by its upper-left corner and size stays within the screen bounds with padding
+		static Vector2 ClampRectToScreen(Vector2 upperLeft, Vector2 size, Vector2 padding)
+		{
+			float clampedX = Mathf.Clamp(upperLeft.x, padding.x, Screen.width - size.x - padding.x);
+			float clampedY = Mathf.Clamp(upperLeft.y, padding.y, Screen.height - size.y - padding.y);
+			return new Vector2(clampedX, clampedY);
+		}
+
 		public static void SetupGuiStyle()
 		{
 			// Must be called from within OnGUI
@@ -34,22 +44,32 @@ namespace Mod
 				StringStyle = new GUIStyle(GUI.skin.label);
 				StringStyle.clipping = TextClipping.Overflow;
 				StringStyle.wordWrap = false;
+				// Ensure default text color is neutral; specific draws will override
+				StringStyle.normal.textColor = Color.white;
 			}
 		}
 
 		public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var cam = Camera.main;
 			if (cam == null) return;
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
+			if (screen.z < 0) screen *= -1; // mirror behind-camera points like ClampToScreen
 			screen.y = Screen.height - screen.y;
-			// Clamp the label to the screen
-			Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
 
 			var content = new GUIContent(label);
 			var style = StringStyle ?? new GUIStyle();
 			var size = style.CalcSize(content);
-			var upperLeft = centered ? position - size / 2f : position;
+
+			// Compute desired upper-left, then clamp the rectangle so it fully fits on screen
+			Vector2 desiredUpperLeft = centered
+				? new Vector2(screen.x, screen.y) - size / 2f
+				: new Vector2(screen.x, screen.y);
+			Vector2 clampedUpperLeft = ClampRectToScreen(desiredUpperLeft, size, new Vector2(25, 25));
 
 			// if (Settings.debugESPNames)
 			// {
@@ -62,31 +82,51 @@ namespace Mod
 			// 	{
 			// 		debugLogsThisFrame++;
 			// 		string printable = label.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
-			// 		MelonLogger.Msg($"ESP Name Debug: '{printable}' len={label.Length} size=({size.x:F1},{size.y:F1}) screen=({screen.x:F1},{screen.y:F1}) clamped=({position.x:F1},{position.y:F1}) rect=({upperLeft.x:F1},{upperLeft.y:F1},{size.x:F1},{size.y:F1})");
+			// 		MelonLogger.Msg($"ESP Name Debug: '{printable}' len={label.Length} size=({size.x:F1},{size.y:F1}) screen=({screen.x:F1},{screen.y:F1}) rect=({clampedUpperLeft.x:F1},{clampedUpperLeft.y:F1},{size.x:F1},{size.y:F1})");
 			// 	}
 			// }
 
-			GUI.Label(new Rect(upperLeft, size), content, style);
+			GUI.Label(new Rect(clampedUpperLeft, size), content, style);
 		}
 
 		public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var style = StringStyle ?? new GUIStyle();
-			var backup = style.normal.textColor;
+			// Backup colors to avoid leaking state across GUI calls
+			var backupTextColor = style.normal.textColor;
+			var prevContentColor = GUI.contentColor;
+			var prevGuiColor = GUI.color;
+
+			// Neutralize any global GUI tint; rely solely on style text color
+			GUI.contentColor = Color.white;
+			GUI.color = Color.white;
+
+			// Apply the requested color for this draw only via style
 			style.normal.textColor = color;
+
 			DrawString(worldPosition, label, centered);
-			style.normal.textColor = backup;
+
+			// Restore previous colors
+			style.normal.textColor = backupTextColor;
+			GUI.contentColor = prevContentColor;
+			GUI.color = prevGuiColor;
 		}
 
 		public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
 			var cam = Camera.main;
 			if (cam == null) return;
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
+			if (screen.z < 0) screen *= -1; // mirror behind-camera points
 			screen.y = Screen.height - screen.y;
-
-			// Clamp the label to the screen
-			Vector2 position = ClampToScreen(screen, new Vector2(25, 25));
 
 			// Split the label into two parts: first 3 characters and the rest
 			string firstPart = label.Length > 3 ? label.Substring(0, 3) : label;
@@ -100,7 +140,12 @@ namespace Mod
 			var secondSize = style.CalcSize(secondContent);
 
 			var totalSize = new Vector2(firstSize.x + secondSize.x, Mathf.Max(firstSize.y, secondSize.y));
-			var upperLeft = centered ? position - totalSize / 2f : position;
+
+			// Compute desired upper-left for the combined rect, then clamp it
+			Vector2 desiredUpperLeft = centered
+				? new Vector2(screen.x, screen.y) - totalSize / 2f
+				: new Vector2(screen.x, screen.y);
+			Vector2 upperLeft = ClampRectToScreen(desiredUpperLeft, totalSize, new Vector2(25, 25));
 
 			// Backup the current GUI color
 			Color prevColor = GUI.color;
@@ -119,6 +164,10 @@ namespace Mod
 
 		public static void DrawLine(Vector3 worldA, Vector3 worldB, Color color, float width)
 		{
+			// Respect line visibility toggle
+			if (!Settings.showESPLines)
+				return;
+
 			if (lineTex == null)
 			{
 				lineTex = new Texture2D(1, 1);

@@ -16,6 +16,7 @@ namespace Mod
 		private const string CatMinimap = "LEHud_Minimap";
 		private const string CatNPC = "LEHud_NPC";
 		private const string CatItems = "LEHud_Items";
+		private const string CatESP = "LEHud_ESP";
 
 		// Categories
 		private static MelonPreferences_Category? _general;
@@ -26,12 +27,23 @@ namespace Mod
 		private static MelonPreferences_Category? _minimap;
 		private static MelonPreferences_Category? _npc;
 		private static MelonPreferences_Category? _items;
+		private static MelonPreferences_Category? _esp;
 
 		// Entries - General
 		private static MelonPreferences_Entry<bool>? _mapHack;
 		private static MelonPreferences_Entry<float>? _drawDistance;
 		private static MelonPreferences_Entry<float>? _timeScale;
 		private static MelonPreferences_Entry<bool>? _useLootFilter;
+
+		// Entries - ESP
+		private static MelonPreferences_Entry<bool>? _showESPLines;
+		private static MelonPreferences_Entry<bool>? _showESPLabels;
+		private static MelonPreferences_Entry<float>? _espVerticalCullMeters;
+		private static MelonPreferences_Entry<bool>? _espShowChests;
+		private static MelonPreferences_Entry<bool>? _espShowShrines;
+		private static MelonPreferences_Entry<bool>? _espShowRunePrisons;
+		private static MelonPreferences_Entry<bool>? _espShowChampions;
+		private static MelonPreferences_Entry<bool>? _espShowLootLizards;
 
 		// Entries - Patches
 		private static MelonPreferences_Entry<bool>? _removeFog;
@@ -74,6 +86,7 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _showMagicMonsters;
 		private static MelonPreferences_Entry<bool>? _showRareMonsters;
 		private static MelonPreferences_Entry<bool>? _showWhiteMonsters;
+		private static MelonPreferences_Entry<bool>? _showBossMonsters;
 		private static MelonPreferences_Entry<float>? _minimapOffsetX;
 		private static MelonPreferences_Entry<float>? _minimapOffsetY;
 
@@ -97,6 +110,7 @@ namespace Mod
 			_minimap = MelonPreferences.CreateCategory(CatMinimap, "LEHud - Minimap");
 			_npc = MelonPreferences.CreateCategory(CatNPC, "LEHud - NPC");
 			_items = MelonPreferences.CreateCategory(CatItems, "LEHud - Items");
+			_esp = MelonPreferences.CreateCategory(CatESP, "LEHud - ESP");
 
 			// Bind categories to a single prefs file and autoload existing values before creating entries
 			var prefsDir = System.IO.Path.GetDirectoryName(GetStandaloneConfigPath())!;
@@ -109,11 +123,21 @@ namespace Mod
 			_minimap.SetFilePath(prefsPath, autoload: true);
 			_npc.SetFilePath(prefsPath, autoload: true);
 			_items.SetFilePath(prefsPath, autoload: true);
+			_esp.SetFilePath(prefsPath, autoload: true);
 
 			_mapHack = _general.CreateEntry("MapHack", Settings.mapHack);
 			_drawDistance = _general.CreateEntry("DrawDistance", Settings.drawDistance);
 			_timeScale = _general.CreateEntry("TimeScale", Settings.timeScale);
 			_useLootFilter = _general.CreateEntry("UseLootFilter", Settings.useLootFilter);
+
+			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
+			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
+			_espVerticalCullMeters = _esp.CreateEntry("EspVerticalCullMeters", Settings.espVerticalCullMeters);
+			_espShowChests = _esp.CreateEntry("ShowChests", Settings.espShowChests);
+			_espShowShrines = _esp.CreateEntry("ShowShrines", Settings.espShowShrines);
+			_espShowRunePrisons = _esp.CreateEntry("ShowRunePrisons", Settings.espShowRunePrisons);
+			_espShowChampions = _esp.CreateEntry("ShowChampions", Settings.espShowChampions);
+			_espShowLootLizards = _esp.CreateEntry("ShowLootLizards", Settings.espShowLootLizards);
 
 			_removeFog = _patches.CreateEntry("RemoveFog", Settings.removeFog);
 			_cameraZoomUnlock = _patches.CreateEntry("CameraZoomUnlock", Settings.cameraZoomUnlock);
@@ -151,6 +175,7 @@ namespace Mod
 			_showMagicMonsters = _minimap.CreateEntry("ShowMagicMonsters", Settings.showMagicMonsters);
 			_showRareMonsters = _minimap.CreateEntry("ShowRareMonsters", Settings.showRareMonsters);
 			_showWhiteMonsters = _minimap.CreateEntry("ShowWhiteMonsters", Settings.showWhiteMonsters);
+			_showBossMonsters = _minimap.CreateEntry("ShowBossMonsters", Settings.showBossMonsters);
 			_minimapOffsetX = _minimap.CreateEntry("OffsetX", Settings.minimapOffsetX);
 			_minimapOffsetY = _minimap.CreateEntry("OffsetY", Settings.minimapOffsetY);
 
@@ -172,6 +197,15 @@ namespace Mod
 			Settings.drawDistance = Clamp(_drawDistance!.Value, 0f, 1000f);
 			Settings.timeScale = Clamp(_timeScale!.Value, 0.1f, 10f);
 			Settings.useLootFilter = _useLootFilter!.Value;
+
+			Settings.showESPLines = _showESPLines!.Value;
+			Settings.showESPLabels = _showESPLabels!.Value;
+			Settings.espVerticalCullMeters = Clamp(_espVerticalCullMeters!.Value, 0f, 200f);
+			Settings.espShowChests = _espShowChests!.Value;
+			Settings.espShowShrines = _espShowShrines!.Value;
+			Settings.espShowRunePrisons = _espShowRunePrisons!.Value;
+			Settings.espShowChampions = _espShowChampions!.Value;
+			Settings.espShowLootLizards = _espShowLootLizards!.Value;
 
 			Settings.removeFog = _removeFog!.Value;
 			Settings.cameraZoomUnlock = _cameraZoomUnlock!.Value;
@@ -209,6 +243,7 @@ namespace Mod
 			Settings.showMagicMonsters = _showMagicMonsters!.Value;
 			Settings.showRareMonsters = _showRareMonsters!.Value;
 			Settings.showWhiteMonsters = _showWhiteMonsters!.Value;
+			Settings.showBossMonsters = _showBossMonsters!.Value;
 			Settings.minimapOffsetX = Clamp(_minimapOffsetX!.Value, -1000f, 1000f);
 			Settings.minimapOffsetY = Clamp(_minimapOffsetY!.Value, -1000f, 1000f);
 
@@ -227,6 +262,15 @@ namespace Mod
 			_drawDistance!.Value = Settings.drawDistance;
 			_timeScale!.Value = Settings.timeScale;
 			_useLootFilter!.Value = Settings.useLootFilter;
+
+			_showESPLines!.Value = Settings.showESPLines;
+			_showESPLabels!.Value = Settings.showESPLabels;
+			_espVerticalCullMeters!.Value = Settings.espVerticalCullMeters;
+			_espShowChests!.Value = Settings.espShowChests;
+			_espShowShrines!.Value = Settings.espShowShrines;
+			_espShowRunePrisons!.Value = Settings.espShowRunePrisons;
+			_espShowChampions!.Value = Settings.espShowChampions;
+			_espShowLootLizards!.Value = Settings.espShowLootLizards;
 
 			_removeFog!.Value = Settings.removeFog;
 			_cameraZoomUnlock!.Value = Settings.cameraZoomUnlock;
@@ -264,6 +308,7 @@ namespace Mod
 			_showMagicMonsters!.Value = Settings.showMagicMonsters;
 			_showRareMonsters!.Value = Settings.showRareMonsters;
 			_showWhiteMonsters!.Value = Settings.showWhiteMonsters;
+			_showBossMonsters!.Value = Settings.showBossMonsters;
 			_minimapOffsetX!.Value = Settings.minimapOffsetX;
 			_minimapOffsetY!.Value = Settings.minimapOffsetY;
 
@@ -286,6 +331,7 @@ namespace Mod
 				_minimap?.SaveToFile();
 				_npc?.SaveToFile();
 				_items?.SaveToFile();
+				_esp?.SaveToFile();
 			}
 			catch (Exception e)
 			{
@@ -460,6 +506,7 @@ namespace Mod
 			public bool showMagicMonsters { get; set; }
 			public bool showRareMonsters { get; set; }
 			public bool showWhiteMonsters { get; set; }
+			public bool showBossMonsters { get; set; }
 			public float minimapOffsetX { get; set; }
 			public float minimapOffsetY { get; set; }
 			public Dictionary<string, bool> npcClassifications { get; set; } = new();
@@ -467,6 +514,14 @@ namespace Mod
 			public Dictionary<string, bool> itemDrawings { get; set; } = new();
 			public bool useSimpleAntiIdle { get; set; }
 			public float simpleAntiIdleInterval { get; set; }
+			public bool showESPLines { get; set; }
+			public bool showESPLabels { get; set; }
+			public float espVerticalCullMeters { get; set; }
+			public bool espShowChests { get; set; }
+			public bool espShowShrines { get; set; }
+			public bool espShowRunePrisons { get; set; }
+			public bool espShowChampions { get; set; }
+			public bool espShowLootLizards { get; set; }
 		}
 
 		private static SettingsSnapshot CreateSnapshot()
@@ -507,13 +562,22 @@ namespace Mod
 				showMagicMonsters = Settings.showMagicMonsters,
 				showRareMonsters = Settings.showRareMonsters,
 				showWhiteMonsters = Settings.showWhiteMonsters,
+				showBossMonsters = Settings.showBossMonsters,
 				minimapOffsetX = Settings.minimapOffsetX,
 				minimapOffsetY = Settings.minimapOffsetY,
 				npcClassifications = new Dictionary<string, bool>(Settings.npcClassifications),
 				npcDrawings = new Dictionary<string, bool>(Settings.npcDrawings),
 				itemDrawings = new Dictionary<string, bool>(Settings.itemDrawings),
 				useSimpleAntiIdle = Settings.useSimpleAntiIdle,
-				simpleAntiIdleInterval = Settings.simpleAntiIdleInterval
+				simpleAntiIdleInterval = Settings.simpleAntiIdleInterval,
+				showESPLines = Settings.showESPLines,
+				showESPLabels = Settings.showESPLabels,
+				espVerticalCullMeters = Settings.espVerticalCullMeters,
+				espShowChests = Settings.espShowChests,
+				espShowShrines = Settings.espShowShrines,
+				espShowRunePrisons = Settings.espShowRunePrisons,
+				espShowChampions = Settings.espShowChampions,
+				espShowLootLizards = Settings.espShowLootLizards
 			};
 		}
 
@@ -553,10 +617,19 @@ namespace Mod
 			Settings.showMagicMonsters = s.showMagicMonsters;
 			Settings.showRareMonsters = s.showRareMonsters;
 			Settings.showWhiteMonsters = s.showWhiteMonsters;
+			Settings.showBossMonsters = s.showBossMonsters;
 			Settings.minimapOffsetX = Clamp(s.minimapOffsetX, -1000f, 1000f);
 			Settings.minimapOffsetY = Clamp(s.minimapOffsetY, -1000f, 1000f);
 			Settings.useSimpleAntiIdle = s.useSimpleAntiIdle;
 			Settings.simpleAntiIdleInterval = Clamp(s.simpleAntiIdleInterval, 60f, 1800f);
+			Settings.showESPLines = s.showESPLines;
+			Settings.showESPLabels = s.showESPLabels;
+			Settings.espVerticalCullMeters = Clamp(s.espVerticalCullMeters, 0f, 200f);
+			Settings.espShowChests = s.espShowChests;
+			Settings.espShowShrines = s.espShowShrines;
+			Settings.espShowRunePrisons = s.espShowRunePrisons;
+			Settings.espShowChampions = s.espShowChampions;
+			Settings.espShowLootLizards = s.espShowLootLizards;
 
 			ApplyDictionarySafely(Settings.npcClassifications, s.npcClassifications);
 			ApplyDictionarySafely(Settings.npcDrawings, s.npcDrawings);

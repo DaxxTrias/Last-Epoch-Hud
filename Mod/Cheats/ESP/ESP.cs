@@ -81,12 +81,15 @@ namespace Mod.Cheats.ESP
             Draw();
         }
 
-        public static void OnUpdate()
-        {
-            Clear();
-            Items.OnUpdate();
-            GoldPiles.OnUpdate();
-            Actors.OnUpdate();
-        }
+        		public static void OnUpdate()
+		{
+			Clear();
+			Items.OnUpdate();
+			GoldPiles.OnUpdate();
+			Shrines.OnUpdate();
+			RunePrisons.OnUpdate();
+			Chests.OnUpdate();
+			Actors.OnUpdate();
+		}
     }
 }
