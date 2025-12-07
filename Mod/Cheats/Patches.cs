@@ -1300,40 +1300,6 @@ namespace Mod.Cheats.Patches
                 }
             }
             #endregion
-
-            #region chest visuals registration
-            [HarmonyPatch(typeof(ChestVisualsCreator), "Awake")]
-            public class ChestVisualsCreator_Awake
-            {
-                public static void Postfix(ChestVisualsCreator __instance)
-                {
-                    try
-                    {
-                        if (__instance != null && __instance.gameObject != null)
-                            global::Mod.Cheats.ESP.Chests.Register(__instance.gameObject);
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-
-            [HarmonyPatch(typeof(ChestVisualsCreator), "OnDestroy")]
-            public class ChestVisualsCreator_OnDestroy
-            {
-                public static void Prefix(ChestVisualsCreator __instance)
-                {
-                    try
-                    {
-                        if (__instance != null && __instance.gameObject != null)
-                            global::Mod.Cheats.ESP.Chests.Unregister(__instance.gameObject);
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-            #endregion
         }
     }
 }
