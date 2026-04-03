@@ -1,4 +1,4 @@
-﻿using Il2Cpp;
+using Il2Cpp;
 
 namespace Mod
 {
@@ -70,6 +70,19 @@ namespace Mod
         public static bool espShowRunePrisons = true;
         public static bool espShowChampions = true;
         public static bool espShowLootLizards = true;
+
+#if DEBUG
+        // Debug / diagnostics (DEBUG builds only)
+        public static bool debugEnableDiagnostics = false;
+        public static bool debugShowLocalPlayerPanel = true;
+        public static bool debugShowLocalPlayerWorldLabel = true;
+        public static bool debugDrawAllManagerActors = false;
+        public static bool debugDrawAllGroundItems = true;
+        public static bool debugDrawAllGroundGold = false;
+        public static bool debugDrawManagerLines = false;
+        public static bool debugIgnoreDistanceCulling = true;
+        public static int debugMaxEntriesPerSystem = 200;
+#endif
 
         public static Dictionary<string, bool> npcClassifications = new Dictionary<string, bool>
         {

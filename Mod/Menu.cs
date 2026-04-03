@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using UnityEngine;
 using static UnityEngine.GUI;
 using MelonLoader;
@@ -22,6 +22,9 @@ namespace Mod
 		public static bool antiIdleSubDropdown = false;
 		public static bool espDropdown = false;
 		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
+#if DEBUG
+		public static bool debugToolsDropdown = false;
+#endif
 
 		public static void DrawModWindow(int windowID)
 		{
@@ -108,6 +111,28 @@ namespace Mod
 			}
 
 			GUI.enabled = true;
+
+#if DEBUG
+			debugToolsDropdown = GUILayout.Toggle(debugToolsDropdown, "DEBUG Tools:", "button");
+			if (debugToolsDropdown)
+			{
+				Settings.debugEnableDiagnostics = GUILayout.Toggle(Settings.debugEnableDiagnostics, "Enable Diagnostics");
+				if (Settings.debugEnableDiagnostics)
+				{
+					Settings.debugShowLocalPlayerPanel = GUILayout.Toggle(Settings.debugShowLocalPlayerPanel, "Show Local Player Panel");
+					Settings.debugShowLocalPlayerWorldLabel = GUILayout.Toggle(Settings.debugShowLocalPlayerWorldLabel, "Show Local Player World Label");
+					Settings.debugDrawAllManagerActors = GUILayout.Toggle(Settings.debugDrawAllManagerActors, "Draw All ActorManager Actors (No Sorting)");
+					Settings.debugDrawAllGroundItems = GUILayout.Toggle(Settings.debugDrawAllGroundItems, "Draw All GroundItemVisuals");
+					Settings.debugDrawAllGroundGold = GUILayout.Toggle(Settings.debugDrawAllGroundGold, "Draw All GroundGoldVisuals");
+					Settings.debugDrawManagerLines = GUILayout.Toggle(Settings.debugDrawManagerLines, "Draw Debug Lines To Targets");
+					Settings.debugIgnoreDistanceCulling = GUILayout.Toggle(Settings.debugIgnoreDistanceCulling, "Ignore Draw Distance Culling");
+
+					GUILayout.Label("Debug Max Entries/System: " + Settings.debugMaxEntriesPerSystem.ToString());
+					var debugMax = GUILayout.HorizontalSlider(Settings.debugMaxEntriesPerSystem, 10f, 500f);
+					Settings.debugMaxEntriesPerSystem = Mathf.RoundToInt(debugMax);
+				}
+			}
+#endif
 
 			// Automation Section
 			automationDropdown = GUILayout.Toggle(automationDropdown, "Automation:", "button");

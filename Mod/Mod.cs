@@ -1,4 +1,4 @@
-﻿using MelonLoader;
+using MelonLoader;
 using Mod.Cheats;
 using Mod.Cheats.ESP;
 using Mod.Game;
@@ -135,6 +135,9 @@ namespace Mod
 				Drawing.SetupGuiStyle();
 				Menu.OnGUI();
 				ESP.OnGUI();
+#if DEBUG
+				DebugDiagnostics.OnGUI();
+#endif
 			}
 			catch (System.Exception e)
 			{

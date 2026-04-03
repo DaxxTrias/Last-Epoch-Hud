@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Mod.Cheats.ESP
 {
@@ -44,8 +44,8 @@ namespace Mod.Cheats.ESP
 
     internal class ESP
     {
-        public static List<LineDrawing> lineDrawings = new List<LineDrawing>();
-        public static List<StringDrawing> stringDrawings = new List<StringDrawing>();
+        public static readonly List<LineDrawing> lineDrawings = new List<LineDrawing>();
+        public static readonly List<StringDrawing> stringDrawings = new List<StringDrawing>();
 
         public static void AddLine(Vector3 start, Vector3 end, Color color)
         {
@@ -90,6 +90,9 @@ namespace Mod.Cheats.ESP
 			RunePrisons.OnUpdate();
 			Chests.OnUpdate();
 			Actors.OnUpdate();
+#if DEBUG
+			DebugDiagnostics.OnUpdate();
+#endif
 		}
     }
 }
