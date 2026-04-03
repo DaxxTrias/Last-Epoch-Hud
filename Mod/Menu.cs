@@ -3,6 +3,7 @@ using UnityEngine;
 using static UnityEngine.GUI;
 using MelonLoader;
 using Mod.Cheats;
+using Mod.Cheats.ESP;
 using Mod.Game;
 
 namespace Mod
@@ -343,6 +344,14 @@ namespace Mod
 			{
 				AutoPotion.LogDebugInfo();
 			}
+
+#if DEBUG
+			// Debug key for actor/local-player correlation diagnostics (F11)
+			if (Input.GetKeyDown(KeyCode.F11))
+			{
+				DebugDiagnostics.LogCorrelationSnapshot();
+			}
+#endif
 		}
 	}
 }
