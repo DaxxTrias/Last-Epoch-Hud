@@ -164,6 +164,9 @@ namespace Mod.Cheats.ESP
 				{
 					if (!actor.gameObject.activeInHierarchy) continue;
 
+					// Skip the local player's own actor visuals
+					if (actor.transform.IsChildOf(localPlayer.transform)) continue;
+
 					// Detect special entities (loot lizards, champions, etc.)
 					var special = DetectSpecialEntity(actor);
 					bool isLizard = special == SpecialEntityType.LootLizard;
@@ -192,8 +195,8 @@ namespace Mod.Cheats.ESP
 					if (distance >= Settings.drawDistance || actor.dead) continue;
 
 					var name = GetActorName(actor);
-					var position = actor.GetHealthBarPosition();
-					position.y += 0.5f;
+					var position = actor.transform.position;
+					position.y += 1.5f;
 
 					// Prefix label for confirmed champions
 					if (special == SpecialEntityType.Champion)
