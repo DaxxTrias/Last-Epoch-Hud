@@ -135,12 +135,12 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(LogType logType, UnityEngine.Object context, string format, Il2CppReferenceArray<Il2CppSystem.Object> args)
                 {
-                    //MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
+                    MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
 
                     // Log all elements
-                    //MelonLogger.Msg($"LogType: {logType}");
-                    //MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    //MelonLogger.Msg($"Format: {format}");
+                    MelonLogger.Msg($"LogType: {logType}");
+                    MelonLogger.Msg($"Context: {context?.name ?? "null"}");
+                    MelonLogger.Msg($"Format: {format}");
 
                     //if (args != null)
                     //{
@@ -168,8 +168,8 @@ namespace Mod.Cheats.Patches
                     MelonLogger.Msg("[LeHud.Hooks]  ClientLogHandler.LogException hooked and blocked.");
 
                     // Log all elements
-                    //MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    //MelonLogger.Msg($"Exception: {exception?.ToString() ?? "null"}");
+                    MelonLogger.Msg($"Context: {context?.name ?? "null"}");
+                    MelonLogger.Msg($"Exception: {exception?.ToString() ?? "null"}");
 
                     return false;
                 }
