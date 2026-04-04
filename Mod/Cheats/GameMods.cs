@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ObjectManager = Mod.Game.ObjectManager;
 using Il2Cpp;
 using MelonLoader;

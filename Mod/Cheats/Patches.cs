@@ -148,6 +148,8 @@ namespace Mod.Cheats.Patches
             public class MainMenuPanel_BugReportHooks : MelonMod
             {
                 private static List<System.Reflection.MethodBase>? s_targets;
+                private static System.Reflection.FieldInfo? s_bugReportButtonField;
+                private static System.Reflection.MethodInfo? s_bugReportButtonGetter;
 
                 [HarmonyPrepare]
                 public static bool Prepare()
@@ -169,6 +171,9 @@ namespace Mod.Cheats.Patches
                             .Cast<System.Reflection.MethodBase>()
                             .ToList();
 
+                        s_bugReportButtonField = AccessTools.Field(mainMenuPanelType, "bugReportButton");
+                        s_bugReportButtonGetter = AccessTools.PropertyGetter(mainMenuPanelType, "bugReportButton");
+
                         if (s_targets.Count == 0)
                             return false;
 
@@ -187,7 +192,52 @@ namespace Mod.Cheats.Patches
 
                 public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
                 {
-                    BugReportUiDisabler.TryDisableBugReportUi(__instance, $"MainMenuPanel.{__originalMethod?.Name ?? "Unknown"}");
+                    string source = $"MainMenuPanel.{__originalMethod?.Name ?? "Unknown"}";
+                    TryDisableMainMenuBugButton(__instance, source);
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, source);
+                }
+
+                private static void TryDisableMainMenuBugButton(object? instance, string source)
+                {
+                    if (instance == null)
+                        return;
+
+                    try
+                    {
+                        object? bugButton = null;
+                        if (s_bugReportButtonField != null)
+                        {
+                            bugButton = s_bugReportButtonField.GetValue(instance);
+                        }
+                        else if (s_bugReportButtonGetter != null)
+                        {
+                            bugButton = s_bugReportButtonGetter.Invoke(instance, null);
+                        }
+
+                        if (bugButton == null)
+                            return;
+
+                        if (bugButton is Component component && component.gameObject != null)
+                        {
+                            component.gameObject.SetActive(false);
+                            BugReportUiDisabler.LogOnce(
+                                key: $"{source}:MainMenuPanel.bugReportButton:hidden-fastpath",
+                                message: $"[LeHud.Hooks]  {source} hid MainMenuPanel.bugReportButton.");
+                            return;
+                        }
+
+                        if (bugButton is GameObject gameObject)
+                        {
+                            gameObject.SetActive(false);
+                            BugReportUiDisabler.LogOnce(
+                                key: $"{source}:MainMenuPanel.bugReportButton.go:hidden-fastpath",
+                                message: $"[LeHud.Hooks]  {source} hid MainMenuPanel.bugReportButton.gameObject.");
+                        }
+                    }
+                    catch
+                    {
+                        // Keep hook non-fatal; reflection fallback handles version variance.
+                    }
                 }
             }
 
