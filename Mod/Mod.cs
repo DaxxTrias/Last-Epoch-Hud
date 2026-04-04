@@ -56,6 +56,7 @@ namespace Mod
 		public override void OnSceneWasLoaded(int buildindex, string sceneName) // Runs when a Scene has Loaded and is passed the Scene's Build Index and Name.
 		{
 			//MelonLogger.Msg("OnSceneWasLoaded: " + buildindex.ToString() + " | " + sceneName); // occurs before scene init
+			AutoDisconnect.OnSceneChanged();
 			GameMods.FogRemover();
 		}
 
@@ -78,7 +79,7 @@ namespace Mod
 
 				// Inform AntiIdleSystem to suppress synthetic keepalive briefly after scene load
 				AntiIdleSystem.OnSceneChanged();
-				AutoDisconnect.ClearCache();
+				AutoDisconnect.OnSceneChanged();
 				Shrines.OnSceneChanged();
 				RunePrisons.OnSceneChanged();
 				Chests.OnSceneChanged();
