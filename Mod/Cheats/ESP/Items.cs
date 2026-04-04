@@ -33,9 +33,11 @@ namespace Mod.Cheats.ESP
 
                 if (Vector3.Distance(localPlayer.transform.position, item.transform.position) > Settings.drawDistance) continue;
 
-                Rule.RuleOutcome filter = ItemFiltering.Match(item.itemData, null, null, 0);
-
-                if (Settings.useLootFilter && filter == Rule.RuleOutcome.HIDE) continue;
+                if (Settings.useLootFilter)
+                {
+                    Rule.RuleOutcome filter = ItemFiltering.Match(item.itemData, null, null, 0);
+                    if (filter == Rule.RuleOutcome.HIDE) continue;
+                }
 
                 var rarity = ResolveItemRarity(item);
 
@@ -56,14 +58,20 @@ namespace Mod.Cheats.ESP
         {
             if (item == null) return null;
 
-            // Legacy fallback in case upstream fields are still populated in some game versions.
+            // New LE versions populate the V2 rarity visuals; keep legacy as a fallback.
+            string? v2Name = NormalizeRarity(item.groundItemRarityVisualsV2?.name);
+            if (!string.IsNullOrEmpty(v2Name))
+            {
+                return v2Name;
+            }
+
             string? legacyName = NormalizeRarity(item.groundItemRarityVisuals?.name);
             if (!string.IsNullOrEmpty(legacyName))
             {
                 return legacyName;
             }
 
-            Transform? rarityRoot = item.groundItemRarityVisuals?.transform;
+            Transform? rarityRoot = item.groundItemRarityVisualsV2?.transform ?? item.groundItemRarityVisuals?.transform;
             if (rarityRoot == null)
             {
                 return null;
