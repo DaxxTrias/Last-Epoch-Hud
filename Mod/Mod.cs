@@ -72,7 +72,7 @@ namespace Mod
 			try
 			{
 				ObjectManager.OnSceneLoaded();
-				MapHack.OnSceneWasLoaded();
+				// MapHack.OnSceneWasLoaded();
 				GameMods.FogRemover();
 				GameMods.playerLantern();
 

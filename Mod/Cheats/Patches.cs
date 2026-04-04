@@ -60,12 +60,12 @@ namespace Mod.Cheats.Patches
                     //__instance.gameObject.SetActive(false);
                     if (__instance != null)
                     {
-                        var bugButton = __instance.bugReportButton;
-                        if (bugButton != null && bugButton.gameObject != null)
-                            bugButton.gameObject.SetActive(false);
-                        var bugPanel = __instance.bugReportPanel;
-                        if (bugPanel != null)
-                            bugPanel.Close();
+                        // var bugButton = __instance.bugReportButton;
+                        // if (bugButton != null && bugButton.gameObject != null)
+                        //     bugButton.gameObject.SetActive(false);
+                        // var bugPanel = __instance.bugReportPanel;
+                        // if (bugPanel != null)
+                        //     bugPanel.Close();
 
                         AutoDisconnect.SetUIBase(__instance);
                         // AntiIdleSystem.SetUIBase(__instance); // UI pulse disabled; keep for future use
@@ -94,12 +94,12 @@ namespace Mod.Cheats.Patches
                     //__instance.gameObject.SetActive(false);
                     if (__instance != null)
                     {
-                        var bugButton = __instance.bugReportButton;
-                        if (bugButton != null && bugButton.gameObject != null)
-                            bugButton.gameObject.SetActive(false);
-                        var bugPanel = __instance.bugReportPanel;
-                        if (bugPanel != null)
-                            bugPanel.Close();
+                        // var bugButton = __instance.bugReportButton;
+                        // if (bugButton != null && bugButton.gameObject != null)
+                        //     bugButton.gameObject.SetActive(false);
+                        // var bugPanel = __instance.bugReportPanel;
+                        // if (bugPanel != null)
+                        //     bugPanel.Close();
                     }
                     return false;
                 }
