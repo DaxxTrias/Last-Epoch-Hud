@@ -4,9 +4,9 @@ namespace Mod.Cheats.ESP
 {
     internal class LineDrawing
     {
-        private Vector3 start;
-        private Vector3 end;
-        private Color color;
+        private readonly Vector3 start;
+        private readonly Vector3 end;
+        private readonly Color color;
 
         // constructor
         public LineDrawing(Vector3 start, Vector3 end, Color color)
@@ -24,9 +24,9 @@ namespace Mod.Cheats.ESP
 
     internal class StringDrawing
     {
-        private string text;
-        private Vector3 position;
-        private Color color;
+        private readonly string text;
+        private readonly Vector3 position;
+        private readonly Color color;
 
         // constructor
         public StringDrawing(string text, Vector3 position, Color color)
@@ -81,7 +81,7 @@ namespace Mod.Cheats.ESP
             Draw();
         }
 
-        		public static void OnUpdate()
+        public static void OnUpdate()
 		{
 			Clear();
 			Items.OnUpdate();
@@ -89,6 +89,7 @@ namespace Mod.Cheats.ESP
 			Shrines.OnUpdate();
 			RunePrisons.OnUpdate();
 			Chests.OnUpdate();
+			Barrels.OnUpdate();
 			Actors.OnUpdate();
 #if DEBUG
 			DebugDiagnostics.OnUpdate();

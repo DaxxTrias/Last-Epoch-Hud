@@ -160,6 +160,7 @@ namespace Mod.Cheats.ESP
 
 			foreach (var visual in ActorManager.instance.visuals)
 			{
+				string alignmentName = visual.alignment?.name ?? string.Empty;
 				foreach (var actor in visual.visuals._list)
 				{
 					if (!actor.gameObject.activeInHierarchy) continue;
@@ -175,7 +176,11 @@ namespace Mod.Cheats.ESP
 					// Non-lizard actors respect alignment/classification filters
 					if (!isLizard)
 					{
-						if (!Settings.ShouldDrawNPCAlignment(visual.alignment.name)) continue;
+						// Dedicated barrel pass reads ActorList.actors to support props that
+						// do not surface as ActorVisuals in some builds/scenes.
+						if (alignmentName == "Barrel") continue;
+
+						if (alignmentName.Length == 0 || !Settings.ShouldDrawNPCAlignment(alignmentName)) continue;
 
 						var actorDisplayInfo = actor.GetComponent<ActorDisplayInformation>();
 						if (actorDisplayInfo != null)
@@ -211,7 +216,7 @@ namespace Mod.Cheats.ESP
 						if (special == SpecialEntityType.LootLizard && !Settings.espShowLootLizards) continue;
 					}
 					
-					var color = (isAnySpecial) ? BloodOrange : GetRarityColor(actor, visual.alignment.name);
+					var color = (isAnySpecial) ? BloodOrange : GetRarityColor(actor, alignmentName);
 					if (Settings.showESPLines) ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
 					//ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
 					if (Settings.showESPLabels) ESP.AddString(name, position, color);
