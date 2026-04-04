@@ -110,9 +110,9 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var controllerHoldManagerType =
-                            AccessTools.TypeByName("Il2Cpp.ControllerButtonHoldManager")
-                            ?? AccessTools.TypeByName("ControllerButtonHoldManager");
+                        var controllerHoldManagerType = TypeLookup.FindType(
+                            "Il2Cpp.ControllerButtonHoldManager",
+                            "ControllerButtonHoldManager");
                         if (controllerHoldManagerType == null)
                             return false;
 
@@ -154,7 +154,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var mainMenuPanelType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.MainMenuPanel");
+                        var mainMenuPanelType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.MainMenuPanel");
                         if (mainMenuPanelType == null)
                             return false;
 
@@ -201,7 +201,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var panelSystemType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.PanelSystem");
+                        var panelSystemType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.PanelSystem");
                         if (panelSystemType == null)
                             return false;
 
@@ -248,7 +248,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var bugReportPanelType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.BugReportPanel");
+                        var bugReportPanelType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.BugReportPanel");
                         if (bugReportPanelType == null)
                             return false;
 
@@ -1384,7 +1384,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         // Generic method: SendClientMessage<T>(T message, NetDeliveryMethod deliveryMethod, int sequenceChannel)
                         s_target = AccessTools.GetDeclaredMethods(t)
@@ -1443,7 +1443,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         // SendMessageBuffer(MessageKey key, ReadOnlySpan<byte> data, NetDeliveryMethod method, int channel)
                         s_target = AccessTools.GetDeclaredMethods(t)
@@ -1503,7 +1503,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         s_target = AccessTools.GetDeclaredMethods(t)
                             .FirstOrDefault(m => m.Name.IndexOf("Receive", StringComparison.OrdinalIgnoreCase) >= 0 && m.GetParameters().Length >= 1);
@@ -1551,7 +1551,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         s_target = AccessTools.GetDeclaredMethods(t)
                             .FirstOrDefault(m => m.Name.IndexOf("Processed", StringComparison.OrdinalIgnoreCase) >= 0 && m.Name.IndexOf("IncomingMessage", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -1602,7 +1602,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
 
                         s_target = AccessTools.GetDeclaredMethods(t)
@@ -1707,7 +1707,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
 
                         var keywords = new[] { "Deserialize", "Decode", "Process", "Handle", "Dispatch" };

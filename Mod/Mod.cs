@@ -6,6 +6,7 @@ using System.Reflection;
 using HarmonyLib;
 using Il2CppLidgren.Network;
 using Il2CppSystem.Net;
+using Mod.Utils;
 
 [assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.5", "Daxx")]
 [assembly: MelonGame("Eleventh Hour Games", "Last Epoch")]
@@ -225,7 +226,7 @@ namespace Mod
 				// NetTime verification
 				try
 				{
-					var netTimeType = AccessTools.TypeByName("Il2CppLidgren.Network.NetTime") ?? AccessTools.TypeByName("Lidgren.Network.NetTime");
+					var netTimeType = TypeLookup.FindType("Il2CppLidgren.Network.NetTime", "Lidgren.Network.NetTime");
 					if (netTimeType != null)
 					{
 						var nowProp = netTimeType.GetProperty("Now", BindingFlags.Public | BindingFlags.Static) ?? netTimeType.GetProperty("get_Now", BindingFlags.Public | BindingFlags.Static);
