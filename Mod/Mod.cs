@@ -74,7 +74,7 @@ namespace Mod
 			try
 			{
 				ObjectManager.OnSceneLoaded();
-				// MapHack.OnSceneWasLoaded();
+				MapHack.OnSceneWasInitialized();
 				GameMods.FogRemover();
 				GameMods.playerLantern();
 
@@ -103,6 +103,7 @@ namespace Mod
 				bool hasPlayer = ObjectManager.HasPlayer();
 				if (hasPlayer)
 				{
+					MapHack.OnUpdate(hasPlayer: true);
 					ESP.OnUpdate();
 					AutoPotion.OnUpdate();
 					MinimapEnemyCircles.Update();
@@ -110,6 +111,7 @@ namespace Mod
 				}
 				else
 				{
+					MapHack.OnUpdate(hasPlayer: false);
 					// Keep overlays clean when no world/player context is available.
 					ESP.Clear();
 					MinimapEnemyCircles.ClearCircles();

@@ -179,8 +179,7 @@ namespace Mod
 
 				Settings.cameraZoomUnlock = GUILayout.Toggle(Settings.cameraZoomUnlock, "Camera Zoom Unlock");
 				Settings.minimapZoomUnlock = GUILayout.Toggle(Settings.minimapZoomUnlock, "Minimap Zoom Unlock");
-				GUILayout.Label("Map Hack: unavailable (Broken in 1.4.x)");
-				// Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack ");
+				Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack (Boost RevealRadius 14,000%)");
 
 				bool previousPlayerLantern = Settings.playerLantern;
 				Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
