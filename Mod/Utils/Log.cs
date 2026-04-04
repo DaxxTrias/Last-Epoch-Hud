@@ -1,6 +1,7 @@
 using MelonLoader;
 using UnityEngine;
 using System.Globalization;
+using System.Diagnostics;
 
 namespace Mod.Utils;
 
@@ -43,6 +44,8 @@ internal static class Log
     private static readonly Queue<GameEvent> s_gameEvents = new();
     private static readonly Dictionary<string, DateTime> s_dumpGates = new(StringComparer.Ordinal);
     private static string s_currentGamePhase = "Boot";
+    private static DateTime s_shaDiagnosticsWindowUntilUtc = DateTime.MinValue;
+    private static int s_shaDiagnosticsCapturesInWindow = 0;
 
     public static void Info(LogSource source, string message) => Write(source, LogLevel.Info, message);
 
@@ -68,6 +71,29 @@ internal static class Log
         {
             s_currentGamePhase = phase.Trim();
         }
+    }
+
+    public static void ArmShaDiagnosticsWindow(string reason, TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+            duration = TimeSpan.FromSeconds(30);
+
+        DateTime now = DateTime.UtcNow;
+        lock (s_lock)
+        {
+            var until = now + duration;
+            if (until > s_shaDiagnosticsWindowUntilUtc)
+            {
+                s_shaDiagnosticsWindowUntilUtc = until;
+                s_shaDiagnosticsCapturesInWindow = 0;
+            }
+        }
+
+        InfoThrottled(
+            LogSource.Game,
+            $"sha-window-arm:{reason}",
+            $"SHA diagnostics armed for {duration.TotalSeconds:F0}s ({reason})",
+            TimeSpan.FromSeconds(15));
     }
 
     public static bool IsLikelyLoginFailureException(string? exceptionText)
@@ -136,6 +162,11 @@ internal static class Log
         var key = $"{logType}|{cleanedContext}|{cleanedMessage}";
 
         RecordGameEvent(level, payload);
+
+        if (IsShaMismatchMessage(cleanedMessage))
+        {
+            TryCaptureShaMismatchDiagnostics(cleanedContext, cleanedMessage);
+        }
 
         // Preserve all Error/Exception details to help root-cause login/load failures.
         if (level == LogLevel.Error)
@@ -217,6 +248,64 @@ internal static class Log
             return firstLine;
 
         return firstLine[..maxLength] + "...";
+    }
+
+    private static bool IsShaMismatchMessage(string message)
+    {
+        return message.Contains("SHA MISMATCH", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void TryCaptureShaMismatchDiagnostics(string contextName, string message)
+    {
+        DateTime now = DateTime.UtcNow;
+        lock (s_lock)
+        {
+            if (now > s_shaDiagnosticsWindowUntilUtc)
+            {
+                return;
+            }
+
+            if (s_shaDiagnosticsCapturesInWindow >= 1)
+            {
+                return;
+            }
+
+            s_shaDiagnosticsCapturesInWindow++;
+        }
+
+        Warning(LogSource.Game, $"SHA probe captured in active window | ctx={contextName} | {message}");
+        DumpRecentGameEventsThrottled(
+            key: "sha-mismatch-recent-events",
+            reason: "SHA mismatch observed in connect/load window",
+            minInterval: TimeSpan.FromSeconds(5),
+            maxLines: 120);
+
+        try
+        {
+            var stack = new StackTrace(skipFrames: 2, fNeedFileInfo: false);
+            var frames = stack.GetFrames();
+            if (frames == null || frames.Length == 0)
+            {
+                Warning(LogSource.Game, "SHA probe stack trace unavailable.");
+                return;
+            }
+
+            int maxFrames = Math.Min(frames.Length, 24);
+            for (int i = 0; i < maxFrames; i++)
+            {
+                var method = frames[i].GetMethod();
+                if (method == null)
+                    continue;
+
+                string typeName = method.DeclaringType?.FullName ?? "<global>";
+                string methodName = method.Name;
+                Warning(LogSource.Game, $"SHA probe stack[{i}] {typeName}.{methodName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Warning(LogSource.Game, $"SHA probe stack trace failed: {ex.GetType().Name} {ex.Message}");
+        }
     }
 
     private static void WriteThrottled(LogSource source, LogLevel level, string key, string message, TimeSpan interval)

@@ -1026,6 +1026,7 @@ namespace Mod.Cheats.Patches
 					{
                         _ = __instance;
                         Log.MarkGamePhase("NetMultiClient.Connect");
+                        Log.ArmShaDiagnosticsWindow("NetMultiClient.Connect", TimeSpan.FromSeconds(60));
 						// Reduced: no verbose prefix log
 					}
 					catch (Exception e)
@@ -1042,6 +1043,7 @@ namespace Mod.Cheats.Patches
 						if (__result != null)
 						{
                             Log.MarkGamePhase("NetMultiClient.Connected");
+                            Log.ArmShaDiagnosticsWindow("NetMultiClient.Connected", TimeSpan.FromSeconds(45));
 							AntiIdleSystem.SetServerConnection(__result);
 							AntiIdleSystem.SetNetMultiClient(__instance);
 						}
