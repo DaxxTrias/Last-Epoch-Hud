@@ -7,7 +7,7 @@ using HarmonyLib;
 using Il2CppLidgren.Network;
 using Il2CppSystem.Net;
 
-[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.1", "Daxx")]
+[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.5", "Daxx")]
 [assembly: MelonGame("Eleventh Hour Games", "Last Epoch")]
 
 namespace Mod
