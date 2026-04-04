@@ -98,12 +98,23 @@ namespace Mod
 		{
 			try
 			{
-				ESP.OnUpdate();
-				AutoPotion.OnUpdate();
+				bool hasPlayer = ObjectManager.HasPlayer();
+				if (hasPlayer)
+				{
+					ESP.OnUpdate();
+					AutoPotion.OnUpdate();
+					MinimapEnemyCircles.Update();
+					AutoDisconnect.OnUpdate();
+				}
+				else
+				{
+					// Keep overlays clean when no world/player context is available.
+					ESP.Clear();
+					MinimapEnemyCircles.ClearCircles();
+				}
+
 				Menu.OnUpdate();
-                MinimapEnemyCircles.Update();
 				AntiIdleSystem.OnUpdate(); // Add anti-idle system
-				AutoDisconnect.OnUpdate();
 				if (Settings.timeScale != 1.0f)
 					UnityEngine.Time.timeScale = Settings.timeScale;
 			}
