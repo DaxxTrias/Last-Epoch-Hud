@@ -135,25 +135,8 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(LogType logType, UnityEngine.Object context, string format, Il2CppReferenceArray<Il2CppSystem.Object> args)
                 {
-                    //TODO: this seems to have been deprecated in 1.4.x
-                    // MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
-
-                    // Log all elements
-                    // MelonLogger.Msg($"LogType: {logType}");
-                    // MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    // MelonLogger.Msg($"Format: {format}");
-
-                    //if (args != null)
-                    //{
-                    //	for (int i = 0; i < args.Length; i++)
-                    //	{
-                    //		MelonLogger.Msg($"Arg[{i}]: {args[i]?.ToString() ?? "null"}");
-                    //	}
-                    //}
-                    //else
-                    //{
-                    //	MelonLogger.Msg("Args: null");
-                    //}
+                    _ = args; // intentionally ignored to avoid extra hot-path allocations
+                    Log.GameLog(logType, context?.name, format);
 
                     return false;
                 }
@@ -165,13 +148,7 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(Il2CppSystem.Exception exception, UnityEngine.Object context)
                 {
-                    // TODO: this goes absolutely nuts on the soreth'ka level for some reason. needs to be investigated
-                    MelonLogger.Msg("[LeHud.Hooks]  ClientLogHandler.LogException hooked and blocked.");
-
-                    // Log all elements
-                    MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    MelonLogger.Msg($"Exception: {exception?.ToString() ?? "null"}");
-
+                    Log.GameException(context?.name, exception?.ToString());
                     return false;
                 }
             }
@@ -513,7 +490,8 @@ namespace Mod.Cheats.Patches
             {
             	public static void Postfix(ref GroundItemManager __instance, ref int __state, ref Actor player, ref ItemData itemData, ref Vector3 location, ref bool playDropSound)
             	{
-            		MelonLogger.Msg("[LEHud] GroundItemManager.dropItemForPlayer hooked");
+                    _ = __state;
+                    Log.InfoThrottled(LogSource.Hooks, "GroundItemManager.dropItemForPlayer", "GroundItemManager.dropItemForPlayer hooked", TimeSpan.FromSeconds(15));
             		if (ItemList.isCraftingItem(itemData.itemType) && Settings.pickupCrafting)
             		{
             			__instance.TryGetGroundItemList(player, out GroundItemList groundItemList);
@@ -1133,7 +1111,8 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        MelonLogger.Msg($"[LeHud.Hooks]  SteamNetworking.ConnectionStatusChanged Prefix - Callback data received");
+                        _ = __instance;
+                        Log.InfoThrottled(LogSource.Hooks, "SteamNetworking.ConnectionStatusChanged", "Steam networking connection status callback observed", TimeSpan.FromSeconds(10));
 
                         // Track Steam networking status changes
                         AntiIdleSystem.OnSteamConnectionStatusChanged(data);
