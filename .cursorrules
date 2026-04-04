@@ -40,6 +40,7 @@ The user asks questions about the following:
   - `OnLateInitializeMelon()` initializes `Drawing`.
   - `OnUpdate()` is hot-path: calls `ESP.OnUpdate()`, `AutoPotion.OnUpdate()`, `Menu.OnUpdate()`, `MinimapEnemyCircles.Update()`, `AntiIdleSystem.OnUpdate()`, `AutoDisconnect.OnUpdate()` (and `DebugDiagnostics.OnUpdate()` in `#if DEBUG`); avoid allocations and LINQ here.
   - `OnGUI()` guards reentrancy with a boolean; call `Drawing.SetupGuiStyle()` once per GUI pass; keep allocations minimal.
+  - Scene lifecycle: both `OnSceneWasLoaded()` and `OnSceneWasInitialized()` call `AutoDisconnect.OnSceneChanged()`; avoid duplicate heavy work in scene callbacks.
   - All Unity API calls must occur on the main thread.
 - Input/keybinds:
   - Insert toggles the in-game menu; F12 logs AutoPotion debug; F11 logs correlation diagnostics in `#if DEBUG`.
@@ -54,18 +55,24 @@ The user asks questions about the following:
     5) `Menu.cs`: add UI to read/write `Settings` (avoid allocations in hot paths).
     6) Ensure persistence on close: closing the menu (Insert) must call `ApplyToPreferencesFromSettings(); Save();` so changes flush to disk.
   - Initialization guard: `SettingsConfig.IsInitialized` must be true before calling load/apply; `Mod.OnPreferencesLoaded` should early-return until init completes.
+  - Network diagnostics are optional and persisted as `Settings.enableNetworkDiagnostics` (`General` category, default `false`); verbose probes must remain gated.
   - Standalone JSON import/export is currently disabled. Prefer MelonPreferences as the single source of truth. If re-enabled in the future, wire Import/Export via the menu and keep both stores in sync only when explicitly invoked.
 - Networking hooks (Anti-Idle/Auto-Disconnect):
   - IL2CPP Lidgren: `NetMultiClient.Connect/Disconnect/SendMessage/get_ConnectionStatus` and `NetConnection.get_Status` are primary hooks.
+  - `ClientLogHandler.LogFormat/LogException` are used as game-log ingestion hooks with source tagging and throttling.
+  - `ClientNetworkService.ReceiveCallback` diagnostics are best-effort only; payload visibility is limited by IL2CPP/native boundaries.
+  - Do not broad-patch low-level Lidgren read loops (`ReadMessage/ReadMessages`) without explicit user approval; these can be unstable on current IL2CPP runtime.
   - Steam sockets: `SteamNetworkingSockets.ConnectionStatusChanged` may be observed if available.
   - Use narrow logging; prefer one-time or stateful logs to avoid spam.
 - Runtime guards:
   - Use `ObjectManager.IsOfflineMode()` to gate features like `useAnyWaypoint`.
   - Respect settings toggles in all patches; bail out early when disabled.
+  - AutoDisconnect has a mandatory post-load grace window (`30s`) and scene-change reset; keep safeguards for low-life builds.
   - Item ESP should only call `ItemFiltering.Match(...)` when `Settings.useLootFilter` is enabled.
   - For item rarity in newer builds, prefer `GroundItemVisuals.itemData` (`ItemDataUnpacked.GetDefaultRarityVisualRarity()` and/or `itemData.rarity`) before visual-name fallbacks.
 - Logging conventions:
-  - Use `MelonLogger.Msg/Error`. Prefix messages contextually: `[LEHud]` for lifecycle, `[Settings]` for config IO, `[LeHud.Hooks]` for Harmony hooks, `[ItemFiltering]` for filter bridge diagnostics.
+  - Prefer `Mod.Utils.Log` for structured runtime logging (`[Game]`, `[Hooks]`, `[LEHud]`, `[AntiIdle]`, `[Settings]`) and throttling; use direct `MelonLogger` only when required.
+  - Keep game-log diagnostics opt-in (`Settings.enableNetworkDiagnostics`) and avoid high-volume logs when disabled.
 - Teardown:
   - On application quit, persist preferences (`SettingsConfig.ApplyToPreferencesFromSettings(); Save();`), clean up sprites/drawing, and unpatch via `s_harmony?.UnpatchSelf()`.
 - Drawing/Assets:
@@ -112,7 +119,8 @@ The user asks questions about the following:
 - **Configuration & Telemetry**
   - Use `SettingsConfig` with MelonPreferences-backed categories; default-safe values; hot-reload support via `OnPreferencesLoaded`.
   - Persist ESP options under `LEHud_ESP`; keep existing `LEHud_Items` dictionary-based item visibility options.
-  - Structured logging with `MelonLogger`; include feature/patch name and correlation hints when helpful.
+  - Structured logging should flow through `Mod.Utils.Log` for source prefixes, dedup/throttle, and diagnostic windows; keep direct logger calls minimal.
+  - Verbose network/SHA diagnostics must remain behind `Settings.enableNetworkDiagnostics` and should default to off in release usage.
   - Optional lightweight overlay to show mod/feature status and perf counters (toggle with Insert).
 
 - **Safety & Recovery**
