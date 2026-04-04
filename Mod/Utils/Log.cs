@@ -291,6 +291,7 @@ internal static class Log
             }
 
             int maxFrames = Math.Min(frames.Length, 24);
+            string? likelyOrigin = null;
             for (int i = 0; i < maxFrames; i++)
             {
                 var method = frames[i].GetMethod();
@@ -300,12 +301,53 @@ internal static class Log
                 string typeName = method.DeclaringType?.FullName ?? "<global>";
                 string methodName = method.Name;
                 Warning(LogSource.Game, $"SHA probe stack[{i}] {typeName}.{methodName}");
+
+                if (likelyOrigin == null && IsLikelyOriginFrame(typeName, methodName))
+                {
+                    likelyOrigin = typeName == "<global>"
+                        ? methodName
+                        : $"{typeName}.{methodName}";
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(likelyOrigin))
+            {
+                Warning(LogSource.Game, $"SHA probe likely origin: {likelyOrigin}");
+            }
+            else
+            {
+                Warning(LogSource.Game, "SHA probe likely origin: unavailable (all frames looked like mod/runtime wrappers)");
             }
         }
         catch (Exception ex)
         {
             Warning(LogSource.Game, $"SHA probe stack trace failed: {ex.GetType().Name} {ex.Message}");
         }
+    }
+
+    private static bool IsLikelyOriginFrame(string typeName, string methodName)
+    {
+        if (typeName.StartsWith("Mod.", StringComparison.Ordinal)
+            || typeName.StartsWith("HarmonyLib.", StringComparison.Ordinal)
+            || typeName.StartsWith("System.", StringComparison.Ordinal)
+            || typeName.StartsWith("Il2CppInterop.Runtime.", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (typeName == "<global>")
+        {
+            if (methodName.Contains("DMD<", StringComparison.Ordinal)
+                || methodName.Contains("il2cpp_runtime_invoke", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            // IL2CPP global wrappers often keep the native target as Namespace.Type::Method.
+            return methodName.Contains("::", StringComparison.Ordinal);
+        }
+
+        return true;
     }
 
     private static void WriteThrottled(LogSource source, LogLevel level, string key, string message, TimeSpan interval)
