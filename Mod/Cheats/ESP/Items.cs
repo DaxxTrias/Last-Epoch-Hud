@@ -58,6 +58,12 @@ namespace Mod.Cheats.ESP
         {
             if (item == null) return null;
 
+            string? itemDataRarity = ResolveItemDataRarity(item.itemData);
+            if (!string.IsNullOrEmpty(itemDataRarity))
+            {
+                return itemDataRarity;
+            }
+
             // New LE versions populate the V2 rarity visuals; keep legacy as a fallback.
             string? v2Name = NormalizeRarity(item.groundItemRarityVisualsV2?.name);
             if (!string.IsNullOrEmpty(v2Name))
@@ -94,6 +100,41 @@ namespace Mod.Cheats.ESP
             }
 
             return null;
+        }
+
+        private static string? ResolveItemDataRarity(ItemDataUnpacked? itemData)
+        {
+            if (itemData == null)
+            {
+                return null;
+            }
+
+            // Preferred source in current LE builds.
+            try
+            {
+                string? methodRarity = NormalizeRarity(itemData.GetDefaultRarityVisualRarity().ToString());
+                if (!string.IsNullOrEmpty(methodRarity))
+                {
+                    return methodRarity;
+                }
+            }
+            catch (Exception)
+            {
+                // IL2CPP binding can throw in some edge cases; continue with byte fallback.
+            }
+
+            return ResolveItemDataRarityFromByte(itemData.rarity);
+        }
+
+        private static string? ResolveItemDataRarityFromByte(byte rarityByte)
+        {
+            // Known values observed in-game after the LE update.
+            return rarityByte switch
+            {
+                3 => "Rare",
+                7 => "Unique",
+                _ => null
+            };
         }
 
         private static string? NormalizeRarity(string? rawName)
