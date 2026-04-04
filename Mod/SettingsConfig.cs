@@ -44,6 +44,17 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _espShowRunePrisons;
 		private static MelonPreferences_Entry<bool>? _espShowChampions;
 		private static MelonPreferences_Entry<bool>? _espShowLootLizards;
+#if DEBUG
+		private static MelonPreferences_Entry<bool>? _debugEnableDiagnostics;
+		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerPanel;
+		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerWorldLabel;
+		private static MelonPreferences_Entry<bool>? _debugDrawAllManagerActors;
+		private static MelonPreferences_Entry<bool>? _debugDrawAllGroundItems;
+		private static MelonPreferences_Entry<bool>? _debugDrawAllGroundGold;
+		private static MelonPreferences_Entry<bool>? _debugDrawManagerLines;
+		private static MelonPreferences_Entry<bool>? _debugIgnoreDistanceCulling;
+		private static MelonPreferences_Entry<int>? _debugMaxEntriesPerSystem;
+#endif
 
 		// Entries - Patches
 		private static MelonPreferences_Entry<bool>? _removeFog;
@@ -138,6 +149,17 @@ namespace Mod
 			_espShowRunePrisons = _esp.CreateEntry("ShowRunePrisons", Settings.espShowRunePrisons);
 			_espShowChampions = _esp.CreateEntry("ShowChampions", Settings.espShowChampions);
 			_espShowLootLizards = _esp.CreateEntry("ShowLootLizards", Settings.espShowLootLizards);
+#if DEBUG
+			_debugEnableDiagnostics = _esp.CreateEntry("DebugEnableDiagnostics", Settings.debugEnableDiagnostics);
+			_debugShowLocalPlayerPanel = _esp.CreateEntry("DebugShowLocalPlayerPanel", Settings.debugShowLocalPlayerPanel);
+			_debugShowLocalPlayerWorldLabel = _esp.CreateEntry("DebugShowLocalPlayerWorldLabel", Settings.debugShowLocalPlayerWorldLabel);
+			_debugDrawAllManagerActors = _esp.CreateEntry("DebugDrawAllManagerActors", Settings.debugDrawAllManagerActors);
+			_debugDrawAllGroundItems = _esp.CreateEntry("DebugDrawAllGroundItems", Settings.debugDrawAllGroundItems);
+			_debugDrawAllGroundGold = _esp.CreateEntry("DebugDrawAllGroundGold", Settings.debugDrawAllGroundGold);
+			_debugDrawManagerLines = _esp.CreateEntry("DebugDrawManagerLines", Settings.debugDrawManagerLines);
+			_debugIgnoreDistanceCulling = _esp.CreateEntry("DebugIgnoreDistanceCulling", Settings.debugIgnoreDistanceCulling);
+			_debugMaxEntriesPerSystem = _esp.CreateEntry("DebugMaxEntriesPerSystem", Settings.debugMaxEntriesPerSystem);
+#endif
 
 			_removeFog = _patches.CreateEntry("RemoveFog", Settings.removeFog);
 			_cameraZoomUnlock = _patches.CreateEntry("CameraZoomUnlock", Settings.cameraZoomUnlock);
@@ -206,6 +228,17 @@ namespace Mod
 			Settings.espShowRunePrisons = _espShowRunePrisons!.Value;
 			Settings.espShowChampions = _espShowChampions!.Value;
 			Settings.espShowLootLizards = _espShowLootLizards!.Value;
+#if DEBUG
+			Settings.debugEnableDiagnostics = _debugEnableDiagnostics!.Value;
+			Settings.debugShowLocalPlayerPanel = _debugShowLocalPlayerPanel!.Value;
+			Settings.debugShowLocalPlayerWorldLabel = _debugShowLocalPlayerWorldLabel!.Value;
+			Settings.debugDrawAllManagerActors = _debugDrawAllManagerActors!.Value;
+			Settings.debugDrawAllGroundItems = _debugDrawAllGroundItems!.Value;
+			Settings.debugDrawAllGroundGold = _debugDrawAllGroundGold!.Value;
+			Settings.debugDrawManagerLines = _debugDrawManagerLines!.Value;
+			Settings.debugIgnoreDistanceCulling = _debugIgnoreDistanceCulling!.Value;
+			Settings.debugMaxEntriesPerSystem = Math.Clamp(_debugMaxEntriesPerSystem!.Value, 10, 500);
+#endif
 
 			Settings.removeFog = _removeFog!.Value;
 			Settings.cameraZoomUnlock = _cameraZoomUnlock!.Value;
@@ -271,6 +304,17 @@ namespace Mod
 			_espShowRunePrisons!.Value = Settings.espShowRunePrisons;
 			_espShowChampions!.Value = Settings.espShowChampions;
 			_espShowLootLizards!.Value = Settings.espShowLootLizards;
+#if DEBUG
+			_debugEnableDiagnostics!.Value = Settings.debugEnableDiagnostics;
+			_debugShowLocalPlayerPanel!.Value = Settings.debugShowLocalPlayerPanel;
+			_debugShowLocalPlayerWorldLabel!.Value = Settings.debugShowLocalPlayerWorldLabel;
+			_debugDrawAllManagerActors!.Value = Settings.debugDrawAllManagerActors;
+			_debugDrawAllGroundItems!.Value = Settings.debugDrawAllGroundItems;
+			_debugDrawAllGroundGold!.Value = Settings.debugDrawAllGroundGold;
+			_debugDrawManagerLines!.Value = Settings.debugDrawManagerLines;
+			_debugIgnoreDistanceCulling!.Value = Settings.debugIgnoreDistanceCulling;
+			_debugMaxEntriesPerSystem!.Value = Settings.debugMaxEntriesPerSystem;
+#endif
 
 			_removeFog!.Value = Settings.removeFog;
 			_cameraZoomUnlock!.Value = Settings.cameraZoomUnlock;
@@ -522,6 +566,17 @@ namespace Mod
 			public bool espShowRunePrisons { get; set; }
 			public bool espShowChampions { get; set; }
 			public bool espShowLootLizards { get; set; }
+#if DEBUG
+			public bool debugEnableDiagnostics { get; set; }
+			public bool debugShowLocalPlayerPanel { get; set; }
+			public bool debugShowLocalPlayerWorldLabel { get; set; }
+			public bool debugDrawAllManagerActors { get; set; }
+			public bool debugDrawAllGroundItems { get; set; }
+			public bool debugDrawAllGroundGold { get; set; }
+			public bool debugDrawManagerLines { get; set; }
+			public bool debugIgnoreDistanceCulling { get; set; }
+			public int debugMaxEntriesPerSystem { get; set; }
+#endif
 		}
 
 		private static SettingsSnapshot CreateSnapshot()
@@ -577,7 +632,18 @@ namespace Mod
 				espShowShrines = Settings.espShowShrines,
 				espShowRunePrisons = Settings.espShowRunePrisons,
 				espShowChampions = Settings.espShowChampions,
-				espShowLootLizards = Settings.espShowLootLizards
+				espShowLootLizards = Settings.espShowLootLizards,
+#if DEBUG
+				debugEnableDiagnostics = Settings.debugEnableDiagnostics,
+				debugShowLocalPlayerPanel = Settings.debugShowLocalPlayerPanel,
+				debugShowLocalPlayerWorldLabel = Settings.debugShowLocalPlayerWorldLabel,
+				debugDrawAllManagerActors = Settings.debugDrawAllManagerActors,
+				debugDrawAllGroundItems = Settings.debugDrawAllGroundItems,
+				debugDrawAllGroundGold = Settings.debugDrawAllGroundGold,
+				debugDrawManagerLines = Settings.debugDrawManagerLines,
+				debugIgnoreDistanceCulling = Settings.debugIgnoreDistanceCulling,
+				debugMaxEntriesPerSystem = Settings.debugMaxEntriesPerSystem
+#endif
 			};
 		}
 
@@ -630,6 +696,17 @@ namespace Mod
 			Settings.espShowRunePrisons = s.espShowRunePrisons;
 			Settings.espShowChampions = s.espShowChampions;
 			Settings.espShowLootLizards = s.espShowLootLizards;
+#if DEBUG
+			Settings.debugEnableDiagnostics = s.debugEnableDiagnostics;
+			Settings.debugShowLocalPlayerPanel = s.debugShowLocalPlayerPanel;
+			Settings.debugShowLocalPlayerWorldLabel = s.debugShowLocalPlayerWorldLabel;
+			Settings.debugDrawAllManagerActors = s.debugDrawAllManagerActors;
+			Settings.debugDrawAllGroundItems = s.debugDrawAllGroundItems;
+			Settings.debugDrawAllGroundGold = s.debugDrawAllGroundGold;
+			Settings.debugDrawManagerLines = s.debugDrawManagerLines;
+			Settings.debugIgnoreDistanceCulling = s.debugIgnoreDistanceCulling;
+			Settings.debugMaxEntriesPerSystem = Math.Clamp(s.debugMaxEntriesPerSystem, 10, 500);
+#endif
 
 			ApplyDictionarySafely(Settings.npcClassifications, s.npcClassifications);
 			ApplyDictionarySafely(Settings.npcDrawings, s.npcDrawings);

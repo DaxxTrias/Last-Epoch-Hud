@@ -10,75 +10,76 @@
    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
    <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnablePackageValidation>true</EnablePackageValidation>
+   <LEMelonLoaderPath>$(LE_ML)</LEMelonLoaderPath>
  </PropertyGroup>  
 
  <ItemGroup>  
    <Reference Include="0Harmony, Version=2.10.2.0, Culture=neutral, processorArchitecture=MSIL">  
      <SpecificVersion>False</SpecificVersion>  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\0Harmony.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\net6\0Harmony.dll</HintPath>  
    </Reference>
    <!-- <Reference Include="Il2CppDMM">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppDMM.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppDMM.dll</HintPath>  
    </Reference> -->
    <Reference Include="Il2CppInterop.Common">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\Il2CppInterop.Common.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\net6\Il2CppInterop.Common.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppInterop.Generator">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\Il2CppInterop.Generator.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\net6\Il2CppInterop.Generator.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppInterop.Runtime">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\net6\Il2CppInterop.Runtime.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppLE">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppLE.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppLE.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppLE.Telemetry.Client">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppLE.Telemetry.Client.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppLE.Telemetry.Client.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppLidgren.Network">
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppLidgren.Network.dll</HintPath>
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppLidgren.Network.dll</HintPath>
    </Reference>
    <Reference Include="Il2CppFacepunch.Steamworks.Win64">
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppFacepunch.Steamworks.Win64.dll</HintPath>
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppFacepunch.Steamworks.Win64.dll</HintPath>
    </Reference>
    <Reference Include="Il2Cppmscorlib">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2Cppmscorlib.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2Cppmscorlib.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppSystem">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSystem.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppSystem.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppSystem.Core">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSystem.Core.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppSystem.Core.dll</HintPath>  
    </Reference>
    <Reference Include="Il2CppSirenix.Serialization">
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\Il2CppSirenix.Serialization.dll</HintPath>
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\Il2CppSirenix.Serialization.dll</HintPath>
    </Reference>
    <Reference Include="MelonLoader">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\net6\MelonLoader.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\net6\MelonLoader.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.CoreModule">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.ImageConversionModule">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.ImageConversionModule.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.ImageConversionModule.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.IMGUIModule">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.IMGUIModule.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.IMGUIModule.dll</HintPath>  
    </Reference>  
    <Reference Include="UnityEngine.InputLegacyModule">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.InputLegacyModule.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.InputLegacyModule.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.TextRenderingModule">
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.TextRenderingModule.dll</HintPath>
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.TextRenderingModule.dll</HintPath>
    </Reference>
    <Reference Include="UnityEngine.Physics">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.PhysicsModule.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.PhysicsModule.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.UI">  
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.UI.dll</HintPath>  
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.UI.dll</HintPath>  
    </Reference>
    <Reference Include="UnityEngine.UIModule">
-     <HintPath>D:\SteamLibrary\steamapps\common\Last Epoch\MelonLoader\Il2CppAssemblies\UnityEngine.UIModule.dll</HintPath>
+    <HintPath>$(LEMelonLoaderPath)\Il2CppAssemblies\UnityEngine.UIModule.dll</HintPath>
    </Reference>
  </ItemGroup>  
 
