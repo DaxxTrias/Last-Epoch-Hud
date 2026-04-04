@@ -56,6 +56,7 @@ namespace Mod.Cheats.Patches
             {
                 public static void Prefix(ref UIBase __instance)
                 {
+                    Log.MarkGamePhase("UIBase.Awake");
                     MelonLogger.Msg("[LeHud.Hooks]  UIBase.Awake hooked. Disabling bug submission button");
                     //__instance.gameObject.SetActive(false);
                     if (__instance != null)
@@ -78,6 +79,7 @@ namespace Mod.Cheats.Patches
             {
                 public static void Prefix(ref CharacterSelect __instance)
                 {
+                    Log.MarkGamePhase("CharacterSelect.Awake");
                     MelonLogger.Msg("[LeHud.Hooks]  CharacterSelect.Awake hooked. Disabling bug submission button");
                     if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
                         __instance.submitBugReportButton.gameObject.SetActive(false);
@@ -135,10 +137,30 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(LogType logType, UnityEngine.Object context, string format, Il2CppReferenceArray<Il2CppSystem.Object> args)
                 {
-                    _ = args; // intentionally ignored to avoid extra hot-path allocations
-                    Log.GameLog(logType, context?.name, format);
+                    Log.GameLog(logType, context?.name, format, ExtractArgs(args));
 
                     return false;
+                }
+
+                private static IReadOnlyList<string>? ExtractArgs(Il2CppReferenceArray<Il2CppSystem.Object> args)
+                {
+                    if (args == null || args.Length == 0)
+                        return null;
+
+                    var output = new string[args.Length];
+                    for (int i = 0; i < args.Length; i++)
+                    {
+                        try
+                        {
+                            output[i] = args[i]?.ToString() ?? "null";
+                        }
+                        catch (Exception ex)
+                        {
+                            output[i] = $"<arg[{i}] {ex.GetType().Name}>";
+                        }
+                    }
+
+                    return output;
                 }
             }
 
@@ -148,7 +170,17 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(Il2CppSystem.Exception exception, UnityEngine.Object context)
                 {
-                    Log.GameException(context?.name, exception?.ToString());
+                    string exceptionText = exception?.ToString() ?? "null";
+                    Log.GameException(context?.name, exceptionText);
+
+                    if (Log.IsLikelyLoginFailureException(exceptionText))
+                    {
+                        Log.DumpRecentGameEventsThrottled(
+                            key: "game-login-failure-exception",
+                            reason: "Likely login/load exception observed",
+                            minInterval: TimeSpan.FromSeconds(15),
+                            maxLines: 80);
+                    }
                     return false;
                 }
             }
@@ -992,6 +1024,8 @@ namespace Mod.Cheats.Patches
 				{
 					try
 					{
+                        _ = __instance;
+                        Log.MarkGamePhase("NetMultiClient.Connect");
 						// Reduced: no verbose prefix log
 					}
 					catch (Exception e)
@@ -1007,9 +1041,14 @@ namespace Mod.Cheats.Patches
 					{
 						if (__result != null)
 						{
+                            Log.MarkGamePhase("NetMultiClient.Connected");
 							AntiIdleSystem.SetServerConnection(__result);
 							AntiIdleSystem.SetNetMultiClient(__instance);
 						}
+                        else
+                        {
+                            Log.MarkGamePhase("NetMultiClient.ConnectFailed");
+                        }
 					}
 					catch (Exception e)
 					{
@@ -1025,10 +1064,22 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {(byeMessage ?? "No reason provided")}");
+                        _ = __instance;
+                        var reason = string.IsNullOrWhiteSpace(byeMessage) ? "No reason provided" : byeMessage.Trim();
+                        Log.MarkGamePhase($"NetMultiClient.Disconnect:{reason}");
+                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {reason}");
 
                         // Log disconnect attempt for anti-idle analysis
                         AntiIdleSystem.OnDisconnectAttempted(byeMessage);
+
+                        if (IsLikelyLoginFailureDisconnect(reason))
+                        {
+                            Log.DumpRecentGameEventsThrottled(
+                                key: "game-login-failure-disconnect",
+                                reason: $"Disconnect observed: {reason}",
+                                minInterval: TimeSpan.FromSeconds(10),
+                                maxLines: 100);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -1040,6 +1091,8 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        _ = __instance;
+                        _ = byeMessage;
                         MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix - Disconnection completed");
 
                         // Clear stored references
@@ -1049,6 +1102,18 @@ namespace Mod.Cheats.Patches
                     {
                         MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix error: {e.Message}");
                     }
+                }
+
+                private static bool IsLikelyLoginFailureDisconnect(string reason)
+                {
+                    if (string.IsNullOrWhiteSpace(reason))
+                        return false;
+
+                    return reason.Contains("returning to menu", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("idle", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("load", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("character", StringComparison.OrdinalIgnoreCase);
                 }
             }
 
