@@ -34,6 +34,7 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _drawDistance;
 		private static MelonPreferences_Entry<float>? _timeScale;
 		private static MelonPreferences_Entry<bool>? _useLootFilter;
+		private static MelonPreferences_Entry<bool>? _enableNetworkDiagnostics;
 
 		// Entries - ESP
 		private static MelonPreferences_Entry<bool>? _showESPLines;
@@ -140,6 +141,7 @@ namespace Mod
 			_drawDistance = _general.CreateEntry("DrawDistance", Settings.drawDistance);
 			_timeScale = _general.CreateEntry("TimeScale", Settings.timeScale);
 			_useLootFilter = _general.CreateEntry("UseLootFilter", Settings.useLootFilter);
+			_enableNetworkDiagnostics = _general.CreateEntry("EnableNetworkDiagnostics", Settings.enableNetworkDiagnostics);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
 			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
@@ -219,6 +221,7 @@ namespace Mod
 			Settings.drawDistance = Clamp(_drawDistance!.Value, 0f, 1000f);
 			Settings.timeScale = Clamp(_timeScale!.Value, 0.1f, 10f);
 			Settings.useLootFilter = _useLootFilter!.Value;
+			Settings.enableNetworkDiagnostics = _enableNetworkDiagnostics!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
 			Settings.showESPLabels = _showESPLabels!.Value;
@@ -295,6 +298,7 @@ namespace Mod
 			_drawDistance!.Value = Settings.drawDistance;
 			_timeScale!.Value = Settings.timeScale;
 			_useLootFilter!.Value = Settings.useLootFilter;
+			_enableNetworkDiagnostics!.Value = Settings.enableNetworkDiagnostics;
 
 			_showESPLines!.Value = Settings.showESPLines;
 			_showESPLabels!.Value = Settings.showESPLabels;
@@ -523,6 +527,7 @@ namespace Mod
 			public float timeScale { get; set; }
 			public bool useAutoPot { get; set; }
 			public bool useLootFilter { get; set; }
+			public bool enableNetworkDiagnostics { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
 			public bool minimapZoomUnlock { get; set; }
@@ -590,6 +595,7 @@ namespace Mod
 				timeScale = Settings.timeScale,
 				useAutoPot = Settings.useAutoPot,
 				useLootFilter = Settings.useLootFilter,
+				enableNetworkDiagnostics = Settings.enableNetworkDiagnostics,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
@@ -656,6 +662,7 @@ namespace Mod
 			Settings.timeScale = Clamp(s.timeScale, 0.1f, 10f);
 			Settings.useAutoPot = s.useAutoPot;
 			Settings.useLootFilter = s.useLootFilter;
+			Settings.enableNetworkDiagnostics = s.enableNetworkDiagnostics;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;

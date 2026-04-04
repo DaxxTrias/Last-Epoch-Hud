@@ -58,6 +58,7 @@ internal static class Log
     private static string s_currentGamePhase = "Boot";
     private static DateTime s_shaDiagnosticsWindowUntilUtc = DateTime.MinValue;
     private static int s_shaDiagnosticsCapturesInWindow = 0;
+    private static bool IsNetworkDiagnosticsEnabled => global::Mod.Settings.enableNetworkDiagnostics;
 
     public static void Info(LogSource source, string message) => Write(source, LogLevel.Info, message);
 
@@ -87,6 +88,9 @@ internal static class Log
 
     public static void ArmShaDiagnosticsWindow(string reason, TimeSpan duration)
     {
+        if (!IsNetworkDiagnosticsEnabled)
+            return;
+
         if (duration <= TimeSpan.Zero)
             duration = TimeSpan.FromSeconds(30);
 
@@ -108,8 +112,22 @@ internal static class Log
             TimeSpan.FromSeconds(15));
     }
 
+    public static bool IsShaDiagnosticsWindowActive()
+    {
+        if (!IsNetworkDiagnosticsEnabled)
+            return false;
+
+        lock (s_lock)
+        {
+            return DateTime.UtcNow <= s_shaDiagnosticsWindowUntilUtc;
+        }
+    }
+
     public static void CaptureNetworkBreadcrumb(string stage, object? payload, TimeSpan minInterval)
     {
+        if (!IsNetworkDiagnosticsEnabled)
+            return;
+
         if (string.IsNullOrWhiteSpace(stage))
             return;
 
@@ -132,6 +150,9 @@ internal static class Log
 
     public static void CaptureNetworkBreadcrumb(string stage, string details, TimeSpan minInterval)
     {
+        if (!IsNetworkDiagnosticsEnabled)
+            return;
+
         if (string.IsNullOrWhiteSpace(stage))
             return;
 
@@ -202,6 +223,9 @@ internal static class Log
 
     public static void DumpRecentNetworkBreadcrumbsThrottled(string key, string reason, TimeSpan minInterval, int maxLines = 100)
     {
+        if (!IsNetworkDiagnosticsEnabled)
+            return;
+
         if (string.IsNullOrWhiteSpace(key))
             key = "net-default";
         if (maxLines <= 0)
@@ -348,6 +372,9 @@ internal static class Log
 
     private static void TryCaptureShaMismatchDiagnostics(string contextName, string message)
     {
+        if (!IsNetworkDiagnosticsEnabled)
+            return;
+
         DateTime now = DateTime.UtcNow;
         lock (s_lock)
         {
@@ -421,6 +448,8 @@ internal static class Log
         }
     }
 
+    public static string DescribePayloadForDiagnostics(object? payload) => DescribeNetworkPayload(payload);
+
     private static bool IsLikelyOriginFrame(string typeName, string methodName)
     {
         if (typeName.StartsWith("Mod.", StringComparison.Ordinal)
@@ -479,6 +508,8 @@ internal static class Log
             AppendKnownMember(sb, payload, t, "MessageKey");
             AppendKnownMember(sb, payload, t, "messageKey");
             AppendKnownMember(sb, payload, t, "MessageType");
+            AppendKnownMember(sb, payload, t, "m_messageType");
+            AppendKnownMember(sb, payload, t, "m_receivedMessageType");
             AppendKnownMember(sb, payload, t, "messageType");
             AppendKnownMember(sb, payload, t, "OpCode");
             AppendKnownMember(sb, payload, t, "Opcode");
@@ -487,6 +518,18 @@ internal static class Log
             AppendKnownMember(sb, payload, t, "type");
             AppendKnownMember(sb, payload, t, "Id");
             AppendKnownMember(sb, payload, t, "id");
+            AppendKnownMember(sb, payload, t, "LengthBytes");
+            AppendKnownMember(sb, payload, t, "LengthBits");
+            AppendKnownMember(sb, payload, t, "m_bitLength");
+            AppendKnownMember(sb, payload, t, "m_sequenceChannel");
+            AppendKnownMember(sb, payload, t, "SequenceChannel");
+            AppendKnownMember(sb, payload, t, "SenderConnection");
+            AppendKnownMember(sb, payload, t, "SenderEndPoint");
+            AppendKnownMember(sb, payload, t, "SenderEndpoint");
+            AppendKnownMember(sb, payload, t, "ReceiveTime");
+            AppendKnownMember(sb, payload, t, "PositionInBytes");
+            AppendKnownMember(sb, payload, t, "PositionInBits");
+            TryAppendDataFingerprint(sb, payload, t);
 
             string text = payload.ToString() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(text))
@@ -536,6 +579,86 @@ internal static class Log
         {
             // best-effort diagnostics only
         }
+    }
+
+    private static void TryAppendDataFingerprint(StringBuilder sb, object payload, Type type)
+    {
+        object? data = TryGetMemberValue(payload, type, "m_data")
+            ?? TryGetMemberValue(payload, type, "data")
+            ?? TryGetMemberValue(payload, type, "Data");
+        if (data == null)
+            return;
+
+        if (!TryExtractBytes(data, out var bytes))
+            return;
+
+        int len = bytes.Length;
+        uint hash = ComputeFNV1a(bytes.AsSpan(0, Math.Min(len, 128)));
+        sb.Append(" | dataLen=").Append(len).Append(" | dataFp=").Append(hash.ToString("X8", CultureInfo.InvariantCulture));
+    }
+
+    private static object? TryGetMemberValue(object payload, Type type, string memberName)
+    {
+        try
+        {
+            var prop = type.GetProperty(memberName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (prop != null && prop.GetIndexParameters().Length == 0)
+                return prop.GetValue(payload);
+
+            var field = type.GetField(memberName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+                return field.GetValue(payload);
+        }
+        catch
+        {
+            // diagnostics best-effort
+        }
+
+        return null;
+    }
+
+    private static bool TryExtractBytes(object data, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+
+        if (data is byte[] direct)
+        {
+            bytes = direct;
+            return true;
+        }
+
+        if (data is Array arr && arr.Length > 0)
+        {
+            try
+            {
+                bytes = new byte[arr.Length];
+                for (int i = 0; i < arr.Length; i++)
+                {
+                    bytes[i] = Convert.ToByte(arr.GetValue(i), CultureInfo.InvariantCulture);
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private static uint ComputeFNV1a(ReadOnlySpan<byte> data)
+    {
+        const uint offset = 2166136261;
+        const uint prime = 16777619;
+        uint hash = offset;
+        for (int i = 0; i < data.Length; i++)
+        {
+            hash ^= data[i];
+            hash *= prime;
+        }
+
+        return hash;
     }
 
     private static string TrimForLog(string value, int maxLen)

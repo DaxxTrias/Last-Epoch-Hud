@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MelonLoader;
 using Il2Cpp;
 // using Il2CppDMM;
@@ -1451,6 +1451,9 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        if (!Settings.enableNetworkDiagnostics)
+                            return;
+
                         _ = __instance;
                         Log.MarkGamePhase("ClientNetworkService.ReceiveCallback");
                         object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
@@ -1458,6 +1461,13 @@ namespace Mod.Cheats.Patches
                             stage: "ClientNetworkService.ReceiveCallback.Prefix",
                             payload: firstArg,
                             minInterval: TimeSpan.FromMilliseconds(20));
+                        if (Log.IsShaDiagnosticsWindowActive())
+                        {
+                            Log.CaptureNetworkBreadcrumb(
+                                stage: "ClientNetworkService.ReceiveCallback.Args",
+                                details: SummarizeArgs(__instance, __args),
+                                minInterval: TimeSpan.FromMilliseconds(60));
+                        }
                     }
                     catch { }
                 }
@@ -1466,6 +1476,9 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        if (!Settings.enableNetworkDiagnostics)
+                            return;
+
                         _ = __instance;
                         object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
                         Log.CaptureNetworkBreadcrumb(
@@ -1475,7 +1488,136 @@ namespace Mod.Cheats.Patches
                     }
                     catch { }
                 }
+
+                private static string SummarizeArgs(object instance, object[]? args)
+                {
+                    var sb = new System.Text.StringBuilder(280);
+                    sb.Append("instance=").Append(Log.DescribePayloadForDiagnostics(instance));
+                    if (args == null || args.Length == 0)
+                    {
+                        sb.Append(" | args=<none>");
+                        return sb.ToString();
+                    }
+
+                    int max = Math.Min(args.Length, 6);
+                    sb.Append(" | argc=").Append(args.Length);
+                    for (int i = 0; i < max; i++)
+                    {
+                        sb.Append(" | arg").Append(i).Append('=').Append(Log.DescribePayloadForDiagnostics(args[i]));
+                    }
+                    if (args.Length > max)
+                    {
+                        sb.Append(" | ...");
+                    }
+
+                    return sb.ToString();
+                }
             }
+
+            // Additional receive-side processing hooks to add breadcrumbs around decode/dispatch methods.
+            [HarmonyPatch]
+            public class ClientNetworkService_MessageProcessing
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+                private static bool s_loggedBinding;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+
+                        var keywords = new[] { "Deserialize", "Decode", "Process", "Handle", "Dispatch" };
+                        s_targets = AccessTools.GetDeclaredMethods(t)
+                            .Where(m => !m.IsAbstract
+                                && !m.IsGenericMethod
+                                && !m.ContainsGenericParameters
+                                && m.GetParameters().Length > 0
+                                && keywords.Any(k => m.Name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Cast<System.Reflection.MethodBase>()
+                            .Take(10)
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        if (!s_loggedBinding)
+                        {
+                            s_loggedBinding = true;
+                            var names = string.Join(", ", s_targets.Select(m => m.Name).Distinct());
+                            MelonLogger.Msg($"[LeHud.Hooks]  ClientNetworkService processing hooks bound: {names}");
+                        }
+
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Prefix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics || !Log.IsShaDiagnosticsWindowActive())
+                            return;
+
+                        _ = __instance;
+                        string method = __originalMethod?.Name ?? "UnknownMethod";
+                        Log.MarkGamePhase($"ClientNetworkService.{method}");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{method}.PrefixArgs",
+                            details: SummarizeArgs(__args),
+                            minInterval: TimeSpan.FromMilliseconds(35));
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics || !Log.IsShaDiagnosticsWindowActive())
+                            return;
+
+                        _ = __instance;
+                        _ = __args;
+                        string method = __originalMethod?.Name ?? "UnknownMethod";
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{method}.Postfix",
+                            details: "ok",
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
+                }
+
+                private static string SummarizeArgs(object[]? args)
+                {
+                    if (args == null || args.Length == 0)
+                        return "args=<none>";
+
+                    var sb = new System.Text.StringBuilder(220);
+                    int max = Math.Min(args.Length, 4);
+                    sb.Append("argc=").Append(args.Length);
+                    for (int i = 0; i < max; i++)
+                    {
+                        sb.Append(" | arg").Append(i).Append('=').Append(Log.DescribePayloadForDiagnostics(args[i]));
+                    }
+                    if (args.Length > max)
+                    {
+                        sb.Append(" | ...");
+                    }
+                    return sb.ToString();
+                }
+            }
+
+            // Lower-level Lidgren ingress probes were disabled due IL2CPP runtime instability.
             #endregion
         }
     }

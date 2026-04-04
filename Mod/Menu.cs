@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using UnityEngine;
 using static UnityEngine.GUI;
 using MelonLoader;
@@ -117,6 +117,11 @@ namespace Mod
 			debugToolsDropdown = GUILayout.Toggle(debugToolsDropdown, "DEBUG Tools:", "button");
 			if (debugToolsDropdown)
 			{
+				Settings.enableNetworkDiagnostics = GUILayout.Toggle(Settings.enableNetworkDiagnostics, "Enable Network Diagnostics (Verbose)");
+                if (Settings.enableNetworkDiagnostics)
+                {
+                    GUILayout.Label("Captures deep ClientNetworkService breadcrumbs during connect/load troubleshooting.");
+                }
 				Settings.debugEnableDiagnostics = GUILayout.Toggle(Settings.debugEnableDiagnostics, "Enable Diagnostics");
 				if (Settings.debugEnableDiagnostics)
 				{
