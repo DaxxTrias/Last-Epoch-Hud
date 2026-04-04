@@ -6,8 +6,9 @@ using System.Reflection;
 using HarmonyLib;
 using Il2CppLidgren.Network;
 using Il2CppSystem.Net;
+using Mod.Utils;
 
-[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.5", "Daxx")]
+[assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.6", "Daxx")]
 [assembly: MelonGame("Eleventh Hour Games", "Last Epoch")]
 
 namespace Mod
@@ -18,7 +19,7 @@ namespace Mod
 		public const string Description = "Hud mod for Last Epoch"; // Description for the Mod.  (Set as null if none)
 		public const string Author = "Daxx"; // Author of the Mod.  (MUST BE SET)
 		public const string Company = null; // Company that made the Mod.  (Set as null if none)
-		public const string Version = "0.4.1"; // Version of the Mod.  (MUST BE SET)
+		public const string Version = "0.4.6"; // Version of the Mod.  (MUST BE SET)
 		public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
 	}
 
@@ -56,6 +57,7 @@ namespace Mod
 		public override void OnSceneWasLoaded(int buildindex, string sceneName) // Runs when a Scene has Loaded and is passed the Scene's Build Index and Name.
 		{
 			//MelonLogger.Msg("OnSceneWasLoaded: " + buildindex.ToString() + " | " + sceneName); // occurs before scene init
+			AutoDisconnect.OnSceneChanged();
 			GameMods.FogRemover();
 		}
 
@@ -72,13 +74,13 @@ namespace Mod
 			try
 			{
 				ObjectManager.OnSceneLoaded();
-				// MapHack.OnSceneWasLoaded();
+				MapHack.OnSceneWasInitialized();
 				GameMods.FogRemover();
 				GameMods.playerLantern();
 
 				// Inform AntiIdleSystem to suppress synthetic keepalive briefly after scene load
 				AntiIdleSystem.OnSceneChanged();
-				AutoDisconnect.ClearCache();
+				AutoDisconnect.OnSceneChanged();
 				Shrines.OnSceneChanged();
 				RunePrisons.OnSceneChanged();
 				Chests.OnSceneChanged();
@@ -98,12 +100,25 @@ namespace Mod
 		{
 			try
 			{
-				ESP.OnUpdate();
-				AutoPotion.OnUpdate();
+				bool hasPlayer = ObjectManager.HasPlayer();
+				if (hasPlayer)
+				{
+					MapHack.OnUpdate(hasPlayer: true);
+					ESP.OnUpdate();
+					AutoPotion.OnUpdate();
+					MinimapEnemyCircles.Update();
+					AutoDisconnect.OnUpdate();
+				}
+				else
+				{
+					MapHack.OnUpdate(hasPlayer: false);
+					// Keep overlays clean when no world/player context is available.
+					ESP.Clear();
+					MinimapEnemyCircles.ClearCircles();
+				}
+
 				Menu.OnUpdate();
-                MinimapEnemyCircles.Update();
 				AntiIdleSystem.OnUpdate(); // Add anti-idle system
-				AutoDisconnect.OnUpdate();
 				if (Settings.timeScale != 1.0f)
 					UnityEngine.Time.timeScale = Settings.timeScale;
 			}
@@ -213,7 +228,7 @@ namespace Mod
 				// NetTime verification
 				try
 				{
-					var netTimeType = AccessTools.TypeByName("Il2CppLidgren.Network.NetTime") ?? AccessTools.TypeByName("Lidgren.Network.NetTime");
+					var netTimeType = TypeLookup.FindType("Il2CppLidgren.Network.NetTime", "Lidgren.Network.NetTime");
 					if (netTimeType != null)
 					{
 						var nowProp = netTimeType.GetProperty("Now", BindingFlags.Public | BindingFlags.Static) ?? netTimeType.GetProperty("get_Now", BindingFlags.Public | BindingFlags.Static);

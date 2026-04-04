@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using UnityEngine;
 using static UnityEngine.GUI;
 using MelonLoader;
@@ -117,6 +117,11 @@ namespace Mod
 			debugToolsDropdown = GUILayout.Toggle(debugToolsDropdown, "DEBUG Tools:", "button");
 			if (debugToolsDropdown)
 			{
+				Settings.enableNetworkDiagnostics = GUILayout.Toggle(Settings.enableNetworkDiagnostics, "Enable Network Diagnostics (Verbose)");
+                if (Settings.enableNetworkDiagnostics)
+                {
+                    GUILayout.Label("Captures deep ClientNetworkService breadcrumbs during connect/load troubleshooting.");
+                }
 				Settings.debugEnableDiagnostics = GUILayout.Toggle(Settings.debugEnableDiagnostics, "Enable Diagnostics");
 				if (Settings.debugEnableDiagnostics)
 				{
@@ -174,8 +179,7 @@ namespace Mod
 
 				Settings.cameraZoomUnlock = GUILayout.Toggle(Settings.cameraZoomUnlock, "Camera Zoom Unlock");
 				Settings.minimapZoomUnlock = GUILayout.Toggle(Settings.minimapZoomUnlock, "Minimap Zoom Unlock");
-				GUILayout.Label("Map Hack: unavailable (Broken in 1.4.x)");
-				// Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack ");
+				Settings.mapHack = GUILayout.Toggle(Settings.mapHack, "Map Hack (Boost RevealRadius 14,000%)");
 
 				bool previousPlayerLantern = Settings.playerLantern;
 				Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");

@@ -56,18 +56,13 @@ namespace Mod.Cheats.Patches
             {
                 public static void Prefix(ref UIBase __instance)
                 {
+                    Log.MarkGamePhase("UIBase.Awake");
                     MelonLogger.Msg("[LeHud.Hooks]  UIBase.Awake hooked. Disabling bug submission button");
                     //__instance.gameObject.SetActive(false);
                     if (__instance != null)
                     {
-                        // var bugButton = __instance.bugReportButton;
-                        // if (bugButton != null && bugButton.gameObject != null)
-                        //     bugButton.gameObject.SetActive(false);
-                        // var bugPanel = __instance.bugReportPanel;
-                        // if (bugPanel != null)
-                        //     bugPanel.Close();
-
                         AutoDisconnect.SetUIBase(__instance);
+                        BugReportUiDisabler.TryDisableBugReportUi(__instance, "UIBase.Awake");
                         // AntiIdleSystem.SetUIBase(__instance); // UI pulse disabled; keep for future use
                     }
                 }
@@ -78,9 +73,9 @@ namespace Mod.Cheats.Patches
             {
                 public static void Prefix(ref CharacterSelect __instance)
                 {
+                    Log.MarkGamePhase("CharacterSelect.Awake");
                     MelonLogger.Msg("[LeHud.Hooks]  CharacterSelect.Awake hooked. Disabling bug submission button");
-                    if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
-                        __instance.submitBugReportButton.gameObject.SetActive(false);
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, "CharacterSelect.Awake");
                 }
             }
 
@@ -89,18 +84,256 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(ref UIBase __instance)
                 {
+                    BugReportUiDisabler.LogOnce("UIBase.OpenBugReportPanel:block", "[LeHud.Hooks]  UIBase.OpenBugReportPanel hooked and blocked.");
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, "UIBase.OpenBugReportPanel");
+                    return false;
+                }
+            }
 
-                    MelonLogger.Msg("[LeHud.Hooks]  UIBase.OpenBugReportPanel hooked and blocked.");
-                    //__instance.gameObject.SetActive(false);
-                    if (__instance != null)
+            [HarmonyPatch(typeof(UIBase), "IsBugReportPanelOpen")]
+            public class UIBase_IsBugReportPanelOpen : MelonMod
+            {
+                public static void Postfix(ref UIBase __instance, ref bool __result)
+                {
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, "UIBase.IsBugReportPanelOpen");
+                    __result = false;
+                }
+            }
+
+            [HarmonyPatch]
+            public class ControllerButtonHoldManager_StartBugReportButtonHold : MelonMod
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
                     {
-                        // var bugButton = __instance.bugReportButton;
-                        // if (bugButton != null && bugButton.gameObject != null)
-                        //     bugButton.gameObject.SetActive(false);
-                        // var bugPanel = __instance.bugReportPanel;
-                        // if (bugPanel != null)
-                        //     bugPanel.Close();
+                        var controllerHoldManagerType = TypeLookup.FindType(
+                            "Il2Cpp.ControllerButtonHoldManager",
+                            "ControllerButtonHoldManager");
+                        if (controllerHoldManagerType == null)
+                            return false;
+
+                        s_target = AccessTools.GetDeclaredMethods(controllerHoldManagerType)
+                            .FirstOrDefault(m => string.Equals(m.Name, "StartBugReportButtonHold", StringComparison.Ordinal));
+                        if (s_target == null)
+                            return false;
+
+                        MelonLogger.Msg("[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold hook bound.");
+                        return true;
                     }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static bool Prefix(object __instance)
+                {
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, "ControllerButtonHoldManager.StartBugReportButtonHold");
+                    BugReportUiDisabler.LogOnce(
+                        key: "ControllerButtonHoldManager.StartBugReportButtonHold:block",
+                        message: "[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold hooked and blocked.");
+                    return false;
+                }
+            }
+
+            [HarmonyPatch]
+            public class MainMenuPanel_BugReportHooks : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+                private static System.Reflection.FieldInfo? s_bugReportButtonField;
+                private static System.Reflection.MethodInfo? s_bugReportButtonGetter;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var mainMenuPanelType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.MainMenuPanel");
+                        if (mainMenuPanelType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(mainMenuPanelType)
+                            .Where(m => !m.IsStatic
+                                && (m.Name.IndexOf("BugReport", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || string.Equals(m.Name, "Awake", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Start", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "OnEnable", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Open", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Initialize", StringComparison.Ordinal)))
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        s_bugReportButtonField = AccessTools.Field(mainMenuPanelType, "bugReportButton");
+                        s_bugReportButtonGetter = AccessTools.PropertyGetter(mainMenuPanelType, "bugReportButton");
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  MainMenuPanel bug-report hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  MainMenuPanel bug-report hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    string source = $"MainMenuPanel.{__originalMethod?.Name ?? "Unknown"}";
+                    TryDisableMainMenuBugButton(__instance, source);
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, source);
+                }
+
+                private static void TryDisableMainMenuBugButton(object? instance, string source)
+                {
+                    if (instance == null)
+                        return;
+
+                    try
+                    {
+                        object? bugButton = null;
+                        if (s_bugReportButtonField != null)
+                        {
+                            bugButton = s_bugReportButtonField.GetValue(instance);
+                        }
+                        else if (s_bugReportButtonGetter != null)
+                        {
+                            bugButton = s_bugReportButtonGetter.Invoke(instance, null);
+                        }
+
+                        if (bugButton == null)
+                            return;
+
+                        if (bugButton is Component component && component.gameObject != null)
+                        {
+                            component.gameObject.SetActive(false);
+                            BugReportUiDisabler.LogOnce(
+                                key: $"{source}:MainMenuPanel.bugReportButton:hidden-fastpath",
+                                message: $"[LeHud.Hooks]  {source} hid MainMenuPanel.bugReportButton.");
+                            return;
+                        }
+
+                        if (bugButton is GameObject gameObject)
+                        {
+                            gameObject.SetActive(false);
+                            BugReportUiDisabler.LogOnce(
+                                key: $"{source}:MainMenuPanel.bugReportButton.go:hidden-fastpath",
+                                message: $"[LeHud.Hooks]  {source} hid MainMenuPanel.bugReportButton.gameObject.");
+                        }
+                    }
+                    catch
+                    {
+                        // Keep hook non-fatal; reflection fallback handles version variance.
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class PanelSystem_BugReportHooks : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var panelSystemType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.PanelSystem");
+                        if (panelSystemType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(panelSystemType)
+                            .Where(m => !m.IsStatic
+                                && (m.Name.IndexOf("BugReport", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || string.Equals(m.Name, "Awake", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Start", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "OnEnable", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Open", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Initialize", StringComparison.Ordinal)))
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  PanelSystem bug-report hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  PanelSystem bug-report hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, $"PanelSystem.{__originalMethod?.Name ?? "Unknown"}");
+                }
+            }
+
+            [HarmonyPatch]
+            public class BugReportPanel_OpenMethods : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var bugReportPanelType = TypeLookup.FindType("Il2CppLE.UI.PanelSystem.BugReportPanel");
+                        if (bugReportPanelType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(bugReportPanelType)
+                            .Where(m => !m.IsStatic
+                                && !m.IsAbstract
+                                && (m.Name.IndexOf("Open", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || m.Name.IndexOf("Show", StringComparison.OrdinalIgnoreCase) >= 0)
+                                && m.Name.IndexOf("Close", StringComparison.OrdinalIgnoreCase) < 0)
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  BugReportPanel open hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  BugReportPanel open hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static bool Prefix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    string methodName = __originalMethod?.Name ?? "Unknown";
+                    BugReportUiDisabler.TryDisableBugReportUi(__instance, $"BugReportPanel.{methodName}");
+                    BugReportUiDisabler.LogOnce(
+                        key: $"BugReportPanel.{methodName}:blocked",
+                        message: $"[LeHud.Hooks]  BugReportPanel.{methodName} hooked and blocked.");
                     return false;
                 }
             }
@@ -135,26 +368,30 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(LogType logType, UnityEngine.Object context, string format, Il2CppReferenceArray<Il2CppSystem.Object> args)
                 {
-                    //MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
-
-                    // Log all elements
-                    //MelonLogger.Msg($"LogType: {logType}");
-                    //MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    //MelonLogger.Msg($"Format: {format}");
-
-                    //if (args != null)
-                    //{
-                    //	for (int i = 0; i < args.Length; i++)
-                    //	{
-                    //		MelonLogger.Msg($"Arg[{i}]: {args[i]?.ToString() ?? "null"}");
-                    //	}
-                    //}
-                    //else
-                    //{
-                    //	MelonLogger.Msg("Args: null");
-                    //}
+                    Log.GameLog(logType, context?.name, format, ExtractArgs(args));
 
                     return false;
+                }
+
+                private static IReadOnlyList<string>? ExtractArgs(Il2CppReferenceArray<Il2CppSystem.Object> args)
+                {
+                    if (args == null || args.Length == 0)
+                        return null;
+
+                    var output = new string[args.Length];
+                    for (int i = 0; i < args.Length; i++)
+                    {
+                        try
+                        {
+                            output[i] = args[i]?.ToString() ?? "null";
+                        }
+                        catch (Exception ex)
+                        {
+                            output[i] = $"<arg[{i}] {ex.GetType().Name}>";
+                        }
+                    }
+
+                    return output;
                 }
             }
 
@@ -164,13 +401,17 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(Il2CppSystem.Exception exception, UnityEngine.Object context)
                 {
-                    // TODO: this goes absolutely nuts on the soreth'ka level for some reason. needs to be investigated
-                    MelonLogger.Msg("[LeHud.Hooks]  ClientLogHandler.LogException hooked and blocked.");
+                    string exceptionText = exception?.ToString() ?? "null";
+                    Log.GameException(context?.name, exceptionText);
 
-                    // Log all elements
-                    //MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    //MelonLogger.Msg($"Exception: {exception?.ToString() ?? "null"}");
-
+                    if (Log.IsLikelyLoginFailureException(exceptionText))
+                    {
+                        Log.DumpRecentGameEventsThrottled(
+                            key: "game-login-failure-exception",
+                            reason: "Likely login/load exception observed",
+                            minInterval: TimeSpan.FromSeconds(15),
+                            maxLines: 80);
+                    }
                     return false;
                 }
             }
@@ -512,7 +753,8 @@ namespace Mod.Cheats.Patches
             {
             	public static void Postfix(ref GroundItemManager __instance, ref int __state, ref Actor player, ref ItemData itemData, ref Vector3 location, ref bool playDropSound)
             	{
-            		MelonLogger.Msg("[LEHud] GroundItemManager.dropItemForPlayer hooked");
+                    _ = __state;
+                    Log.InfoThrottled(LogSource.Hooks, "GroundItemManager.dropItemForPlayer", "GroundItemManager.dropItemForPlayer hooked", TimeSpan.FromSeconds(15));
             		if (ItemList.isCraftingItem(itemData.itemType) && Settings.pickupCrafting)
             		{
             			__instance.TryGetGroundItemList(player, out GroundItemList groundItemList);
@@ -1013,6 +1255,9 @@ namespace Mod.Cheats.Patches
 				{
 					try
 					{
+                        _ = __instance;
+                        Log.MarkGamePhase("NetMultiClient.Connect");
+                        Log.ArmShaDiagnosticsWindow("NetMultiClient.Connect", TimeSpan.FromSeconds(60));
 						// Reduced: no verbose prefix log
 					}
 					catch (Exception e)
@@ -1028,9 +1273,15 @@ namespace Mod.Cheats.Patches
 					{
 						if (__result != null)
 						{
+                            Log.MarkGamePhase("NetMultiClient.Connected");
+                            Log.ArmShaDiagnosticsWindow("NetMultiClient.Connected", TimeSpan.FromSeconds(45));
 							AntiIdleSystem.SetServerConnection(__result);
 							AntiIdleSystem.SetNetMultiClient(__instance);
 						}
+                        else
+                        {
+                            Log.MarkGamePhase("NetMultiClient.ConnectFailed");
+                        }
 					}
 					catch (Exception e)
 					{
@@ -1046,10 +1297,22 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {(byeMessage ?? "No reason provided")}");
+                        _ = __instance;
+                        var reason = string.IsNullOrWhiteSpace(byeMessage) ? "No reason provided" : byeMessage.Trim();
+                        Log.MarkGamePhase($"NetMultiClient.Disconnect:{reason}");
+                        MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Prefix - Reason: {reason}");
 
                         // Log disconnect attempt for anti-idle analysis
                         AntiIdleSystem.OnDisconnectAttempted(byeMessage);
+
+                        if (IsLikelyLoginFailureDisconnect(reason))
+                        {
+                            Log.DumpRecentGameEventsThrottled(
+                                key: "game-login-failure-disconnect",
+                                reason: $"Disconnect observed: {reason}",
+                                minInterval: TimeSpan.FromSeconds(10),
+                                maxLines: 100);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -1061,6 +1324,8 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        _ = __instance;
+                        _ = byeMessage;
                         MelonLogger.Msg($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix - Disconnection completed");
 
                         // Clear stored references
@@ -1070,6 +1335,18 @@ namespace Mod.Cheats.Patches
                     {
                         MelonLogger.Error($"[LeHud.Hooks]  NetMultiClient.Disconnect Postfix error: {e.Message}");
                     }
+                }
+
+                private static bool IsLikelyLoginFailureDisconnect(string reason)
+                {
+                    if (string.IsNullOrWhiteSpace(reason))
+                        return false;
+
+                    return reason.Contains("returning to menu", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("idle", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("load", StringComparison.OrdinalIgnoreCase)
+                        || reason.Contains("character", StringComparison.OrdinalIgnoreCase);
                 }
             }
 
@@ -1132,7 +1409,8 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        MelonLogger.Msg($"[LeHud.Hooks]  SteamNetworking.ConnectionStatusChanged Prefix - Callback data received");
+                        _ = __instance;
+                        Log.InfoThrottled(LogSource.Hooks, "SteamNetworking.ConnectionStatusChanged", "Steam networking connection status callback observed", TimeSpan.FromSeconds(10));
 
                         // Track Steam networking status changes
                         AntiIdleSystem.OnSteamConnectionStatusChanged(data);
@@ -1156,7 +1434,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         // Generic method: SendClientMessage<T>(T message, NetDeliveryMethod deliveryMethod, int sequenceChannel)
                         s_target = AccessTools.GetDeclaredMethods(t)
@@ -1187,8 +1465,16 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendClientMessage.Prefix",
+                            details: $"delivery={deliveryMethod?.ToString() ?? "null"} channel={sequenceChannel}",
+                            minInterval: TimeSpan.FromMilliseconds(250));
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendClientMessage.Message",
+                            payload: message,
+                            minInterval: TimeSpan.FromMilliseconds(120));
                         AntiIdleSystem.SetClientNetworkService(__instance);
-                        AntiIdleSystem.OnMessageSent(message, deliveryMethod, sequenceChannel);
+                        AntiIdleSystem.OnMessageSent(message, deliveryMethod ?? "null", sequenceChannel);
                     }
                     catch (Exception e)
                     {
@@ -1207,7 +1493,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         // SendMessageBuffer(MessageKey key, ReadOnlySpan<byte> data, NetDeliveryMethod method, int channel)
                         s_target = AccessTools.GetDeclaredMethods(t)
@@ -1238,9 +1524,17 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendMessageBuffer.Prefix",
+                            details: $"method={method?.ToString() ?? "null"} channel={channel}",
+                            minInterval: TimeSpan.FromMilliseconds(250));
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendMessageBuffer.Key",
+                            payload: key,
+                            minInterval: TimeSpan.FromMilliseconds(120));
                         AntiIdleSystem.SetClientNetworkService(__instance);
-                        AntiIdleSystem.OnMessageSent(key, method, channel);
-                        AntiIdleSystem.OnWrapperBufferSent(key, method, channel);
+                        AntiIdleSystem.OnMessageSent(key, method ?? "null", channel);
+                        AntiIdleSystem.OnWrapperBufferSent(key, method ?? "null", channel);
                     }
                     catch (Exception e)
                     {
@@ -1259,7 +1553,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         s_target = AccessTools.GetDeclaredMethods(t)
                             .FirstOrDefault(m => m.Name.IndexOf("Receive", StringComparison.OrdinalIgnoreCase) >= 0 && m.GetParameters().Length >= 1);
@@ -1271,7 +1565,30 @@ namespace Mod.Cheats.Patches
                 public static System.Reflection.MethodBase TargetMethod() => s_target!;
                 public static void Prefix(object __instance, object __0)
                 {
-                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                    try
+                    {
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.Receive");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{s_target?.Name ?? "Receive*"}.Prefix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(30));
+                        AntiIdleSystem.OnWrapperReceive(__0);
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object __0)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{s_target?.Name ?? "Receive*"}.Postfix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
                 }
             }
 
@@ -1284,7 +1601,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
                         if (t == null) return false;
                         s_target = AccessTools.GetDeclaredMethods(t)
                             .FirstOrDefault(m => m.Name.IndexOf("Processed", StringComparison.OrdinalIgnoreCase) >= 0 && m.Name.IndexOf("IncomingMessage", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -1296,9 +1613,242 @@ namespace Mod.Cheats.Patches
                 public static System.Reflection.MethodBase TargetMethod() => s_target!;
                 public static void Prefix(object __instance, object __0)
                 {
-                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                    try
+                    {
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.ProcessedIncomingMessage");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ProcessedIncomingMessage.Prefix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(30));
+                        AntiIdleSystem.OnWrapperReceive(__0);
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object __0)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ProcessedIncomingMessage.Postfix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
                 }
             }
+
+            // Focused hook for the method seen in SHA probe stacks.
+            [HarmonyPatch]
+            public class ClientNetworkService_ReceiveCallback
+            {
+                private static System.Reflection.MethodBase? s_target;
+                private static bool s_loggedBinding;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => string.Equals(m.Name, "ReceiveCallback", StringComparison.Ordinal));
+                        if (s_target == null)
+                            return false;
+
+                        if (!s_loggedBinding)
+                        {
+                            s_loggedBinding = true;
+                            var ps = s_target.GetParameters();
+                            MelonLogger.Msg($"[LeHud.Hooks]  ClientNetworkService.ReceiveCallback bound (params={ps.Length})");
+                        }
+
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics)
+                            return;
+
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.ReceiveCallback");
+                        object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ReceiveCallback.Prefix",
+                            payload: firstArg,
+                            minInterval: TimeSpan.FromMilliseconds(20));
+                        if (Log.IsShaDiagnosticsWindowActive())
+                        {
+                            Log.CaptureNetworkBreadcrumb(
+                                stage: "ClientNetworkService.ReceiveCallback.Args",
+                                details: SummarizeArgs(__instance, __args),
+                                minInterval: TimeSpan.FromMilliseconds(60));
+                        }
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics)
+                            return;
+
+                        _ = __instance;
+                        object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ReceiveCallback.Postfix",
+                            payload: firstArg,
+                            minInterval: TimeSpan.FromMilliseconds(35));
+                    }
+                    catch { }
+                }
+
+                private static string SummarizeArgs(object instance, object[]? args)
+                {
+                    var sb = new System.Text.StringBuilder(280);
+                    sb.Append("instance=").Append(Log.DescribePayloadForDiagnostics(instance));
+                    if (args == null || args.Length == 0)
+                    {
+                        sb.Append(" | args=<none>");
+                        return sb.ToString();
+                    }
+
+                    int max = Math.Min(args.Length, 6);
+                    sb.Append(" | argc=").Append(args.Length);
+                    for (int i = 0; i < max; i++)
+                    {
+                        sb.Append(" | arg").Append(i).Append('=').Append(Log.DescribePayloadForDiagnostics(args[i]));
+                    }
+                    if (args.Length > max)
+                    {
+                        sb.Append(" | ...");
+                    }
+
+                    return sb.ToString();
+                }
+            }
+
+            // Additional receive-side processing hooks to add breadcrumbs around decode/dispatch methods.
+            [HarmonyPatch]
+            public class ClientNetworkService_MessageProcessing
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+                private static bool s_loggedBinding;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+
+                        var keywords = new[] { "Deserialize", "Decode", "Process", "Handle", "Dispatch" };
+                        s_targets = AccessTools.GetDeclaredMethods(t)
+                            .Where(m => !m.IsAbstract
+                                && !m.IsGenericMethod
+                                && !m.ContainsGenericParameters
+                                && m.GetParameters().Length > 0
+                                && keywords.Any(k => m.Name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Cast<System.Reflection.MethodBase>()
+                            .Take(10)
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        if (!s_loggedBinding)
+                        {
+                            s_loggedBinding = true;
+                            var names = string.Join(", ", s_targets.Select(m => m.Name).Distinct());
+                            MelonLogger.Msg($"[LeHud.Hooks]  ClientNetworkService processing hooks bound: {names}");
+                        }
+
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Prefix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics || !Log.IsShaDiagnosticsWindowActive())
+                            return;
+
+                        _ = __instance;
+                        string method = __originalMethod?.Name ?? "UnknownMethod";
+                        Log.MarkGamePhase($"ClientNetworkService.{method}");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{method}.PrefixArgs",
+                            details: SummarizeArgs(__args),
+                            minInterval: TimeSpan.FromMilliseconds(35));
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                {
+                    try
+                    {
+                        if (!Settings.enableNetworkDiagnostics || !Log.IsShaDiagnosticsWindowActive())
+                            return;
+
+                        _ = __instance;
+                        _ = __args;
+                        string method = __originalMethod?.Name ?? "UnknownMethod";
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{method}.Postfix",
+                            details: "ok",
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
+                }
+
+                private static string SummarizeArgs(object[]? args)
+                {
+                    if (args == null || args.Length == 0)
+                        return "args=<none>";
+
+                    var sb = new System.Text.StringBuilder(220);
+                    int max = Math.Min(args.Length, 4);
+                    sb.Append("argc=").Append(args.Length);
+                    for (int i = 0; i < max; i++)
+                    {
+                        sb.Append(" | arg").Append(i).Append('=').Append(Log.DescribePayloadForDiagnostics(args[i]));
+                    }
+                    if (args.Length > max)
+                    {
+                        sb.Append(" | ...");
+                    }
+                    return sb.ToString();
+                }
+            }
+
+            // Lower-level Lidgren ingress probes were disabled due IL2CPP runtime instability.
             #endregion
         }
     }

@@ -8,12 +8,16 @@ namespace Mod.Cheats
 {
     internal static class AutoDisconnect
     {
+        private const float PostLoadGraceSeconds = 30f;
+
         // Cached components (reusing the AutoPotion pattern)
         private static GameObject? _cachedPlayerObject;
         private static PlayerHealth? _cachedPlayerHealth;
         private static ChangeHealthMaterialDuringLifetime? _cachedReaperCheck;
         private static bool _componentsInitialized = false;
         private static UIBase? _cachedUIBase;
+        private static bool _hasSeenPlayerSinceSceneChange = false;
+        private static float _suppressUntil = 0f;
 
         // Timing / debounce
         private static float _lastAttemptTime = 0f;
@@ -65,9 +69,7 @@ namespace Mod.Cheats
 
         private static bool IsSuppressed()
         {
-            // Suppress around scene changes or activity using AntiIdle suppression window if present (best-effort)
-            // For now we simply reuse Settings.sceneChangeSuppressionSeconds via Mod hook; expand later if needed.
-            return false;
+            return Time.time < _suppressUntil;
         }
 
         private static bool IsStateValid()
@@ -86,6 +88,20 @@ namespace Mod.Cheats
         {
             if (uiBase != null)
                 _cachedUIBase = uiBase;
+        }
+
+        public static void OnSceneChanged()
+        {
+            ClearCache();
+            _hasSeenPlayerSinceSceneChange = false;
+            StartPostLoadGrace();
+        }
+
+        private static void StartPostLoadGrace()
+        {
+            var nextSuppression = Time.time + PostLoadGraceSeconds;
+            if (nextSuppression > _suppressUntil)
+                _suppressUntil = nextSuppression;
         }
 
         private static bool TryEnsureUIBase()
@@ -153,7 +169,19 @@ namespace Mod.Cheats
             try
             {
                 if (!Settings.useAutoDisconnect) return;
-                if (!ObjectManager.HasPlayer()) return;
+                if (!ObjectManager.HasPlayer())
+                {
+                    _hasSeenPlayerSinceSceneChange = false;
+                    return;
+                }
+
+                // Apply an additional grace window when the local player is first reacquired.
+                if (!_hasSeenPlayerSinceSceneChange)
+                {
+                    _hasSeenPlayerSinceSceneChange = true;
+                    StartPostLoadGrace();
+                }
+
                 if (!InitializeComponents()) return;
                 if (!IsStateValid()) return;
                 if (IsSuppressed()) return;

@@ -11,6 +11,7 @@ namespace Mod
         public static float timeScale = 1.0f;
         public static bool useAutoPot = true;
         public static bool useLootFilter = true;
+        public static bool enableNetworkDiagnostics = false; // Verbose receive/send diagnostics for troubleshooting
         public static bool removeFog = true;
         public static bool cameraZoomUnlock = true;
         public static bool minimapZoomUnlock = true;
