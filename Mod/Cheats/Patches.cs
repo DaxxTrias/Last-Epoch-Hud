@@ -50,6 +50,236 @@ namespace Mod.Cheats.Patches
             //todo: verify there arent any new methods that should be patched
             //todo: verify that we patched out the unreal crash handler
 
+            private static readonly HashSet<string> s_bugUiLogOnce = new(StringComparer.Ordinal);
+            private static readonly Dictionary<string, Func<object, object?>?> s_memberGetterCache = new(StringComparer.Ordinal);
+            private static readonly Dictionary<Type, Func<object, bool>?> s_closeMethodCache = new();
+
+            private static void LogBugUiOnce(string key, string message)
+            {
+                lock (s_bugUiLogOnce)
+                {
+                    if (!s_bugUiLogOnce.Add(key))
+                        return;
+                }
+
+                MelonLogger.Msg(message);
+            }
+
+            private static object? TryGetMemberValue(object owner, string memberName)
+            {
+                try
+                {
+                    var ownerType = owner.GetType();
+                    var key = $"{ownerType.FullName ?? ownerType.Name}|{memberName}";
+                    Func<object, object?>? getter;
+                    lock (s_memberGetterCache)
+                    {
+                        if (!s_memberGetterCache.TryGetValue(key, out getter))
+                        {
+                            getter = BuildMemberGetter(ownerType, memberName);
+                            s_memberGetterCache[key] = getter;
+                        }
+                    }
+
+                    if (getter != null)
+                        return getter(owner);
+                }
+                catch
+                {
+                    // Best-effort reflection lookup for version-variant IL2CPP wrappers.
+                }
+
+                return null;
+            }
+
+            private static Func<object, object?>? BuildMemberGetter(Type ownerType, string memberName)
+            {
+                const System.Reflection.BindingFlags Flags =
+                    System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public
+                    | System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.DeclaredOnly;
+
+                for (var t = ownerType; t != null; t = t.BaseType)
+                {
+                    var field = t.GetField(memberName, Flags);
+                    if (field != null)
+                        return owner => field.GetValue(owner);
+
+                    var property = t.GetProperty(memberName, Flags);
+                    if (property == null || property.GetIndexParameters().Length != 0)
+                        continue;
+
+                    var getter = property.GetGetMethod(nonPublic: true);
+                    if (getter != null)
+                        return owner => getter.Invoke(owner, null);
+                }
+
+                return null;
+            }
+
+            private static bool TryInvokeClose(object target)
+            {
+                var targetType = target.GetType();
+                Func<object, bool>? closeInvoker;
+
+                lock (s_closeMethodCache)
+                {
+                    if (!s_closeMethodCache.TryGetValue(targetType, out closeInvoker))
+                    {
+                        closeInvoker = BuildCloseInvoker(targetType);
+                        s_closeMethodCache[targetType] = closeInvoker;
+                    }
+                }
+
+                if (closeInvoker == null)
+                    return false;
+
+                try
+                {
+                    return closeInvoker(target);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            private static Func<object, bool>? BuildCloseInvoker(Type targetType)
+            {
+                const System.Reflection.BindingFlags Flags =
+                    System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public
+                    | System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.DeclaredOnly;
+
+                for (var t = targetType; t != null; t = t.BaseType)
+                {
+                    var method = t.GetMethod("Close", Flags, binder: null, types: Type.EmptyTypes, modifiers: null);
+                    if (method == null)
+                        continue;
+
+                    return target =>
+                    {
+                        method.Invoke(target, null);
+                        return true;
+                    };
+                }
+
+                return null;
+            }
+
+            private static bool TrySetInactive(object? target)
+            {
+                if (target == null)
+                    return false;
+
+                try
+                {
+                    if (target is GameObject gameObject)
+                    {
+                        gameObject.SetActive(false);
+                        return true;
+                    }
+
+                    if (target is Component component && component.gameObject != null)
+                    {
+                        component.gameObject.SetActive(false);
+                        return true;
+                    }
+
+                    if (TryGetMemberValue(target, "gameObject") is GameObject nestedGameObject)
+                    {
+                        nestedGameObject.SetActive(false);
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Suppress any UI mutation fault to keep hooks non-fatal.
+                }
+
+                return false;
+            }
+
+            private static void TryCloseAndHide(object? panelLikeObject, string source, string objectName)
+            {
+                if (panelLikeObject == null)
+                    return;
+
+                bool changed = false;
+                try
+                {
+                    changed = TryInvokeClose(panelLikeObject);
+                }
+                catch
+                {
+                    // Ignore missing/unstable panel Close wrappers; hiding still handles disablement.
+                }
+
+                if (TrySetInactive(panelLikeObject))
+                    changed = true;
+
+                if (changed)
+                {
+                    LogBugUiOnce(
+                        key: $"{source}:{objectName}:closed",
+                        message: $"[LeHud.Hooks]  {source} closed/hidden {objectName}.");
+                }
+            }
+
+            private static void TryHideMemberObject(object owner, string memberName, string source)
+            {
+                var memberObject = TryGetMemberValue(owner, memberName);
+                if (memberObject == null)
+                    return;
+
+                if (TrySetInactive(memberObject))
+                {
+                    LogBugUiOnce(
+                        key: $"{source}:{owner.GetType().Name}:{memberName}:hidden",
+                        message: $"[LeHud.Hooks]  {source} hid {owner.GetType().Name}.{memberName}.");
+                }
+            }
+
+            private static void TryCloseAndHideMemberObject(object owner, string memberName, string source)
+            {
+                var memberObject = TryGetMemberValue(owner, memberName);
+                if (memberObject == null)
+                    return;
+
+                TryCloseAndHide(
+                    panelLikeObject: memberObject,
+                    source: source,
+                    objectName: $"{owner.GetType().Name}.{memberName}");
+            }
+
+            private static void TryDisableBugReportUi(object? owner, string source)
+            {
+                if (owner == null)
+                    return;
+
+                try
+                {
+                    TryHideMemberObject(owner, "bugReportButton", source);
+                    TryHideMemberObject(owner, "submitBugReportButton", source);
+                    TryCloseAndHideMemberObject(owner, "bugReportPanel", source);
+
+                    string typeName = owner.GetType().FullName ?? owner.GetType().Name;
+                    if (typeName.IndexOf("BugReportPanel", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        TryCloseAndHide(
+                            panelLikeObject: owner,
+                            source: source,
+                            objectName: owner.GetType().Name);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error($"[LeHud.Hooks]  {source} bug-report disable error: {e.Message}");
+                }
+            }
+
             #region security / detection patches
             [HarmonyPatch(typeof(UIBase), "Awake")]
             public class UIBase_Awake : MelonMod
@@ -61,14 +291,8 @@ namespace Mod.Cheats.Patches
                     //__instance.gameObject.SetActive(false);
                     if (__instance != null)
                     {
-                        // var bugButton = __instance.bugReportButton;
-                        // if (bugButton != null && bugButton.gameObject != null)
-                        //     bugButton.gameObject.SetActive(false);
-                        // var bugPanel = __instance.bugReportPanel;
-                        // if (bugPanel != null)
-                        //     bugPanel.Close();
-
                         AutoDisconnect.SetUIBase(__instance);
+                        TryDisableBugReportUi(__instance, "UIBase.Awake");
                         // AntiIdleSystem.SetUIBase(__instance); // UI pulse disabled; keep for future use
                     }
                 }
@@ -81,8 +305,7 @@ namespace Mod.Cheats.Patches
                 {
                     Log.MarkGamePhase("CharacterSelect.Awake");
                     MelonLogger.Msg("[LeHud.Hooks]  CharacterSelect.Awake hooked. Disabling bug submission button");
-                    if (__instance != null && __instance.submitBugReportButton != null && __instance.submitBugReportButton.gameObject != null)
-                        __instance.submitBugReportButton.gameObject.SetActive(false);
+                    TryDisableBugReportUi(__instance, "CharacterSelect.Awake");
                 }
             }
 
@@ -91,18 +314,206 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(ref UIBase __instance)
                 {
+                    LogBugUiOnce("UIBase.OpenBugReportPanel:block", "[LeHud.Hooks]  UIBase.OpenBugReportPanel hooked and blocked.");
+                    TryDisableBugReportUi(__instance, "UIBase.OpenBugReportPanel");
+                    return false;
+                }
+            }
 
-                    MelonLogger.Msg("[LeHud.Hooks]  UIBase.OpenBugReportPanel hooked and blocked.");
-                    //__instance.gameObject.SetActive(false);
-                    if (__instance != null)
+            [HarmonyPatch(typeof(UIBase), "IsBugReportPanelOpen")]
+            public class UIBase_IsBugReportPanelOpen : MelonMod
+            {
+                public static void Postfix(ref UIBase __instance, ref bool __result)
+                {
+                    TryDisableBugReportUi(__instance, "UIBase.IsBugReportPanelOpen");
+                    __result = false;
+                }
+            }
+
+            [HarmonyPatch]
+            public class ControllerButtonHoldManager_StartBugReportButtonHold : MelonMod
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
                     {
-                        // var bugButton = __instance.bugReportButton;
-                        // if (bugButton != null && bugButton.gameObject != null)
-                        //     bugButton.gameObject.SetActive(false);
-                        // var bugPanel = __instance.bugReportPanel;
-                        // if (bugPanel != null)
-                        //     bugPanel.Close();
+                        var controllerHoldManagerType =
+                            AccessTools.TypeByName("Il2Cpp.ControllerButtonHoldManager")
+                            ?? AccessTools.TypeByName("ControllerButtonHoldManager");
+                        if (controllerHoldManagerType == null)
+                            return false;
+
+                        s_target = AccessTools.GetDeclaredMethods(controllerHoldManagerType)
+                            .FirstOrDefault(m => string.Equals(m.Name, "StartBugReportButtonHold", StringComparison.Ordinal));
+                        if (s_target == null)
+                            return false;
+
+                        MelonLogger.Msg("[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold hook bound.");
+                        return true;
                     }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static bool Prefix(object __instance)
+                {
+                    TryDisableBugReportUi(__instance, "ControllerButtonHoldManager.StartBugReportButtonHold");
+                    LogBugUiOnce(
+                        key: "ControllerButtonHoldManager.StartBugReportButtonHold:block",
+                        message: "[LeHud.Hooks]  ControllerButtonHoldManager.StartBugReportButtonHold hooked and blocked.");
+                    return false;
+                }
+            }
+
+            [HarmonyPatch]
+            public class MainMenuPanel_BugReportHooks : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var mainMenuPanelType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.MainMenuPanel");
+                        if (mainMenuPanelType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(mainMenuPanelType)
+                            .Where(m => !m.IsStatic
+                                && (m.Name.IndexOf("BugReport", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || string.Equals(m.Name, "Awake", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Start", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "OnEnable", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Open", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Initialize", StringComparison.Ordinal)))
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  MainMenuPanel bug-report hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  MainMenuPanel bug-report hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    TryDisableBugReportUi(__instance, $"MainMenuPanel.{__originalMethod?.Name ?? "Unknown"}");
+                }
+            }
+
+            [HarmonyPatch]
+            public class PanelSystem_BugReportHooks : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var panelSystemType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.PanelSystem");
+                        if (panelSystemType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(panelSystemType)
+                            .Where(m => !m.IsStatic
+                                && (m.Name.IndexOf("BugReport", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || string.Equals(m.Name, "Awake", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Start", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "OnEnable", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Open", StringComparison.Ordinal)
+                                    || string.Equals(m.Name, "Initialize", StringComparison.Ordinal)))
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  PanelSystem bug-report hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  PanelSystem bug-report hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    TryDisableBugReportUi(__instance, $"PanelSystem.{__originalMethod?.Name ?? "Unknown"}");
+                }
+            }
+
+            [HarmonyPatch]
+            public class BugReportPanel_OpenMethods : MelonMod
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var bugReportPanelType = AccessTools.TypeByName("Il2CppLE.UI.PanelSystem.BugReportPanel");
+                        if (bugReportPanelType == null)
+                            return false;
+
+                        s_targets = AccessTools.GetDeclaredMethods(bugReportPanelType)
+                            .Where(m => !m.IsStatic
+                                && !m.IsAbstract
+                                && (m.Name.IndexOf("Open", StringComparison.OrdinalIgnoreCase) >= 0
+                                    || m.Name.IndexOf("Show", StringComparison.OrdinalIgnoreCase) >= 0)
+                                && m.Name.IndexOf("Close", StringComparison.OrdinalIgnoreCase) < 0)
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                            return false;
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  BugReportPanel open hooks bound: {string.Join(", ", s_targets.Select(t => t.Name).Distinct())}");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  BugReportPanel open hook Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static bool Prefix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    string methodName = __originalMethod?.Name ?? "Unknown";
+                    TryDisableBugReportUi(__instance, $"BugReportPanel.{methodName}");
+                    LogBugUiOnce(
+                        key: $"BugReportPanel.{methodName}:blocked",
+                        message: $"[LeHud.Hooks]  BugReportPanel.{methodName} hooked and blocked.");
                     return false;
                 }
             }
