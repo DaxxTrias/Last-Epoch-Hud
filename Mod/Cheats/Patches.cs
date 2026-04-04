@@ -135,12 +135,13 @@ namespace Mod.Cheats.Patches
             {
                 public static bool Prefix(LogType logType, UnityEngine.Object context, string format, Il2CppReferenceArray<Il2CppSystem.Object> args)
                 {
-                    MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
+                    //TODO: this seems to have been deprecated in 1.4.x
+                    // MelonLogger.Msg("[Mod] ClientLogHandler.LogFormat hooked and blocked.");
 
                     // Log all elements
-                    MelonLogger.Msg($"LogType: {logType}");
-                    MelonLogger.Msg($"Context: {context?.name ?? "null"}");
-                    MelonLogger.Msg($"Format: {format}");
+                    // MelonLogger.Msg($"LogType: {logType}");
+                    // MelonLogger.Msg($"Context: {context?.name ?? "null"}");
+                    // MelonLogger.Msg($"Format: {format}");
 
                     //if (args != null)
                     //{
