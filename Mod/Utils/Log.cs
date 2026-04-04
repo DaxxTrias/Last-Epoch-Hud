@@ -2,6 +2,7 @@ using MelonLoader;
 using UnityEngine;
 using System.Globalization;
 using System.Diagnostics;
+using System.Text;
 
 namespace Mod.Utils;
 
@@ -31,6 +32,14 @@ internal static class Log
         public string Summary { get; init; } = string.Empty;
     }
 
+    private sealed class NetworkBreadcrumb
+    {
+        public DateTime TimestampUtc { get; init; }
+        public string Phase { get; init; } = "Unknown";
+        public string Stage { get; init; } = string.Empty;
+        public string Details { get; init; } = string.Empty;
+    }
+
     private sealed class ThrottleState
     {
         public DateTime LastLogUtc { get; set; }
@@ -38,10 +47,13 @@ internal static class Log
     }
 
     private const int MaxBufferedGameEvents = 240;
+    private const int MaxBufferedNetworkBreadcrumbs = 400;
 
     private static readonly object s_lock = new();
     private static readonly Dictionary<string, ThrottleState> s_throttleStates = new(StringComparer.Ordinal);
     private static readonly Queue<GameEvent> s_gameEvents = new();
+    private static readonly Queue<NetworkBreadcrumb> s_networkBreadcrumbs = new();
+    private static readonly Dictionary<string, DateTime> s_networkBreadcrumbGates = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, DateTime> s_dumpGates = new(StringComparer.Ordinal);
     private static string s_currentGamePhase = "Boot";
     private static DateTime s_shaDiagnosticsWindowUntilUtc = DateTime.MinValue;
@@ -96,6 +108,49 @@ internal static class Log
             TimeSpan.FromSeconds(15));
     }
 
+    public static void CaptureNetworkBreadcrumb(string stage, object? payload, TimeSpan minInterval)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return;
+
+        DateTime now = DateTime.UtcNow;
+        string typeName = payload?.GetType().FullName ?? "<null>";
+        string gateKey = $"{stage}|{typeName}";
+        string phase;
+
+        lock (s_lock)
+        {
+            if (s_networkBreadcrumbGates.TryGetValue(gateKey, out var lastUtc) && now - lastUtc < minInterval)
+                return;
+
+            s_networkBreadcrumbGates[gateKey] = now;
+            phase = s_currentGamePhase;
+        }
+
+        EnqueueNetworkBreadcrumb(now, phase, stage, DescribeNetworkPayload(payload));
+    }
+
+    public static void CaptureNetworkBreadcrumb(string stage, string details, TimeSpan minInterval)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return;
+
+        DateTime now = DateTime.UtcNow;
+        string gateKey = $"{stage}|{details}";
+        string phase;
+
+        lock (s_lock)
+        {
+            if (s_networkBreadcrumbGates.TryGetValue(gateKey, out var lastUtc) && now - lastUtc < minInterval)
+                return;
+
+            s_networkBreadcrumbGates[gateKey] = now;
+            phase = s_currentGamePhase;
+        }
+
+        EnqueueNetworkBreadcrumb(now, phase, stage, string.IsNullOrWhiteSpace(details) ? "<empty>" : details.Trim());
+    }
+
     public static bool IsLikelyLoginFailureException(string? exceptionText)
     {
         if (string.IsNullOrWhiteSpace(exceptionText))
@@ -142,6 +197,42 @@ internal static class Log
         {
             var e = snapshot[i];
             Write(LogSource.Game, e.Level, $"{e.TimestampUtc:HH:mm:ss.fff} [{e.Phase}] {e.Summary}");
+        }
+    }
+
+    public static void DumpRecentNetworkBreadcrumbsThrottled(string key, string reason, TimeSpan minInterval, int maxLines = 100)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            key = "net-default";
+        if (maxLines <= 0)
+            maxLines = 1;
+
+        DateTime now = DateTime.UtcNow;
+        NetworkBreadcrumb[] snapshot;
+        string phaseAtDump;
+
+        lock (s_lock)
+        {
+            if (s_dumpGates.TryGetValue(key, out var lastDumpUtc) && now - lastDumpUtc < minInterval)
+                return;
+
+            s_dumpGates[key] = now;
+            snapshot = s_networkBreadcrumbs.ToArray();
+            phaseAtDump = s_currentGamePhase;
+        }
+
+        Warning(LogSource.Game, $"Network breadcrumb dump triggered: {reason} (phase={phaseAtDump})");
+        if (snapshot.Length == 0)
+        {
+            Info(LogSource.Game, "Network breadcrumb dump: no buffered breadcrumbs.");
+            return;
+        }
+
+        int start = Math.Max(0, snapshot.Length - maxLines);
+        for (int i = start; i < snapshot.Length; i++)
+        {
+            var b = snapshot[i];
+            Warning(LogSource.Game, $"NET {b.TimestampUtc:HH:mm:ss.fff} [{b.Phase}] {b.Stage} | {b.Details}");
         }
     }
 
@@ -279,6 +370,11 @@ internal static class Log
             reason: "SHA mismatch observed in connect/load window",
             minInterval: TimeSpan.FromSeconds(5),
             maxLines: 120);
+        DumpRecentNetworkBreadcrumbsThrottled(
+            key: "sha-mismatch-network-breadcrumbs",
+            reason: "SHA mismatch observed in connect/load window",
+            minInterval: TimeSpan.FromSeconds(5),
+            maxLines: 120);
 
         try
         {
@@ -348,6 +444,109 @@ internal static class Log
         }
 
         return true;
+    }
+
+    private static void EnqueueNetworkBreadcrumb(DateTime timestampUtc, string phase, string stage, string details)
+    {
+        lock (s_lock)
+        {
+            s_networkBreadcrumbs.Enqueue(new NetworkBreadcrumb
+            {
+                TimestampUtc = timestampUtc,
+                Phase = phase,
+                Stage = stage,
+                Details = details
+            });
+
+            while (s_networkBreadcrumbs.Count > MaxBufferedNetworkBreadcrumbs)
+            {
+                _ = s_networkBreadcrumbs.Dequeue();
+            }
+        }
+    }
+
+    private static string DescribeNetworkPayload(object? payload)
+    {
+        if (payload == null)
+            return "payload=<null>";
+
+        try
+        {
+            var t = payload.GetType();
+            var sb = new StringBuilder(200);
+            sb.Append("type=").Append(t.FullName ?? t.Name);
+
+            AppendKnownMember(sb, payload, t, "MessageKey");
+            AppendKnownMember(sb, payload, t, "messageKey");
+            AppendKnownMember(sb, payload, t, "MessageType");
+            AppendKnownMember(sb, payload, t, "messageType");
+            AppendKnownMember(sb, payload, t, "OpCode");
+            AppendKnownMember(sb, payload, t, "Opcode");
+            AppendKnownMember(sb, payload, t, "opCode");
+            AppendKnownMember(sb, payload, t, "Type");
+            AppendKnownMember(sb, payload, t, "type");
+            AppendKnownMember(sb, payload, t, "Id");
+            AppendKnownMember(sb, payload, t, "id");
+
+            string text = payload.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                text = text.Trim();
+                if (!string.Equals(text, t.FullName, StringComparison.Ordinal)
+                    && !string.Equals(text, t.Name, StringComparison.Ordinal))
+                {
+                    sb.Append(" | text=").Append(TrimForLog(text, 140));
+                }
+            }
+
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"payload-describe-failed: {ex.GetType().Name} {ex.Message}";
+        }
+    }
+
+    private static void AppendKnownMember(StringBuilder sb, object payload, Type type, string memberName)
+    {
+        try
+        {
+            var prop = type.GetProperty(memberName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (prop != null && prop.GetIndexParameters().Length == 0)
+            {
+                var value = prop.GetValue(payload);
+                if (value != null)
+                {
+                    sb.Append(" | ").Append(memberName).Append('=').Append(TrimForLog(value.ToString() ?? "null", 60));
+                    return;
+                }
+            }
+
+            var field = type.GetField(memberName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+            {
+                var value = field.GetValue(payload);
+                if (value != null)
+                {
+                    sb.Append(" | ").Append(memberName).Append('=').Append(TrimForLog(value.ToString() ?? "null", 60));
+                }
+            }
+        }
+        catch
+        {
+            // best-effort diagnostics only
+        }
+    }
+
+    private static string TrimForLog(string value, int maxLen)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return value;
+
+        if (value.Length <= maxLen)
+            return value;
+
+        return value[..maxLen] + "...";
     }
 
     private static void WriteThrottled(LogSource source, LogLevel level, string key, string message, TimeSpan interval)

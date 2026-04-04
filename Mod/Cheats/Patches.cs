@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using MelonLoader;
 using Il2Cpp;
 // using Il2CppDMM;
@@ -1234,8 +1234,16 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendClientMessage.Prefix",
+                            details: $"delivery={deliveryMethod?.ToString() ?? "null"} channel={sequenceChannel}",
+                            minInterval: TimeSpan.FromMilliseconds(250));
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendClientMessage.Message",
+                            payload: message,
+                            minInterval: TimeSpan.FromMilliseconds(120));
                         AntiIdleSystem.SetClientNetworkService(__instance);
-                        AntiIdleSystem.OnMessageSent(message, deliveryMethod, sequenceChannel);
+                        AntiIdleSystem.OnMessageSent(message, deliveryMethod ?? "null", sequenceChannel);
                     }
                     catch (Exception e)
                     {
@@ -1285,9 +1293,17 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendMessageBuffer.Prefix",
+                            details: $"method={method?.ToString() ?? "null"} channel={channel}",
+                            minInterval: TimeSpan.FromMilliseconds(250));
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.SendMessageBuffer.Key",
+                            payload: key,
+                            minInterval: TimeSpan.FromMilliseconds(120));
                         AntiIdleSystem.SetClientNetworkService(__instance);
-                        AntiIdleSystem.OnMessageSent(key, method, channel);
-                        AntiIdleSystem.OnWrapperBufferSent(key, method, channel);
+                        AntiIdleSystem.OnMessageSent(key, method ?? "null", channel);
+                        AntiIdleSystem.OnWrapperBufferSent(key, method ?? "null", channel);
                     }
                     catch (Exception e)
                     {
@@ -1318,7 +1334,30 @@ namespace Mod.Cheats.Patches
                 public static System.Reflection.MethodBase TargetMethod() => s_target!;
                 public static void Prefix(object __instance, object __0)
                 {
-                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                    try
+                    {
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.Receive");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{s_target?.Name ?? "Receive*"}.Prefix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(30));
+                        AntiIdleSystem.OnWrapperReceive(__0);
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object __0)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: $"ClientNetworkService.{s_target?.Name ?? "Receive*"}.Postfix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
                 }
             }
 
@@ -1343,7 +1382,98 @@ namespace Mod.Cheats.Patches
                 public static System.Reflection.MethodBase TargetMethod() => s_target!;
                 public static void Prefix(object __instance, object __0)
                 {
-                    try { AntiIdleSystem.OnWrapperReceive(__0); } catch { }
+                    try
+                    {
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.ProcessedIncomingMessage");
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ProcessedIncomingMessage.Prefix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(30));
+                        AntiIdleSystem.OnWrapperReceive(__0);
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object __0)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ProcessedIncomingMessage.Postfix",
+                            payload: __0,
+                            minInterval: TimeSpan.FromMilliseconds(50));
+                    }
+                    catch { }
+                }
+            }
+
+            // Focused hook for the method seen in SHA probe stacks.
+            [HarmonyPatch]
+            public class ClientNetworkService_ReceiveCallback
+            {
+                private static System.Reflection.MethodBase? s_target;
+                private static bool s_loggedBinding;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = AccessTools.TypeByName("Il2CppLE.Networking.Core.Networking.ClientNetworkService");
+                        if (t == null) return false;
+
+                        s_target = AccessTools.GetDeclaredMethods(t)
+                            .FirstOrDefault(m => string.Equals(m.Name, "ReceiveCallback", StringComparison.Ordinal));
+                        if (s_target == null)
+                            return false;
+
+                        if (!s_loggedBinding)
+                        {
+                            s_loggedBinding = true;
+                            var ps = s_target.GetParameters();
+                            MelonLogger.Msg($"[LeHud.Hooks]  ClientNetworkService.ReceiveCallback bound (params={ps.Length})");
+                        }
+
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        Log.MarkGamePhase("ClientNetworkService.ReceiveCallback");
+                        object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ReceiveCallback.Prefix",
+                            payload: firstArg,
+                            minInterval: TimeSpan.FromMilliseconds(20));
+                    }
+                    catch { }
+                }
+
+                public static void Postfix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        object? firstArg = (__args != null && __args.Length > 0) ? __args[0] : null;
+                        Log.CaptureNetworkBreadcrumb(
+                            stage: "ClientNetworkService.ReceiveCallback.Postfix",
+                            payload: firstArg,
+                            minInterval: TimeSpan.FromMilliseconds(35));
+                    }
+                    catch { }
                 }
             }
             #endregion
