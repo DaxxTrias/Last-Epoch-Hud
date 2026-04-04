@@ -1,4 +1,4 @@
-﻿using Il2Cpp;
+using Il2Cpp;
 using Mod.Game;
 using MelonLoader;
 using UnityEngine;
@@ -196,6 +196,9 @@ namespace Mod.Cheats
             {
                 // Early exit if auto-potion is disabled
                 if (!Settings.useAutoPot) return;
+
+                // Not relevant until the local player object is loaded.
+                if (ObjectManager.GetLocalPlayer() == null) return;
                 
                 // Check cooldown
                 if (!IsCooldownExpired()) return;
@@ -285,8 +288,9 @@ namespace Mod.Cheats
         {
             try
             {
-                // Early exit if auto-potion is disabled or no player exists
-                if (!Settings.useAutoPot || !ObjectManager.HasPlayer()) return;
+                // Early exit if auto-potion is disabled or local player is not loaded yet
+                if (!Settings.useAutoPot) return;
+                if (ObjectManager.GetLocalPlayer() == null) return;
 
                 // Initialize components if needed
                 if (!InitializeComponents()) return;

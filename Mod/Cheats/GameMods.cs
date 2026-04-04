@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using ObjectManager = Mod.Game.ObjectManager;
 using Il2Cpp;
 using MelonLoader;
@@ -12,27 +12,30 @@ namespace Mod.Cheats
         {
             //todo: getting kicked due to idle can cause this to stop triggering. staleness?
             //todo: alternatively we may need to do more checks then just sceneInit (x3)
-            if (Settings.removeFog)
+            if (!Settings.removeFog)
+                return;
+
+            if (ObjectManager.GetLocalPlayer() == null)
+                return;
+
+            MelonLogger.Msg($"Patching fog");
+            // Iterate through all loaded scenes
+            for (int i = 0; i < SceneManager.sceneCount; i++)
             {
-                MelonLogger.Msg($"Patching fog");
-                // Iterate through all loaded scenes
-                for (int i = 0; i < SceneManager.sceneCount; i++)
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (scene.isLoaded || scene.isSubScene)
                 {
-                    Scene scene = SceneManager.GetSceneAt(i);
-                    if (scene.isLoaded || scene.isSubScene)
+                    // Get all root objects in the scene
+                    var rootObjects = scene.GetRootGameObjects();
+                    foreach (var rootObject in rootObjects)
                     {
-                        // Get all root objects in the scene
-                        var rootObjects = scene.GetRootGameObjects();
-                        foreach (var rootObject in rootObjects)
+                        var lights = rootObject.GetComponentsInChildren<HxVolumetricLight>(true);
+                        foreach (var light in lights)
                         {
-                            var lights = rootObject.GetComponentsInChildren<HxVolumetricLight>(true);
-                            foreach (var light in lights)
-                            {
-                                if (light.dirty)
-                                    {
-                                        light.dirty = false;
-                                    }
-                            }
+                            if (light.dirty)
+                                {
+                                    light.dirty = false;
+                                }
                         }
                     }
                 }
