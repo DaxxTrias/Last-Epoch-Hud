@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using Il2Cpp;
 using MelonLoader;
@@ -14,6 +14,10 @@ namespace Mod.Cheats
         private static bool isInitialized = false;
         private static bool isMinimapOpen = false;
         private static bool wasTabPressed = false;
+        private static float nextInitializeAttemptAt = 0f;
+        private static float initializeRetryDelaySeconds = InitialInitializeRetrySeconds;
+        private const float InitialInitializeRetrySeconds = 0.25f;
+        private const float MaxInitializeRetrySeconds = 3.0f;
         
         // Debug info for GUI display
         public static string lastDebugInfo = "";
@@ -54,6 +58,14 @@ namespace Mod.Cheats
                 if (shouldUpdateDebug) lastDebugInfo = "Feature DISABLED in settings";
                 return;
             }
+
+            var playerActor = ObjectManager.GetLocalPlayer();
+            if (playerActor == null)
+            {
+                ClearCircles();
+                if (shouldUpdateDebug) lastDebugInfo = "No local player found";
+                return;
+            }
             
             if (!Initialize(shouldUpdateDebug)) return;
             
@@ -74,7 +86,7 @@ namespace Mod.Cheats
                 return;
             }
             
-            UpdateEnemyCircles(shouldUpdateDebug);
+            UpdateEnemyCircles(playerActor, shouldUpdateDebug);
         }
         
         private static void CheckMinimapToggle(bool updateDebug = true)
@@ -110,6 +122,7 @@ namespace Mod.Cheats
         public static bool Initialize(bool updateDebug = true)
         {
             if (isInitialized && (iconsContainer != null)) return true;
+            if (Time.unscaledTime < nextInitializeAttemptAt) return false;
             
             try
             {
@@ -158,15 +171,21 @@ namespace Mod.Cheats
                 if (iconsContainer != null)
                 {
                     isInitialized = true;
+                    initializeRetryDelaySeconds = InitialInitializeRetrySeconds;
+                    nextInitializeAttemptAt = 0f;
                     if (updateDebug) lastDebugInfo = $"Bound Icons container: {iconsContainer.name}";
                     return true;
                 }
                 
+                nextInitializeAttemptAt = Time.unscaledTime + initializeRetryDelaySeconds;
+                initializeRetryDelaySeconds = Mathf.Min(MaxInitializeRetrySeconds, initializeRetryDelaySeconds * 2f);
                 if (updateDebug) lastDebugInfo = "Icons container not found";
                 return false;
             }
             catch (System.Exception e)
             {
+                nextInitializeAttemptAt = Time.unscaledTime + initializeRetryDelaySeconds;
+                initializeRetryDelaySeconds = Mathf.Min(MaxInitializeRetrySeconds, initializeRetryDelaySeconds * 2f);
                 if (updateDebug) lastDebugInfo = $"Initialize error: {e.Message}";
                 return false;
             }
@@ -188,21 +207,13 @@ namespace Mod.Cheats
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
         
-        public static void UpdateEnemyCircles(bool updateDebug = true)
+        public static void UpdateEnemyCircles(GameObject playerActor, bool updateDebug = true)
         {
             try
             {
                 if (ActorManager.instance == null) 
                 {
                     if (updateDebug) lastDebugInfo = "ActorManager.instance is null";
-                    return;
-                }
-                
-                // Try to get player using ObjectManager
-                var playerActor = ObjectManager.GetLocalPlayer();
-                if (playerActor == null)
-                {
-                    if (updateDebug) lastDebugInfo = "No local player found";
                     return;
                 }
                 
