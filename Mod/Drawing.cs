@@ -17,6 +17,9 @@ namespace Mod
 		private static readonly Vector2 LabelScreenPadding = new Vector2(25f, 25f);
 		private static readonly Color EmphasizedOutlineColor = new Color(0f, 0f, 0f, 0.95f);
 
+		private static readonly GUIContent s_contentA = new GUIContent();
+		private static readonly GUIContent s_contentB = new GUIContent();
+
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
 			if (vecIn.z < 0)
@@ -73,33 +76,17 @@ namespace Mod
 
 		public static void DrawString(Vector3 worldPosition, string label, bool centered = true)
 		{
-			// Respect label visibility toggle
 			if (!Settings.showESPLabels)
 				return;
 
-			var content = new GUIContent(label);
+			s_contentA.text = label;
 			var style = StringStyle ?? new GUIStyle();
-			if (!TryGetLabelPlacement(worldPosition, content, style, centered, out var clampedUpperLeft, out var size))
+			if (!TryGetLabelPlacement(worldPosition, s_contentA, style, centered, out var clampedUpperLeft, out var size))
 			{
 				return;
 			}
 
-			// if (Settings.debugESPNames)
-			// {
-			// 	if (debugLastFrame != Time.frameCount)
-			// 	{
-			// 		debugLastFrame = Time.frameCount;
-			// 		debugLogsThisFrame = 0;
-			// 	}
-			// 	if (debugLogsThisFrame < DebugMaxLogsPerFrame)
-			// 	{
-			// 		debugLogsThisFrame++;
-			// 		string printable = label.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
-			// 		MelonLogger.Msg($"ESP Name Debug: '{printable}' len={label.Length} size=({size.x:F1},{size.y:F1}) screen=({screen.x:F1},{screen.y:F1}) rect=({clampedUpperLeft.x:F1},{clampedUpperLeft.y:F1},{size.x:F1},{size.y:F1})");
-			// 	}
-			// }
-
-			GUI.Label(new Rect(clampedUpperLeft, size), content, style);
+			GUI.Label(new Rect(clampedUpperLeft, size), s_contentA, style);
 		}
 
 		public static void DrawString(Vector3 worldPosition, string label, Color color, bool centered = true)
@@ -131,13 +118,12 @@ namespace Mod
 
 		public static void DrawStringEmphasized(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
-			// Respect label visibility toggle
 			if (!Settings.showESPLabels)
 				return;
 
 			var style = StringStyle ?? new GUIStyle();
-			var content = new GUIContent(label);
-			if (!TryGetLabelPlacement(worldPosition, content, style, centered, out var upperLeft, out var size))
+			s_contentA.text = label;
+			if (!TryGetLabelPlacement(worldPosition, s_contentA, style, centered, out var upperLeft, out var size))
 			{
 				return;
 			}
@@ -152,17 +138,17 @@ namespace Mod
 			style.fontStyle = FontStyle.Bold;
 
 			style.normal.textColor = EmphasizedOutlineColor;
-			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x, upperLeft.y - 1f, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x, upperLeft.y + 1f, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y - 1f, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y - 1f, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y + 1f, size.x, size.y), content, style);
-			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y + 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x, upperLeft.y - 1f, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x, upperLeft.y + 1f, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y - 1f, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y - 1f, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y + 1f, size.x, size.y), s_contentA, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y + 1f, size.x, size.y), s_contentA, style);
 
 			style.normal.textColor = color;
-			GUI.Label(new Rect(upperLeft, size), content, style);
+			GUI.Label(new Rect(upperLeft, size), s_contentA, style);
 
 			style.normal.textColor = backupTextColor;
 			style.fontStyle = backupFontStyle;
@@ -172,47 +158,40 @@ namespace Mod
 
 		public static void DrawCustomString(Vector3 worldPosition, string label, Color color, bool centered = true)
 		{
-			// Respect label visibility toggle
 			if (!Settings.showESPLabels)
 				return;
 
 			var cam = Camera.main;
 			if (cam == null) return;
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
-			if (screen.z < 0) screen *= -1; // mirror behind-camera points
+			if (screen.z < 0) screen *= -1;
 			screen.y = Screen.height - screen.y;
 
-			// Split the label into two parts: first 3 characters and the rest
 			string firstPart = label.Length > 3 ? label.Substring(0, 3) : label;
 			string secondPart = label.Length > 3 ? label.Substring(3) : string.Empty;
 
-			var firstContent = new GUIContent(firstPart);
-			var secondContent = new GUIContent(secondPart);
+			s_contentA.text = firstPart;
+			s_contentB.text = secondPart;
 
 			var style = StringStyle ?? new GUIStyle();
-			var firstSize = style.CalcSize(firstContent);
-			var secondSize = style.CalcSize(secondContent);
+			var firstSize = style.CalcSize(s_contentA);
+			var secondSize = style.CalcSize(s_contentB);
 
 			var totalSize = new Vector2(firstSize.x + secondSize.x, Mathf.Max(firstSize.y, secondSize.y));
 
-			// Compute desired upper-left for the combined rect, then clamp it
 			Vector2 desiredUpperLeft = centered
 				? new Vector2(screen.x, screen.y) - totalSize / 2f
 				: new Vector2(screen.x, screen.y);
-			Vector2 upperLeft = ClampRectToScreen(desiredUpperLeft, totalSize, new Vector2(25, 25));
+			Vector2 upperLeft = ClampRectToScreen(desiredUpperLeft, totalSize, LabelScreenPadding);
 
-			// Backup the current GUI color
 			Color prevColor = GUI.color;
 
-			// Draw the first part with the custom color
 			GUI.color = color;
-			GUI.Label(new Rect(upperLeft, firstSize), firstContent, style);
+			GUI.Label(new Rect(upperLeft, firstSize), s_contentA, style);
 
-			// Draw the second part with the default color
 			GUI.color = prevColor;
-			GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), secondContent, style);
+			GUI.Label(new Rect(new Vector2(upperLeft.x + firstSize.x, upperLeft.y), secondSize), s_contentB, style);
 
-			// Restore the previous GUI color
 			GUI.color = prevColor;
 		}
 
