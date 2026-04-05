@@ -21,6 +21,9 @@ namespace Mod.Cheats
         private const float RotationEpsilon = 0.0001f;
         private const string HostileAlignmentName = "Evil";
         private const string HostileNeutralAlignmentName = "HostileNeutral";
+        private const string FullscreenMapPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/DMMap Canvas/Map (1)";
+        private const string MinimapBgPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/Minimap/SquareMinimap/minimapBG";
+        private const string LegacyMinimapBgPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG";
         
         // Debug info for GUI display
         public static string lastDebugInfo = "";
@@ -50,7 +53,8 @@ namespace Mod.Cheats
         // Target containers discovered from the scene hierarchy (screenshot)
         private static RectTransform? iconsContainer; // ".../DMMap Canvas/Icons"
         private static RectTransform? mapContainer;   // ".../DMMap Canvas/Map" (optional for later)
-        private static GameObject? smallMinimapBg;    // "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG"
+        private static GameObject? fullscreenMap;
+        private static GameObject? smallMinimapBg;
         
         // Prebuilt sprites cache to avoid per-frame texture allocations
         private static Sprite? spriteWhite;
@@ -127,14 +131,34 @@ namespace Mod.Cheats
         
         private static bool IsFullscreenMapOpen()
         {
-            // Explicit sentinel: when small minimap BG is disabled, fullscreen map is likely open
+            if (fullscreenMap == null)
+            {
+                fullscreenMap = GameObject.Find(FullscreenMapPath);
+            }
+
+            if (fullscreenMap != null)
+            {
+                return fullscreenMap.activeInHierarchy;
+            }
+
             if (smallMinimapBg != null)
             {
                 return !smallMinimapBg.activeInHierarchy;
             }
-            // If not bound yet, try to find once by explicit path
-            smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
-            return smallMinimapBg != null && !smallMinimapBg.activeInHierarchy;
+
+            // Fallback: infer fullscreen open when minimap background is inactive.
+            smallMinimapBg = GameObject.Find(MinimapBgPath);
+            if (smallMinimapBg == null)
+            {
+                smallMinimapBg = GameObject.Find(LegacyMinimapBgPath);
+            }
+
+            if (smallMinimapBg != null)
+            {
+                return !smallMinimapBg.activeInHierarchy;
+            }
+
+            return false;
         }
         
         public static bool Initialize(bool updateDebug = true)
@@ -186,8 +210,13 @@ namespace Mod.Cheats
                     mapContainer = mapGO.GetComponent<RectTransform>();
                 }
                 
-                // Bind small minimap BG sentinel
-                smallMinimapBg = GameObject.Find("GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG");
+                // Bind minimap/fullscreen sentinels for visibility gating.
+                fullscreenMap = GameObject.Find(FullscreenMapPath);
+                smallMinimapBg = GameObject.Find(MinimapBgPath);
+                if (smallMinimapBg == null)
+                {
+                    smallMinimapBg = GameObject.Find(LegacyMinimapBgPath);
+                }
                 
                 // Build sprite cache once
                 EnsureSpriteCache();
