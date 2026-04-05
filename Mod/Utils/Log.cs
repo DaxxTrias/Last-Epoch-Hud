@@ -3,7 +3,6 @@ using UnityEngine;
 using System.Globalization;
 using System.Diagnostics;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Mod.Utils;
 
@@ -49,9 +48,6 @@ internal static class Log
 
     private const int MaxBufferedGameEvents = 240;
     private const int MaxBufferedNetworkBreadcrumbs = 400;
-    private static readonly Regex s_unityColorTagRegex = new(
-        @"<\s*/?\s*color(?:\s*=\s*(?:""(?<color>[^""]+)""|'(?<color>[^']+)'|(?<color>[^\s>]+)))?\s*>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static readonly object s_lock = new();
     private static readonly Dictionary<string, ThrottleState> s_throttleStates = new(StringComparer.Ordinal);
@@ -310,7 +306,7 @@ internal static class Log
     {
         var template = string.IsNullOrWhiteSpace(format) ? "<empty>" : format.Trim();
         if (args == null || args.Count == 0)
-            return NormalizeUnityColorMarkup(template);
+            return template;
 
         var values = new object?[args.Count];
         for (int i = 0; i < args.Count; i++)
@@ -320,50 +316,12 @@ internal static class Log
 
         try
         {
-            return NormalizeUnityColorMarkup(string.Format(CultureInfo.InvariantCulture, template, values));
+            return string.Format(CultureInfo.InvariantCulture, template, values);
         }
         catch (FormatException)
         {
-            return NormalizeUnityColorMarkup($"{template} | args=[{string.Join(", ", values)}]");
+            return $"{template} | args=[{string.Join(", ", values)}]";
         }
-    }
-
-    private static string NormalizeUnityColorMarkup(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-            return message;
-
-        if (message.IndexOf("<color", StringComparison.OrdinalIgnoreCase) < 0
-            && message.IndexOf("</color>", StringComparison.OrdinalIgnoreCase) < 0)
-        {
-            return message;
-        }
-
-        string? firstColor = null;
-        string plain = s_unityColorTagRegex.Replace(message, match =>
-        {
-            if (firstColor == null)
-            {
-                var colorGroup = match.Groups["color"];
-                if (colorGroup.Success)
-                {
-                    string candidate = colorGroup.Value.Trim().Trim('"', '\'');
-                    if (!string.IsNullOrWhiteSpace(candidate))
-                    {
-                        firstColor = candidate;
-                    }
-                }
-            }
-
-            return string.Empty;
-        }).Trim();
-
-        if (string.IsNullOrWhiteSpace(firstColor))
-            return plain;
-
-        return string.IsNullOrWhiteSpace(plain)
-            ? $"color={firstColor}"
-            : $"color={firstColor} | {plain}";
     }
 
     private static void RecordGameEvent(LogLevel level, string message)
