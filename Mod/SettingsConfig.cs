@@ -46,7 +46,6 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _espShowChampions;
 		private static MelonPreferences_Entry<bool>? _espShowLootLizards;
 #if DEBUG
-		private static MelonPreferences_Entry<bool>? _espChestScanDiagnostics;
 		private static MelonPreferences_Entry<bool>? _debugEnableDiagnostics;
 		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerPanel;
 		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerWorldLabel;
@@ -153,7 +152,6 @@ namespace Mod
 			_espShowChampions = _esp.CreateEntry("ShowChampions", Settings.espShowChampions);
 			_espShowLootLizards = _esp.CreateEntry("ShowLootLizards", Settings.espShowLootLizards);
 #if DEBUG
-			_espChestScanDiagnostics = _esp.CreateEntry("ChestScanDiagnostics", Settings.espChestScanDiagnostics);
 			_debugEnableDiagnostics = _esp.CreateEntry("DebugEnableDiagnostics", Settings.debugEnableDiagnostics);
 			_debugShowLocalPlayerPanel = _esp.CreateEntry("DebugShowLocalPlayerPanel", Settings.debugShowLocalPlayerPanel);
 			_debugShowLocalPlayerWorldLabel = _esp.CreateEntry("DebugShowLocalPlayerWorldLabel", Settings.debugShowLocalPlayerWorldLabel);
@@ -234,7 +232,6 @@ namespace Mod
 			Settings.espShowChampions = _espShowChampions!.Value;
 			Settings.espShowLootLizards = _espShowLootLizards!.Value;
 #if DEBUG
-			Settings.espChestScanDiagnostics = _espChestScanDiagnostics!.Value;
 			Settings.debugEnableDiagnostics = _debugEnableDiagnostics!.Value;
 			Settings.debugShowLocalPlayerPanel = _debugShowLocalPlayerPanel!.Value;
 			Settings.debugShowLocalPlayerWorldLabel = _debugShowLocalPlayerWorldLabel!.Value;
@@ -312,7 +309,6 @@ namespace Mod
 			_espShowChampions!.Value = Settings.espShowChampions;
 			_espShowLootLizards!.Value = Settings.espShowLootLizards;
 #if DEBUG
-			_espChestScanDiagnostics!.Value = Settings.espChestScanDiagnostics;
 			_debugEnableDiagnostics!.Value = Settings.debugEnableDiagnostics;
 			_debugShowLocalPlayerPanel!.Value = Settings.debugShowLocalPlayerPanel;
 			_debugShowLocalPlayerWorldLabel!.Value = Settings.debugShowLocalPlayerWorldLabel;
@@ -576,7 +572,6 @@ namespace Mod
 			public bool espShowChampions { get; set; }
 			public bool espShowLootLizards { get; set; }
 #if DEBUG
-			public bool espChestScanDiagnostics { get; set; }
 			public bool debugEnableDiagnostics { get; set; }
 			public bool debugShowLocalPlayerPanel { get; set; }
 			public bool debugShowLocalPlayerWorldLabel { get; set; }
@@ -645,7 +640,6 @@ namespace Mod
 				espShowChampions = Settings.espShowChampions,
 				espShowLootLizards = Settings.espShowLootLizards,
 #if DEBUG
-				espChestScanDiagnostics = Settings.espChestScanDiagnostics,
 				debugEnableDiagnostics = Settings.debugEnableDiagnostics,
 				debugShowLocalPlayerPanel = Settings.debugShowLocalPlayerPanel,
 				debugShowLocalPlayerWorldLabel = Settings.debugShowLocalPlayerWorldLabel,
@@ -710,7 +704,6 @@ namespace Mod
 			Settings.espShowChampions = s.espShowChampions;
 			Settings.espShowLootLizards = s.espShowLootLizards;
 #if DEBUG
-			Settings.espChestScanDiagnostics = s.espChestScanDiagnostics;
 			Settings.debugEnableDiagnostics = s.debugEnableDiagnostics;
 			Settings.debugShowLocalPlayerPanel = s.debugShowLocalPlayerPanel;
 			Settings.debugShowLocalPlayerWorldLabel = s.debugShowLocalPlayerWorldLabel;

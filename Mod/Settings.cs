@@ -74,7 +74,6 @@ namespace Mod
 
 #if DEBUG
         // Debug / diagnostics (DEBUG builds only)
-        public static bool espChestScanDiagnostics = false; // Chest manager/candidate path logging
         public static bool debugEnableDiagnostics = false;
         public static bool debugShowLocalPlayerPanel = true;
         public static bool debugShowLocalPlayerWorldLabel = true;

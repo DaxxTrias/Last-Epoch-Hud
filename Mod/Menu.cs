@@ -122,7 +122,6 @@ namespace Mod
                 {
                     GUILayout.Label("Captures deep ClientNetworkService breadcrumbs during connect/load troubleshooting.");
                 }
-				Settings.espChestScanDiagnostics = GUILayout.Toggle(Settings.espChestScanDiagnostics, "Chest Scan Diagnostics (Logs)");
 				Settings.debugEnableDiagnostics = GUILayout.Toggle(Settings.debugEnableDiagnostics, "Enable Diagnostics");
 				if (Settings.debugEnableDiagnostics)
 				{

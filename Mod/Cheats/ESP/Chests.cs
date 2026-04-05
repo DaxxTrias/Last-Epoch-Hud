@@ -14,16 +14,13 @@ namespace Mod.Cheats.ESP
 		private static readonly List<Transform> s_chestTransforms = new List<Transform>(16);
 		private static readonly Color ChestColor = Drawing.BloodOrange;
 		private const int ManagerSearchIntervalFrames = 180;
-		private const int FallbackManagerSearchIntervalFrames = 1800;
 		private const int CacheRebuildIntervalFramesWhenEmpty = 20;
 		private const int CacheRebuildIntervalFramesWhenPopulated = 120;
 		private const int RebuildBatchSize = 64;
-		private const int MaxManagerCandidatesToInspect = 96;
 		private const int DiagnosticMinReportIntervalFrames = 300;
 		private const int DiagnosticMaxCandidatesPerReport = 48;
 		private const int DiagnosticMaxCachedChestPaths = 24;
 		private static int s_nextManagerSearchFrame;
-		private static int s_nextFallbackManagerSearchFrame;
 		private static int s_nextCacheRebuildFrame;
 		private static bool s_rebuildInProgress;
 		private static Transform? s_rebuildRoot;
@@ -38,7 +35,6 @@ namespace Mod.Cheats.ESP
 			s_chestManager = null;
 			s_chestTransforms.Clear();
 			s_nextManagerSearchFrame = 0;
-			s_nextFallbackManagerSearchFrame = 0;
 			s_nextCacheRebuildFrame = 0;
 			s_rebuildInProgress = false;
 			s_rebuildRoot = null;
@@ -51,11 +47,7 @@ namespace Mod.Cheats.ESP
 
 		private static bool IsDiagnosticsEnabled()
 		{
-#if DEBUG
-			return Settings.espChestScanDiagnostics;
-#else
 			return false;
-#endif
 		}
 
 		private static string BuildTransformPath(Transform? tr)
@@ -102,54 +94,6 @@ namespace Mod.Cheats.ESP
 			{
 				LogManagerSelection("exact:Chest Placement Manager", s_chestManager);
 				return;
-			}
-
-			// Heavy fallback scan is expensive. Run it rarely in normal play, or more often while
-			// diagnostics are enabled for investigation sessions.
-			int fallbackInterval = IsDiagnosticsEnabled()
-				? ManagerSearchIntervalFrames
-				: FallbackManagerSearchIntervalFrames;
-			if (Time.frameCount < s_nextFallbackManagerSearchFrame) return;
-			s_nextFallbackManagerSearchFrame = Time.frameCount + fallbackInterval;
-
-			// Fallback: broader scan for an object that looks like a chest manager/container
-			var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
-			for (int i = 0; i < allTransforms.Length; i++)
-			{
-				var tr = allTransforms[i];
-				if (tr == null || tr.gameObject == null) continue;
-				var go = tr.gameObject;
-				var name = go.name ?? string.Empty;
-				if (tr.childCount == 0) continue;
-
-				bool managerLikeName = name.IndexOf("ChestPlacementManager", StringComparison.OrdinalIgnoreCase) >= 0
-					|| (name.IndexOf("Chest", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Manager", StringComparison.OrdinalIgnoreCase) >= 0);
-
-				if (!managerLikeName) continue;
-				if (CountChestCandidatesFast(tr, MaxManagerCandidatesToInspect) <= 0) continue;
-
-				s_chestManager = go;
-				LogManagerSelection("fallback:managerLikeName", s_chestManager);
-				break;
-			}
-
-			// Last-resort fallback for builds/scenes with unusual manager names.
-			if (s_chestManager != null) return;
-			for (int i = 0; i < allTransforms.Length; i++)
-			{
-				var tr = allTransforms[i];
-				if (tr == null || tr.gameObject == null || tr.childCount == 0) continue;
-				var go = tr.gameObject;
-				var name = go.name ?? string.Empty;
-				if (name.IndexOf("Chest", StringComparison.OrdinalIgnoreCase) < 0) continue;
-
-				// Require multiple chest candidates to avoid selecting a single chest instance.
-				if (CountChestCandidatesFast(tr, MaxManagerCandidatesToInspect) >= 2)
-				{
-					s_chestManager = go;
-					LogManagerSelection("fallback:chestName", s_chestManager);
-					break;
-				}
 			}
 
 			if (s_chestManager == null && IsDiagnosticsEnabled() && Time.frameCount - s_lastNoManagerLogFrame >= ManagerSearchIntervalFrames)
@@ -234,14 +178,6 @@ namespace Mod.Cheats.ESP
 			return true;
 		}
 
-		private static bool IsPotentialChest(Transform tr)
-		{
-			if (tr == null) return false;
-			var go = tr.gameObject;
-			if (go == null || !go.activeInHierarchy) return false;
-			return LooksLikeChest(go);
-		}
-
 		private static bool TryResolveChestTransform(Transform candidate, out Transform chestTransform)
 		{
 			chestTransform = null!;
@@ -264,48 +200,6 @@ namespace Mod.Cheats.ESP
 			}
 
 			return false;
-		}
-
-		private static bool TryResolveChestTransformFast(Transform candidate, out Transform chestTransform)
-		{
-			chestTransform = null!;
-			if (candidate == null) return false;
-
-			if (IsPotentialChest(candidate))
-			{
-				chestTransform = candidate;
-				return true;
-			}
-
-			for (int i = 0; i < candidate.childCount; i++)
-			{
-				var child = candidate.GetChild(i);
-				if (!IsPotentialChest(child)) continue;
-				chestTransform = child;
-				return true;
-			}
-
-			return false;
-		}
-
-		private static int CountChestCandidatesFast(Transform root, int maxChildrenToInspect)
-		{
-			if (root == null) return 0;
-			int max = root.childCount;
-			if (maxChildrenToInspect > 0 && max > maxChildrenToInspect)
-			{
-				max = maxChildrenToInspect;
-			}
-
-			int count = 0;
-			for (int i = 0; i < max; i++)
-			{
-				var child = root.GetChild(i);
-				if (child == null) continue;
-				if (!TryResolveChestTransformFast(child, out _)) continue;
-				count++;
-			}
-			return count;
 		}
 
 		private static bool TryResolveChestTransformDiagnostic(Transform candidate, out Transform chestTransform, out string resolution)
