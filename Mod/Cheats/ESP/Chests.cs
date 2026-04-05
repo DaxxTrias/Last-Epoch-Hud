@@ -48,11 +48,13 @@ namespace Mod.Cheats.ESP
 		{
 			if (s_chestManager != null) return;
 
-			// Primary: exact-name lookup
+			// Primary: exact-name lookup across known variants
+			s_chestManager = GameObject.Find("ChestPlacementManager");
+			if (s_chestManager != null) return;
 			s_chestManager = GameObject.Find("Chest Placement Manager");
 			if (s_chestManager != null) return;
 
-			// Fallback: broader scan for an object that looks like a chest container
+			// Fallback: broader scan for an object that looks like a chest manager/container
 			var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
 			for (int i = 0; i < allTransforms.Length; i++)
 			{
@@ -60,7 +62,30 @@ namespace Mod.Cheats.ESP
 				if (tr == null || tr.gameObject == null) continue;
 				var go = tr.gameObject;
 				var name = go.name ?? string.Empty;
-				if (name.IndexOf("Chest", StringComparison.OrdinalIgnoreCase) >= 0 && tr.childCount > 0)
+				if (tr.childCount == 0) continue;
+
+				bool managerLikeName = name.IndexOf("ChestPlacementManager", StringComparison.OrdinalIgnoreCase) >= 0
+					|| (name.IndexOf("Chest", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Manager", StringComparison.OrdinalIgnoreCase) >= 0);
+
+				if (!managerLikeName) continue;
+				if (CountActiveChestCandidates(tr) <= 0) continue;
+
+				s_chestManager = go;
+				break;
+			}
+
+			// Last-resort fallback for builds/scenes with unusual manager names.
+			if (s_chestManager != null) return;
+			for (int i = 0; i < allTransforms.Length; i++)
+			{
+				var tr = allTransforms[i];
+				if (tr == null || tr.gameObject == null || tr.childCount == 0) continue;
+				var go = tr.gameObject;
+				var name = go.name ?? string.Empty;
+				if (name.IndexOf("Chest", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+				// Require multiple chest candidates to avoid selecting a single chest instance.
+				if (CountActiveChestCandidates(tr) >= 2)
 				{
 					s_chestManager = go;
 					break;
@@ -100,8 +125,85 @@ namespace Mod.Cheats.ESP
 			if (!go.activeInHierarchy) return false;
 
 			var outline = go.GetComponent<OutlineOnMouseOver>();
-			if (outline == null) return false;
-			return IsComponentEnabled(outline);
+			if (outline != null && IsComponentEnabled(outline)) return true;
+
+			var clickListener = go.GetComponent<WorldObjectClickListener>();
+			if (clickListener != null && IsComponentEnabled(clickListener)) return true;
+
+			var root = go.transform;
+			if (root == null) return false;
+
+			// Some chest variants place interaction components on an immediate child mesh root.
+			for (int i = 0; i < root.childCount; i++)
+			{
+				var child = root.GetChild(i);
+				if (child == null || child.gameObject == null || !child.gameObject.activeInHierarchy) continue;
+
+				var childOutline = child.gameObject.GetComponent<OutlineOnMouseOver>();
+				if (childOutline != null && IsComponentEnabled(childOutline)) return true;
+
+				var childClickListener = child.gameObject.GetComponent<WorldObjectClickListener>();
+				if (childClickListener != null && IsComponentEnabled(childClickListener)) return true;
+			}
+
+			return false;
+		}
+
+		private static bool ContainsTransformReference(List<Transform> list, Transform target)
+		{
+			for (int i = 0; i < list.Count; i++)
+			{
+				if (ReferenceEquals(list[i], target)) return true;
+			}
+			return false;
+		}
+
+		private static bool IsEligibleChest(Transform tr)
+		{
+			if (tr == null) return false;
+			var go = tr.gameObject;
+			if (go == null || !go.activeInHierarchy) return false;
+			if (!LooksLikeChest(go)) return false;
+			if (!IsChestInteractable(go)) return false;
+			return true;
+		}
+
+		private static bool TryResolveChestTransform(Transform candidate, out Transform chestTransform)
+		{
+			chestTransform = null!;
+			if (candidate == null) return false;
+
+			// Most scenes: direct child is the chest root.
+			if (IsEligibleChest(candidate))
+			{
+				chestTransform = candidate;
+				return true;
+			}
+
+			// Some scenes: manager child is a wrapper/slot and chest is nested one level down.
+			for (int i = 0; i < candidate.childCount; i++)
+			{
+				var child = candidate.GetChild(i);
+				if (!IsEligibleChest(child)) continue;
+				chestTransform = child;
+				return true;
+			}
+
+			return false;
+		}
+
+		private static int CountActiveChestCandidates(Transform root)
+		{
+			if (root == null) return 0;
+			int count = 0;
+			for (int i = 0; i < root.childCount; i++)
+			{
+				var child = root.GetChild(i);
+				if (child == null) continue;
+				if (!TryResolveChestTransform(child, out _)) continue;
+				count++;
+			}
+			return count;
 		}
 
 		private static void RebuildChestCacheIfNeeded()
@@ -116,16 +218,30 @@ namespace Mod.Cheats.ESP
 			for (int i = 0; i < t.childCount; i++)
 			{
 				var child = t.GetChild(i);
-				if (child != null && child.gameObject != null && child.gameObject.activeInHierarchy && LooksLikeChest(child.gameObject) && IsChestInteractable(child.gameObject))
+				if (child == null) continue;
+				if (!TryResolveChestTransform(child, out _)) continue;
+				currentActiveChests++;
+			}
+
+			bool needsRebuild = currentActiveChests != s_chestTransforms.Count;
+
+			// Count can remain unchanged while specific chest instances swap (e.g. consume/spawn),
+			// which would leave stale cached transforms and hide valid chests.
+			if (!needsRebuild && currentActiveChests > 0)
+			{
+				for (int i = 0; i < t.childCount; i++)
 				{
-					currentActiveChests++;
+					var child = t.GetChild(i);
+					if (child == null) continue;
+					if (!TryResolveChestTransform(child, out var resolved)) continue;
+					if (ContainsTransformReference(s_chestTransforms, resolved)) continue;
+
+					needsRebuild = true;
+					break;
 				}
 			}
 
-			if (currentActiveChests == s_chestTransforms.Count && currentActiveChests > 0)
-			{
-				return;
-			}
+			if (!needsRebuild && currentActiveChests > 0) return;
 
 			s_chestTransforms.Clear();
 			s_chestNames.Clear();
@@ -134,12 +250,13 @@ namespace Mod.Cheats.ESP
 			{
 				var child = t.GetChild(i);
 				if (child == null) continue;
-				var go = child.gameObject;
-				if (go == null || !go.activeInHierarchy) continue;
-				if (!LooksLikeChest(go)) continue;
-				if (!IsChestInteractable(go)) continue;
+				if (!TryResolveChestTransform(child, out var chestTransform)) continue;
+				if (ContainsTransformReference(s_chestTransforms, chestTransform)) continue;
 
-				s_chestTransforms.Add(child);
+				var go = chestTransform.gameObject;
+				if (go == null) continue;
+
+				s_chestTransforms.Add(chestTransform);
 				s_chestNames.Add(GetDisplayName(go));
 			}
 		}
