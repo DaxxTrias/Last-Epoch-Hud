@@ -130,47 +130,9 @@ namespace Mod.Cheats.ESP
 			return true;
 		}
 
-		private static bool IsKnownConsumedChestState(GameObject go)
-		{
-			var root = go.transform;
-			if (root == null) return false;
-
-			bool foundEnableOnClick = false;
-			bool foundDisableOnClick = false;
-			bool enableOnClickActive = false;
-			bool disableOnClickActive = false;
-
-			for (int i = 0; i < root.childCount; i++)
-			{
-				var child = root.GetChild(i);
-				if (child == null || child.gameObject == null) continue;
-
-				var childGo = child.gameObject;
-				var childName = childGo.name ?? string.Empty;
-
-				if (childName.Equals("Enable On Click", StringComparison.OrdinalIgnoreCase))
-				{
-					foundEnableOnClick = true;
-					enableOnClickActive = childGo.activeSelf;
-				}
-				else if (childName.Equals("Disable On Click", StringComparison.OrdinalIgnoreCase))
-				{
-					foundDisableOnClick = true;
-					disableOnClickActive = childGo.activeSelf;
-				}
-
-				if (foundEnableOnClick && foundDisableOnClick) break;
-			}
-
-			// Only classify consumed when both known state markers are present.
-			if (!foundEnableOnClick || !foundDisableOnClick) return false;
-			return enableOnClickActive && !disableOnClickActive;
-		}
-
 		private static bool IsChestInteractable(GameObject go)
 		{
 			if (!go.activeInHierarchy) return false;
-			if (IsKnownConsumedChestState(go)) return false;
 
 			var outline = go.GetComponent<OutlineOnMouseOver>();
 			if (outline != null && IsComponentEnabled(outline)) return true;
@@ -471,7 +433,6 @@ namespace Mod.Cheats.ESP
 				if (tr == null) continue;
 				var go = tr.gameObject;
 				if (go == null || !go.activeInHierarchy) continue;
-				if (IsKnownConsumedChestState(go)) continue;
 				// Interactable checks are done during periodic cache rebuild to keep this hot path light.
 
 				// Additional sanity: require an enabled collider and at least one enabled renderer when possible
