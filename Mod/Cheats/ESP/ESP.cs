@@ -1,7 +1,13 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Mod.Cheats.ESP
 {
+    internal enum EspStringStyle
+    {
+        Default = 0,
+        Emphasized = 1
+    }
+
     internal class LineDrawing
     {
         private readonly Vector3 start;
@@ -27,17 +33,25 @@ namespace Mod.Cheats.ESP
         private readonly string text;
         private readonly Vector3 position;
         private readonly Color color;
+        private readonly EspStringStyle style;
 
         // constructor
-        public StringDrawing(string text, Vector3 position, Color color)
+        public StringDrawing(string text, Vector3 position, Color color, EspStringStyle style)
         {
             this.text = text;
             this.position = position;
             this.color = color;
+            this.style = style;
         }
 
         public void Draw()
         {
+            if (style == EspStringStyle.Emphasized)
+            {
+                Drawing.DrawStringEmphasized(position, text, color);
+                return;
+            }
+
             Drawing.DrawString(position, text, color);
         }
     }
@@ -52,9 +66,9 @@ namespace Mod.Cheats.ESP
             lineDrawings.Add(new LineDrawing(start, end, color));
         }
 
-        public static void AddString(string text, Vector3 position, Color color)
+        public static void AddString(string text, Vector3 position, Color color, EspStringStyle style = EspStringStyle.Default)
         {
-            stringDrawings.Add(new StringDrawing(text, position, color));
+            stringDrawings.Add(new StringDrawing(text, position, color, style));
         }
 
         public static void Draw()

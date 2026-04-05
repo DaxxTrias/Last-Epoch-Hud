@@ -1,4 +1,4 @@
-﻿using Il2Cpp;
+using Il2Cpp;
 using Mod.Game;
 using UnityEngine;
 using System;
@@ -17,7 +17,6 @@ namespace Mod.Cheats.ESP
 		//        SummonedCorpse: Necromancer summons
 
 		private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
-		private static readonly Color BloodOrange = Drawing.BloodOrange;
 
 		private static string SanitizeLabel(string? value)
 		{
@@ -80,77 +79,6 @@ namespace Mod.Cheats.ESP
 			return Drawing.AlignmentToColor(alignmentName);
 		}
 
-		// Unified special entity detection for ESP logic and future features
-		internal enum SpecialEntityType
-		{
-			None = 0,
-			LootLizard = 1,
-			Champion = 2
-		}
-		
-		private static bool IsLootLizard(ActorVisuals actor)
-		{
-			// Component-based detection first (if available in this build)
-			if (actor.gameObject.GetComponent<LootLizardFleeing>() != null
-				|| actor.gameObject.GetComponentInParent<LootLizardFleeing>() != null
-				|| actor.gameObject.GetComponentInChildren<LootLizardFleeing>() != null)
-			{
-				return true;
-			}
-			
-			// Name-based fallbacks (seen in screenshots: "v_LootLizard Blue (Clone)" and parent "sync v_LootLizard ...")
-			const StringComparison ic = StringComparison.OrdinalIgnoreCase;
-			var go = actor.gameObject;
-			if (!string.IsNullOrEmpty(go.name) && go.name.IndexOf("LootLizard", ic) >= 0)
-			{
-				return true;
-			}
-			
-			var parent = go.transform != null ? go.transform.parent : null;
-			if (parent != null && !string.IsNullOrEmpty(parent.name) && parent.name.IndexOf("LootLizard", ic) >= 0)
-			{
-				return true;
-			}
-			
-			// Intentionally avoid display/localized name checks to prevent false positives
-			return false;
-		}
-
-		private static bool IsChampion(ActorVisuals actor)
-		{
-			var info = actor.GetComponent<ActorDisplayInformation>();
-			if (info == null) return false;
-			try
-			{
-				// Certain IL2CPP variants may throw on missing bindings; guard accordingly
-				return info.IsChampion();
-			}
-			catch (Exception)
-			{
-				return false;
-			}
-		}
-
-		internal static SpecialEntityType DetectSpecialEntity(ActorVisuals actor)
-		{
-			// Loot Lizards are unique entities; detect them first
-			if (IsLootLizard(actor))
-			{
-				return SpecialEntityType.LootLizard;
-			}
-
-			// Champion NPCs (super rares)
-			if (IsChampion(actor))
-			{
-				return SpecialEntityType.Champion;
-			}
-
-			return SpecialEntityType.None;
-		}
-
-		// Convenience exposure for later use by other systems
-		internal static bool IsChampionActor(ActorVisuals actor) => DetectSpecialEntity(actor) == SpecialEntityType.Champion;
-
 		public static void GatherActors()
 		{
 			if (ActorManager.instance == null) return;
@@ -169,9 +97,9 @@ namespace Mod.Cheats.ESP
 					if (actor.transform.IsChildOf(localPlayer.transform)) continue;
 
 					// Detect special entities (loot lizards, champions, etc.)
-					var special = DetectSpecialEntity(actor);
+					var special = SpecialEntityEspHelper.DetectType(actor);
 					bool isLizard = special == SpecialEntityType.LootLizard;
-					bool isAnySpecial = isLizard || special == SpecialEntityType.Champion;
+					bool isAnySpecial = SpecialEntityEspHelper.IsSpecial(special);
 
 					// Non-lizard actors respect alignment/classification filters
 					if (!isLizard)
@@ -203,23 +131,19 @@ namespace Mod.Cheats.ESP
 					var position = actor.transform.position;
 					position.y += 1.5f;
 
-					// Prefix label for confirmed champions
-					if (special == SpecialEntityType.Champion)
-					{
-						name = "Champion " + name;
-					}
-					
 					// Per-special gating
-					if (isAnySpecial)
+					if (isAnySpecial && !SpecialEntityEspHelper.ShouldRender(special))
 					{
-						if (special == SpecialEntityType.Champion && !Settings.espShowChampions) continue;
-						if (special == SpecialEntityType.LootLizard && !Settings.espShowLootLizards) continue;
+						continue;
 					}
-					
-					var color = (isAnySpecial) ? BloodOrange : GetRarityColor(actor, alignmentName);
+
+					name = SpecialEntityEspHelper.BuildLabel(special, name);
+					var textStyle = SpecialEntityEspHelper.ResolveTextStyle(special);
+					var color = SpecialEntityEspHelper.ResolveColor(special, GetRarityColor(actor, alignmentName));
+
 					if (Settings.showESPLines) ESP.AddLine(localPlayer.transform.position, actor.transform.position, color);
 					//ESP.AddString(name + " (" + distance.ToString("F1") + ")  ", position, color);
-					if (Settings.showESPLabels) ESP.AddString(name, position, color);
+					if (Settings.showESPLabels) ESP.AddString(name, position, color, textStyle);
 				}
 			}
 		}

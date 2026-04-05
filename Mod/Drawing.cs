@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Color = UnityEngine.Color;
 using MelonLoader;
 
@@ -14,6 +14,8 @@ namespace Mod
 		// private const int DebugMaxLogsPerFrame = 8;
 
 		public static readonly Color BloodOrange = new Color(1.00f, 0.50f, 0.00f, 1f);
+		private static readonly Vector2 LabelScreenPadding = new Vector2(25f, 25f);
+		private static readonly Color EmphasizedOutlineColor = new Color(0f, 0f, 0f, 0.95f);
 
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
@@ -36,6 +38,26 @@ namespace Mod
 			return new Vector2(clampedX, clampedY);
 		}
 
+		static bool TryGetLabelPlacement(Vector3 worldPosition, GUIContent content, GUIStyle style, bool centered, out Vector2 upperLeft, out Vector2 size)
+		{
+			upperLeft = Vector2.zero;
+			size = Vector2.zero;
+
+			var cam = Camera.main;
+			if (cam == null) return false;
+
+			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
+			if (screen.z < 0) screen *= -1; // mirror behind-camera points like ClampToScreen
+			screen.y = Screen.height - screen.y;
+
+			size = style.CalcSize(content);
+			Vector2 desiredUpperLeft = centered
+				? new Vector2(screen.x, screen.y) - size / 2f
+				: new Vector2(screen.x, screen.y);
+			upperLeft = ClampRectToScreen(desiredUpperLeft, size, LabelScreenPadding);
+			return true;
+		}
+
 		public static void SetupGuiStyle()
 		{
 			// Must be called from within OnGUI
@@ -55,21 +77,12 @@ namespace Mod
 			if (!Settings.showESPLabels)
 				return;
 
-			var cam = Camera.main;
-			if (cam == null) return;
-			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
-			if (screen.z < 0) screen *= -1; // mirror behind-camera points like ClampToScreen
-			screen.y = Screen.height - screen.y;
-
 			var content = new GUIContent(label);
 			var style = StringStyle ?? new GUIStyle();
-			var size = style.CalcSize(content);
-
-			// Compute desired upper-left, then clamp the rectangle so it fully fits on screen
-			Vector2 desiredUpperLeft = centered
-				? new Vector2(screen.x, screen.y) - size / 2f
-				: new Vector2(screen.x, screen.y);
-			Vector2 clampedUpperLeft = ClampRectToScreen(desiredUpperLeft, size, new Vector2(25, 25));
+			if (!TryGetLabelPlacement(worldPosition, content, style, centered, out var clampedUpperLeft, out var size))
+			{
+				return;
+			}
 
 			// if (Settings.debugESPNames)
 			// {
@@ -112,6 +125,47 @@ namespace Mod
 
 			// Restore previous colors
 			style.normal.textColor = backupTextColor;
+			GUI.contentColor = prevContentColor;
+			GUI.color = prevGuiColor;
+		}
+
+		public static void DrawStringEmphasized(Vector3 worldPosition, string label, Color color, bool centered = true)
+		{
+			// Respect label visibility toggle
+			if (!Settings.showESPLabels)
+				return;
+
+			var style = StringStyle ?? new GUIStyle();
+			var content = new GUIContent(label);
+			if (!TryGetLabelPlacement(worldPosition, content, style, centered, out var upperLeft, out var size))
+			{
+				return;
+			}
+
+			var backupTextColor = style.normal.textColor;
+			var backupFontStyle = style.fontStyle;
+			var prevContentColor = GUI.contentColor;
+			var prevGuiColor = GUI.color;
+
+			GUI.contentColor = Color.white;
+			GUI.color = Color.white;
+			style.fontStyle = FontStyle.Bold;
+
+			style.normal.textColor = EmphasizedOutlineColor;
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x, upperLeft.y - 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x, upperLeft.y + 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y - 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y - 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x - 1f, upperLeft.y + 1f, size.x, size.y), content, style);
+			GUI.Label(new Rect(upperLeft.x + 1f, upperLeft.y + 1f, size.x, size.y), content, style);
+
+			style.normal.textColor = color;
+			GUI.Label(new Rect(upperLeft, size), content, style);
+
+			style.normal.textColor = backupTextColor;
+			style.fontStyle = backupFontStyle;
 			GUI.contentColor = prevContentColor;
 			GUI.color = prevGuiColor;
 		}
