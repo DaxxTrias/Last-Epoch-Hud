@@ -139,7 +139,11 @@ namespace Mod.Cheats
         
         public static bool Initialize(bool updateDebug = true)
         {
-            if (isInitialized && (iconsContainer != null)) return true;
+            if (isInitialized && (iconsContainer != null))
+            {
+                EnsureSpriteCache();
+                return true;
+            }
             if (Time.unscaledTime < nextInitializeAttemptAt) return false;
             
             try
@@ -421,12 +425,7 @@ namespace Mod.Cheats
                     sprite = spriteWhite;
                     return sprite != null;
                 default:
-                    if (!Settings.showWhiteMonsters)
-                    {
-                        sprite = null;
-                        return false;
-                    }
-
+                    // Match previous behavior: unknown classes with display info were shown by default.
                     sprite = spriteWhite;
                     return sprite != null;
             }
