@@ -13,12 +13,6 @@ namespace Mod.Cheats.ESP
 		private static readonly List<string> s_shrineNames = new List<string>(16);
 		private static readonly Color ShrineColor = Drawing.BloodOrange;
 
-		private static string SanitizeLabel(string? value)
-		{
-			if (string.IsNullOrEmpty(value)) return string.Empty;
-			var sanitized = value.Replace("\r", " ").Replace("\n", " ").Replace("\t", " ");
-			return sanitized.Trim();
-		}
 
 		public static void OnSceneChanged()
 		{
@@ -62,13 +56,13 @@ namespace Mod.Cheats.ESP
 				{
 					string? localized = null;
 					try { localized = info.GetLocalizedName(); } catch (Exception) { }
-					if (!string.IsNullOrWhiteSpace(localized)) return SanitizeLabel(localized);
-					if (!string.IsNullOrWhiteSpace(info.displayName)) return SanitizeLabel(info.displayName);
+					if (!string.IsNullOrWhiteSpace(localized)) return EspUtils.SanitizeLabel(localized);
+					if (!string.IsNullOrWhiteSpace(info.displayName)) return EspUtils.SanitizeLabel(info.displayName);
 				}
 			}
 			catch (Exception) { /* Some builds may lack DisplayInformation; fall back to name */ }
 
-			return SanitizeLabel(shrineGo.name);
+			return EspUtils.SanitizeLabel(shrineGo.name);
 		}
 
 		private static bool LooksLikeShrine(GameObject go)
@@ -91,16 +85,6 @@ namespace Mod.Cheats.ESP
 			return false;
 		}
 
-		private static bool IsComponentEnabled(Component comp)
-		{
-			try
-			{
-				var behaviour = comp as Behaviour;
-				if (behaviour != null) return behaviour.enabled;
-			}
-			catch (Exception) { }
-			return true; // assume enabled if unknown
-		}
 
 		private static bool IsShrineInteractable(GameObject go)
 		{
@@ -119,7 +103,7 @@ namespace Mod.Cheats.ESP
 			// var collider = go.GetComponent<BoxCollider>();
 			// if (collider != null) { anyFound = true; anyEnabled |= collider.enabled; }
 			var outline = go.GetComponent<OutlineOnMouseOver>();
-			if (outline != null) { anyFound = true; anyEnabled |= IsComponentEnabled(outline); }
+			if (outline != null) { anyFound = true; anyEnabled |= EspUtils.IsComponentEnabled(outline); }
 
 			// If no known components are present, treat as not interactable to avoid placeholders
 			return anyFound && anyEnabled;
@@ -192,7 +176,7 @@ namespace Mod.Cheats.ESP
 				if (Vector3.Distance(playerPos, pos) > Settings.drawDistance) continue;
 
 				var labelPos = pos; labelPos.y += 0.5f;
-				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : SanitizeLabel(go.name);
+				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : EspUtils.SanitizeLabel(go.name);
 
 				// Respect global specials toggle and per-special whitelist
 				// If user provided a whitelist, honor it; otherwise draw all shrines

@@ -119,26 +119,16 @@ namespace Mod.Cheats.ESP
 			return false;
 		}
 
-		private static bool IsComponentEnabled(Component comp)
-		{
-			try
-			{
-				var behaviour = comp as Behaviour;
-				if (behaviour != null) return behaviour.enabled;
-			}
-			catch (Exception) { }
-			return true;
-		}
 
 		private static bool IsChestInteractable(GameObject go)
 		{
 			if (!go.activeInHierarchy) return false;
 
 			var outline = go.GetComponent<OutlineOnMouseOver>();
-			if (outline != null && IsComponentEnabled(outline)) return true;
+			if (outline != null && EspUtils.IsComponentEnabled(outline)) return true;
 
 			var clickListener = go.GetComponent<WorldObjectClickListener>();
-			if (clickListener != null && IsComponentEnabled(clickListener)) return true;
+			if (clickListener != null && EspUtils.IsComponentEnabled(clickListener)) return true;
 
 			var root = go.transform;
 			if (root == null) return false;
@@ -150,10 +140,10 @@ namespace Mod.Cheats.ESP
 				if (child == null || child.gameObject == null || !child.gameObject.activeInHierarchy) continue;
 
 				var childOutline = child.gameObject.GetComponent<OutlineOnMouseOver>();
-				if (childOutline != null && IsComponentEnabled(childOutline)) return true;
+				if (childOutline != null && EspUtils.IsComponentEnabled(childOutline)) return true;
 
 				var childClickListener = child.gameObject.GetComponent<WorldObjectClickListener>();
-				if (childClickListener != null && IsComponentEnabled(childClickListener)) return true;
+				if (childClickListener != null && EspUtils.IsComponentEnabled(childClickListener)) return true;
 			}
 
 			return false;
