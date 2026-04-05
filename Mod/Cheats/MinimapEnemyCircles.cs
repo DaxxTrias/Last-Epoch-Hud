@@ -21,7 +21,9 @@ namespace Mod.Cheats
         private const float RotationEpsilon = 0.0001f;
         private const string HostileAlignmentName = "Evil";
         private const string HostileNeutralAlignmentName = "HostileNeutral";
+        private const float MapModeLocalPositionEpsilon = 0.01f;
         private const string FullscreenMapPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/DMMap Canvas/Map (1)";
+        private const string MinimapMapPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/Minimap/SquareMinimap/DMMap Canvas/Map (1)";
         private const string MinimapBgPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/Minimap/SquareMinimap/minimapBG";
         private const string LegacyMinimapBgPath = "GUI/Canvas (animated)/Minimap Holder/Minimap(Clone)/SquareMinimap/minimapBG";
         
@@ -53,6 +55,7 @@ namespace Mod.Cheats
         // Target containers discovered from the scene hierarchy (screenshot)
         private static RectTransform? iconsContainer; // ".../DMMap Canvas/Icons"
         private static RectTransform? mapContainer;   // ".../DMMap Canvas/Map" (optional for later)
+        private static GameObject? minimapMap;
         private static GameObject? fullscreenMap;
         private static GameObject? smallMinimapBg;
         
@@ -131,6 +134,16 @@ namespace Mod.Cheats
         
         private static bool IsFullscreenMapOpen()
         {
+            if (minimapMap == null)
+            {
+                minimapMap = GameObject.Find(MinimapMapPath);
+            }
+
+            if (minimapMap != null)
+            {
+                return IsNearZeroLocalPosition(minimapMap.transform.localPosition);
+            }
+
             if (fullscreenMap == null)
             {
                 fullscreenMap = GameObject.Find(FullscreenMapPath);
@@ -138,7 +151,7 @@ namespace Mod.Cheats
 
             if (fullscreenMap != null)
             {
-                return fullscreenMap.activeInHierarchy;
+                return IsNearZeroLocalPosition(fullscreenMap.transform.localPosition);
             }
 
             if (smallMinimapBg != null)
@@ -159,6 +172,13 @@ namespace Mod.Cheats
             }
 
             return false;
+        }
+
+        private static bool IsNearZeroLocalPosition(Vector3 localPosition)
+        {
+            return Mathf.Abs(localPosition.x) <= MapModeLocalPositionEpsilon &&
+                   Mathf.Abs(localPosition.y) <= MapModeLocalPositionEpsilon &&
+                   Mathf.Abs(localPosition.z) <= MapModeLocalPositionEpsilon;
         }
         
         public static bool Initialize(bool updateDebug = true)
@@ -211,6 +231,7 @@ namespace Mod.Cheats
                 }
                 
                 // Bind minimap/fullscreen sentinels for visibility gating.
+                minimapMap = GameObject.Find(MinimapMapPath);
                 fullscreenMap = GameObject.Find(FullscreenMapPath);
                 smallMinimapBg = GameObject.Find(MinimapBgPath);
                 if (smallMinimapBg == null)
