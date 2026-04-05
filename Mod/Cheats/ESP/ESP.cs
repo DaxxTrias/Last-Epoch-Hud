@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Mod.Cheats.ESP
 {
@@ -8,13 +8,12 @@ namespace Mod.Cheats.ESP
         Emphasized = 1
     }
 
-    internal class LineDrawing
+    internal readonly struct LineDrawing
     {
         private readonly Vector3 start;
         private readonly Vector3 end;
         private readonly Color color;
 
-        // constructor
         public LineDrawing(Vector3 start, Vector3 end, Color color)
         {
             this.start = start;
@@ -28,14 +27,13 @@ namespace Mod.Cheats.ESP
         }
     }
 
-    internal class StringDrawing
+    internal readonly struct StringDrawing
     {
         private readonly string text;
         private readonly Vector3 position;
         private readonly Color color;
         private readonly EspStringStyle style;
 
-        // constructor
         public StringDrawing(string text, Vector3 position, Color color, EspStringStyle style)
         {
             this.text = text;
@@ -73,14 +71,14 @@ namespace Mod.Cheats.ESP
 
         public static void Draw()
         {
-            foreach (var line in lineDrawings)
+            for (int i = 0; i < lineDrawings.Count; i++)
             {
-                line.Draw();
+                lineDrawings[i].Draw();
             }
 
-            foreach (var str in stringDrawings)
+            for (int i = 0; i < stringDrawings.Count; i++)
             {
-                str.Draw();
+                stringDrawings[i].Draw();
             }
         }
 
