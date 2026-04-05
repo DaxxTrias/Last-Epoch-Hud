@@ -1,9 +1,8 @@
 using System.Collections.Generic;
-using UnityEngine;
 using Il2Cpp;
-using MelonLoader;
-using System.Linq;
 using Mod.Game;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace Mod.Cheats
 {
@@ -18,6 +17,10 @@ namespace Mod.Cheats
         private static float initializeRetryDelaySeconds = InitialInitializeRetrySeconds;
         private const float InitialInitializeRetrySeconds = 0.25f;
         private const float MaxInitializeRetrySeconds = 3.0f;
+        private const int MaxRenderedEnemies = 100;
+        private const float RotationEpsilon = 0.0001f;
+        private const string HostileAlignmentName = "Evil";
+        private const string HostileNeutralAlignmentName = "HostileNeutral";
         
         // Debug info for GUI display
         public static string lastDebugInfo = "";
@@ -25,8 +28,23 @@ namespace Mod.Cheats
         public static int lastCircleCount = 0;
         public static string lastCreateAttempt = "";
         
-        // Store our UI circles for cleanup
-        private static readonly List<GameObject> enemyCircles = new List<GameObject>();
+        private sealed class CircleVisual
+        {
+            public CircleVisual(GameObject gameObject, RectTransform rectTransform, Image image)
+            {
+                GameObject = gameObject;
+                RectTransform = rectTransform;
+                Image = image;
+            }
+
+            public GameObject GameObject { get; }
+            public RectTransform RectTransform { get; }
+            public Image Image { get; }
+        }
+
+        // Store and reuse our UI circles to avoid per-frame Instantiate/Destroy churn
+        private static readonly List<CircleVisual> enemyCircles = new List<CircleVisual>(MaxRenderedEnemies);
+        private static int activeCircleCount = 0;
         private static int debugUpdateCounter = 0; // Add counter to reduce debug frequency
         
         // Target containers discovered from the scene hierarchy (screenshot)
@@ -126,6 +144,8 @@ namespace Mod.Cheats
             
             try
             {
+                int previousIconsContainerId = iconsContainer != null ? iconsContainer.GetInstanceID() : 0;
+
                 // Try exact paths first (from screenshot)
                 GameObject iconsGO = GameObject.Find("BWF/GameManager/GeneralGameManager/Minimap Folder/DMMap/DMMap Canvas/Icons");
                 GameObject mapGO = GameObject.Find("BWF/GameManager/GeneralGameManager/Minimap Folder/DMMap/DMMap Canvas/Map");
@@ -170,6 +190,11 @@ namespace Mod.Cheats
                 
                 if (iconsContainer != null)
                 {
+                    if (previousIconsContainerId != iconsContainer.GetInstanceID())
+                    {
+                        DestroyAllCircles();
+                    }
+
                     isInitialized = true;
                     initializeRetryDelaySeconds = InitialInitializeRetrySeconds;
                     nextInitializeAttemptAt = 0f;
@@ -216,21 +241,65 @@ namespace Mod.Cheats
                     if (updateDebug) lastDebugInfo = "ActorManager.instance is null";
                     return;
                 }
-                
-                // Clear old circles each frame to get fresh positions
-                ClearCircles();
-                
-                List<ActorVisuals> enemies = new List<ActorVisuals>();
+
+                if (iconsContainer == null)
+                {
+                    if (updateDebug) lastDebugInfo = "Icons container not initialized";
+                    return;
+                }
+
+                CompactCirclePool();
+
+                Transform playerTransform = playerActor.transform;
+                Vector3 playerPosition = playerTransform.position;
+                float drawDistance = Settings.drawDistance;
+                float drawDistanceSqr = drawDistance * drawDistance;
+                int circleSize = Mathf.Max(2, Mathf.RoundToInt(Settings.minimapCircleSize));
+                Vector2 circleSizeDelta = new Vector2(circleSize, circleSize);
+
                 int totalVisuals = 0;
                 int alignmentFiltered = 0;
-                
+                int candidateEnemyCount = 0;
+                int successfulCircles = 0;
+
+                // Precompute mapping parameters once per update
+                float pixelsPerMeter = GetPixelsPerMeter();
+                Vector2 maxBounds = GetIconRectHalfSize();
+                float mapRotationRad = GetMapRotationRadians();
+                float basisRad = GetBasisRotationRadians();
+
+                bool applyBasisRotation = Mathf.Abs(basisRad) > RotationEpsilon;
+                bool applyMapRotation = Mathf.Abs(mapRotationRad) > RotationEpsilon;
+                float cosBasis = 1f;
+                float sinBasis = 0f;
+                float cosMap = 1f;
+                float sinMap = 0f;
+
+                if (applyBasisRotation)
+                {
+                    cosBasis = Mathf.Cos(basisRad);
+                    sinBasis = Mathf.Sin(basisRad);
+                }
+
+                if (applyMapRotation)
+                {
+                    cosMap = Mathf.Cos(mapRotationRad);
+                    sinMap = Mathf.Sin(mapRotationRad);
+                }
+
+                bool flipX = Settings.minimapFlipX;
+                bool flipY = Settings.minimapFlipY;
+                float offsetX = Settings.minimapOffsetX;
+                float offsetY = Settings.minimapOffsetY;
+
                 foreach (var visual in ActorManager.instance.visuals)
                 {
                     totalVisuals++;
                     
                     // Skip if no alignment or not hostile
                     if (visual.alignment == null) continue;
-                    if (visual.alignment.name != "Evil" && visual.alignment.name != "HostileNeutral") 
+                    string alignmentName = visual.alignment.name;
+                    if (alignmentName != HostileAlignmentName && alignmentName != HostileNeutralAlignmentName) 
                     {
                         alignmentFiltered++;
                         continue;
@@ -246,57 +315,227 @@ namespace Mod.Cheats
                             
                             // Skip dead enemies
                             if (actor.dead) continue;
-                            
-                            // Check distance to player
-                            float distance = Vector3.Distance(
-                                actor.transform.position, playerActor.transform.position);
-                            
-                            if (distance < Settings.drawDistance)
-                            {
-                                enemies.Add(actor);
-                            }
+
+                            Vector3 actorPosition = actor.transform.position;
+                            Vector3 delta = actorPosition - playerPosition;
+                            if (delta.sqrMagnitude >= drawDistanceSqr) continue;
+
+                            candidateEnemyCount++;
+                            if (successfulCircles >= MaxRenderedEnemies) continue;
+
+                            if (!TryGetEnemySprite(actor, out Sprite? sprite) || sprite == null)
+                                continue;
+
+                            Vector2 minimapPos = WorldDeltaToMinimapPosition(
+                                delta.x,
+                                delta.z,
+                                pixelsPerMeter,
+                                offsetX,
+                                offsetY,
+                                flipX,
+                                flipY,
+                                applyBasisRotation,
+                                cosBasis,
+                                sinBasis,
+                                applyMapRotation,
+                                cosMap,
+                                sinMap);
+
+                            if (Mathf.Abs(minimapPos.x) > maxBounds.x || Mathf.Abs(minimapPos.y) > maxBounds.y)
+                                continue;
+
+                            UpsertMinimapCircle(successfulCircles, sprite, minimapPos, circleSizeDelta);
+                            successfulCircles++;
                         }
                     }
                 }
-                
-                lastEnemyCount = enemies.Count;
-                int successfulCircles = 0;
-                
-                // Precompute mapping parameters
-                float pixelsPerMeter = GetPixelsPerMeter();
-                float mapRotationRad = GetMapRotationRadians();
-                Vector2 maxBounds = GetIconRectHalfSize();
-                
-                foreach (var enemy in enemies.Take(100)) // Limit to 100 enemies
-                {
-                    var enemyPos = enemy.transform.position;
-                    var minimapPos = WorldToMinimapPosition(enemyPos, playerActor.transform.position, pixelsPerMeter, mapRotationRad);
-                    
-                    // Check if position is within Icons rect bounds
-                    if (Mathf.Abs(minimapPos.x) > maxBounds.x || Mathf.Abs(minimapPos.y) > maxBounds.y)
-                        continue;
-                    
-                    // Check if this enemy type should be shown based on settings
-                    if (!ShouldShowEnemyType(enemy))
-                        continue;
-                    
-                    var color = GetEnemyColor(enemy);
-                    CreateMinimapCircle(enemy, color, minimapPos);
-                    successfulCircles++;
-                }
-                
-                lastCircleCount = enemyCircles.Count;
-                
-                // Update creation attempt status
-                lastCreateAttempt = $"Successfully created {successfulCircles} circles for {lastEnemyCount} enemies";
+
+                lastEnemyCount = candidateEnemyCount;
+                SetActiveCircleCount(successfulCircles);
+                lastCircleCount = successfulCircles;
+                lastCreateAttempt = $"Updated {successfulCircles} circles for {candidateEnemyCount} enemies";
                 
                 // Set final debug info with complete status
-                if (updateDebug) lastDebugInfo = $"ACTIVE | Summary: Visuals: {totalVisuals}, Filtered: {alignmentFiltered}, Enemies: {lastEnemyCount}, Circles: {lastCircleCount}";
+                if (updateDebug)
+                {
+                    lastDebugInfo = $"ACTIVE | Visuals: {totalVisuals}, Filtered: {alignmentFiltered}, InRange: {lastEnemyCount}, Rendered: {lastCircleCount}, Pool: {enemyCircles.Count}";
+                }
             }
             catch (System.Exception e)
             {
                 if (updateDebug) lastDebugInfo = $"Error updating circles: {e.Message}";
             }
+        }
+
+        private static bool TryGetEnemySprite(ActorVisuals enemy, out Sprite? sprite)
+        {
+            var displayInfo = enemy.GetComponent<ActorDisplayInformation>();
+            if (displayInfo == null)
+            {
+                if (!Settings.showWhiteMonsters)
+                {
+                    sprite = null;
+                    return false;
+                }
+
+                sprite = spriteWhite;
+                return sprite != null;
+            }
+
+            switch (displayInfo.actorClass)
+            {
+                case DisplayActorClass.Boss:
+                    if (!Settings.showBossMonsters)
+                    {
+                        sprite = null;
+                        return false;
+                    }
+
+                    sprite = spriteRed;
+                    return sprite != null;
+                case DisplayActorClass.Rare:
+                    if (!Settings.showRareMonsters)
+                    {
+                        sprite = null;
+                        return false;
+                    }
+
+                    sprite = spriteYellow;
+                    return sprite != null;
+                case DisplayActorClass.Magic:
+                    if (!Settings.showMagicMonsters)
+                    {
+                        sprite = null;
+                        return false;
+                    }
+
+                    sprite = spriteBlue;
+                    return sprite != null;
+                case DisplayActorClass.Normal:
+                    if (!Settings.showWhiteMonsters)
+                    {
+                        sprite = null;
+                        return false;
+                    }
+
+                    sprite = spriteWhite;
+                    return sprite != null;
+                default:
+                    if (!Settings.showWhiteMonsters)
+                    {
+                        sprite = null;
+                        return false;
+                    }
+
+                    sprite = spriteWhite;
+                    return sprite != null;
+            }
+        }
+
+        private static void UpsertMinimapCircle(int index, Sprite sprite, Vector2 position, Vector2 sizeDelta)
+        {
+            CircleVisual circle = GetOrCreateCircle(index);
+            if (iconsContainer != null && circle.RectTransform.parent != iconsContainer.transform)
+            {
+                circle.RectTransform.SetParent(iconsContainer.transform, false);
+            }
+
+            circle.RectTransform.anchoredPosition = position;
+            if (circle.RectTransform.sizeDelta != sizeDelta)
+            {
+                circle.RectTransform.sizeDelta = sizeDelta;
+            }
+
+            if (circle.Image.sprite != sprite)
+            {
+                circle.Image.sprite = sprite;
+            }
+
+            if (!circle.GameObject.activeSelf)
+            {
+                circle.GameObject.SetActive(true);
+            }
+        }
+
+        private static CircleVisual GetOrCreateCircle(int index)
+        {
+            if (index < enemyCircles.Count)
+            {
+                CircleVisual existing = enemyCircles[index];
+                if (existing.GameObject != null && existing.RectTransform != null && existing.Image != null)
+                {
+                    return existing;
+                }
+
+                CircleVisual replacement = CreateCircleVisual();
+                enemyCircles[index] = replacement;
+                return replacement;
+            }
+
+            CircleVisual created = CreateCircleVisual();
+            enemyCircles.Add(created);
+            return created;
+        }
+
+        private static CircleVisual CreateCircleVisual()
+        {
+            var circleObj = new GameObject("EnemyCircle");
+            if (iconsContainer != null)
+            {
+                circleObj.transform.SetParent(iconsContainer.transform, false);
+            }
+
+            var rectTransform = circleObj.AddComponent<RectTransform>();
+            var image = circleObj.AddComponent<Image>();
+            image.raycastTarget = false;
+            circleObj.SetActive(false);
+            return new CircleVisual(circleObj, rectTransform, image);
+        }
+
+        private static void CompactCirclePool()
+        {
+            for (int i = enemyCircles.Count - 1; i >= 0; i--)
+            {
+                CircleVisual circle = enemyCircles[i];
+                if (circle.GameObject == null || circle.RectTransform == null || circle.Image == null)
+                {
+                    enemyCircles.RemoveAt(i);
+                }
+            }
+
+            if (activeCircleCount > enemyCircles.Count)
+            {
+                activeCircleCount = enemyCircles.Count;
+            }
+        }
+
+        private static void SetActiveCircleCount(int count)
+        {
+            activeCircleCount = Mathf.Clamp(count, 0, enemyCircles.Count);
+
+            for (int i = activeCircleCount; i < enemyCircles.Count; i++)
+            {
+                GameObject circleObject = enemyCircles[i].GameObject;
+                if (circleObject != null && circleObject.activeSelf)
+                {
+                    circleObject.SetActive(false);
+                }
+            }
+        }
+
+        private static void DestroyAllCircles()
+        {
+            foreach (CircleVisual circle in enemyCircles)
+            {
+                if (circle.GameObject != null)
+                {
+                    UnityEngine.Object.Destroy(circle.GameObject);
+                }
+            }
+
+            enemyCircles.Clear();
+            activeCircleCount = 0;
+            lastCircleCount = 0;
         }
         
         private static float GetPixelsPerMeter()
@@ -337,141 +576,51 @@ namespace Mod.Cheats
             return Settings.minimapBasisRotationDegrees * Mathf.Deg2Rad;
         }
         
-        private static Vector2 WorldToMinimapPosition(Vector3 worldPosition, Vector3 playerPosition, float pixelsPerMeter, float rotationRadians)
+        private static Vector2 WorldDeltaToMinimapPosition(
+            float worldDeltaX,
+            float worldDeltaZ,
+            float pixelsPerMeter,
+            float offsetX,
+            float offsetY,
+            bool flipX,
+            bool flipY,
+            bool applyBasisRotation,
+            float cosBasis,
+            float sinBasis,
+            bool applyMapRotation,
+            float cosMap,
+            float sinMap)
         {
-            // Calculate relative position to player in world XZ plane
-            Vector2 rel = new Vector2(worldPosition.x - playerPosition.x, worldPosition.z - playerPosition.z);
+            float relX = worldDeltaX;
+            float relY = worldDeltaZ;
             
             // Apply basis rotation to align world axes to DMap axes
-            float basisRad = GetBasisRotationRadians();
-            if (basisRad != 0f)
+            if (applyBasisRotation)
             {
-                float cosB = Mathf.Cos(basisRad);
-                float sinB = Mathf.Sin(basisRad);
-                float bx = rel.x * cosB - rel.y * sinB;
-                float by = rel.x * sinB + rel.y * cosB;
-                rel = new Vector2(bx, by);
+                float bx = relX * cosBasis - relY * sinBasis;
+                float by = relX * sinBasis + relY * cosBasis;
+                relX = bx;
+                relY = by;
             }
             
             // Rotate to match map rotation
-            if (rotationRadians != 0f)
+            if (applyMapRotation)
             {
-                float cos = Mathf.Cos(rotationRadians);
-                float sin = Mathf.Sin(rotationRadians);
-                float rx = rel.x * cos - rel.y * sin;
-                float ry = rel.x * sin + rel.y * cos;
-                rel = new Vector2(rx, ry);
+                float rx = relX * cosMap - relY * sinMap;
+                float ry = relX * sinMap + relY * cosMap;
+                relX = rx;
+                relY = ry;
             }
             
             // Optional axis flips to match DMap handedness
-            if (Settings.minimapFlipX) rel.x = -rel.x;
-            if (Settings.minimapFlipY) rel.y = -rel.y;
+            if (flipX) relX = -relX;
+            if (flipY) relY = -relY;
             
             // Convert to minimap space (Unity UI is typically +Y up). Map convention: x->right, z->forward
-            float minimapX = rel.x * pixelsPerMeter + Settings.minimapOffsetX;
-            float minimapY = rel.y * pixelsPerMeter + Settings.minimapOffsetY;
+            float minimapX = relX * pixelsPerMeter + offsetX;
+            float minimapY = relY * pixelsPerMeter + offsetY;
             
             return new Vector2(minimapX, minimapY);
-        }
-        
-        private static Color GetEnemyColor(ActorVisuals enemy)
-        {
-            var displayInfo = enemy.GetComponent<ActorDisplayInformation>();
-            if (displayInfo != null)
-            {
-                if (displayInfo.actorClass == DisplayActorClass.Boss) return Color.red;
-                if (displayInfo.actorClass == DisplayActorClass.Rare) return Color.yellow;
-                if (displayInfo.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
-            }
-            return Color.white;
-        }
-        
-        private static Sprite? GetSpriteForColor(Color color)
-        {
-            // Map arbitrary input color to the closest cached sprite
-            if (color.Equals(Color.red)) return spriteRed;
-            if (color.Equals(Color.yellow)) return spriteYellow;
-            if (Approximately(color, MagicLightBlue) || color.Equals(Color.blue)) return spriteBlue;
-            return spriteWhite;
-        }
-        
-        private static bool Approximately(Color a, Color b)
-        {
-            return Mathf.Abs(a.r - b.r) < 0.02f &&
-                   Mathf.Abs(a.g - b.g) < 0.02f &&
-                   Mathf.Abs(a.b - b.b) < 0.02f &&
-                   Mathf.Abs(a.a - b.a) < 0.02f;
-        }
-        
-        private static bool ShouldShowEnemyType(ActorVisuals enemy)
-        {
-            var displayInfo = enemy.GetComponent<ActorDisplayInformation>();
-            if (displayInfo != null)
-            {
-                // Check each monster type against settings
-                if (displayInfo.actorClass == DisplayActorClass.Magic && !Settings.showMagicMonsters)
-                    return false;
-                if (displayInfo.actorClass == DisplayActorClass.Rare && !Settings.showRareMonsters)
-                    return false;
-                				if (displayInfo.actorClass == DisplayActorClass.Boss && !Settings.showBossMonsters)
-					return false;
-				if (displayInfo.actorClass == DisplayActorClass.Boss)
-					return true;
-                
-                // For normal/white monsters
-                if (displayInfo.actorClass == DisplayActorClass.Normal && !Settings.showWhiteMonsters)
-                    return false;
-            }
-            else
-            {
-                // If no display info, treat as white monster
-                if (!Settings.showWhiteMonsters)
-                    return false;
-            }
-            
-            return true; // Show by default if not filtered out
-        }
-        
-        private static void CreateMinimapCircle(ActorVisuals enemy, Color color, Vector2 position)
-        {
-            try
-            {
-                if (iconsContainer == null) 
-                {
-                    lastCreateAttempt = "Icons container is null - cannot create circle";
-                    return;
-                }
-                
-                // Clamp and unify size to avoid zero/invalid textures
-                int size = Mathf.Max(2, Mathf.RoundToInt(Settings.minimapCircleSize));
-                Vector2 sizeDelta = new Vector2(size, size);
-                
-                // Resolve sprite from cache; build on-demand fallback if needed
-                Sprite? sprite = GetSpriteForColor(color);
-                if (sprite == null)
-                {
-                    sprite = BuildCircleSprite(Mathf.Max(8, size), color);
-                }
-                
-                // Create object only after we have a valid sprite
-                var circleObj = new GameObject($"EnemyCircle_{enemy.name}");
-                circleObj.transform.SetParent(iconsContainer.transform, false);
-                
-                var rectTransform = circleObj.AddComponent<RectTransform>();
-                rectTransform.anchoredPosition = position;
-                rectTransform.sizeDelta = sizeDelta;
-                
-                var image = circleObj.AddComponent<UnityEngine.UI.Image>();
-                image.raycastTarget = false;
-                image.sprite = sprite;
-                
-                enemyCircles.Add(circleObj);
-                lastCreateAttempt = $"Created circle at {position} for {enemy.name}";
-            }
-            catch (System.Exception e)
-            {
-                lastCreateAttempt = $"Failed to create circle: {e.Message}";
-            }
         }
         
         private static Texture2D CreateCircleTexture(int size, Color color)
@@ -506,14 +655,8 @@ namespace Mod.Cheats
         
         public static void ClearCircles()
         {
-            foreach (var circle in enemyCircles)
-            {
-                if (circle != null)
-                {
-                    UnityEngine.Object.Destroy(circle);
-                }
-            }
-            enemyCircles.Clear();
+            SetActiveCircleCount(0);
+            lastCircleCount = 0;
         }
     }
 }
