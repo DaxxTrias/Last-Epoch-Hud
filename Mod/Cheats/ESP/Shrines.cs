@@ -22,28 +22,22 @@ namespace Mod.Cheats.ESP
 			s_shrineNames.Clear();
 		}
 
+		private static readonly string[] ManagerNameCandidates =
+		{
+			"Shrine Placement Manager",
+			"ShrinePlacementManager",
+			"Shrine Manager",
+			"ShrineManager"
+		};
+
 		private static void TryFindManager()
 		{
 			if (s_shrineManager != null) return;
 
-			// Primary: exact-name lookup (observed in inspector)
-			s_shrineManager = GameObject.Find("Shrine Placement Manager");
-			if (s_shrineManager != null) return;
-
-			// Fallback: broader scan for any object that looks like a shrine container
-			// We avoid allocations by iterating transforms
-			var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
-			for (int i = 0; i < allTransforms.Length; i++)
+			for (int i = 0; i < ManagerNameCandidates.Length; i++)
 			{
-				var tr = allTransforms[i];
-				if (tr == null || tr.gameObject == null) continue;
-				var go = tr.gameObject;
-				// Heuristic: manager with multiple children named "Shrine Spot" or containing active shrine clones
-				if (go.name != null && go.name.IndexOf("Shrine", StringComparison.OrdinalIgnoreCase) >= 0 && tr.childCount > 0)
-				{
-					s_shrineManager = go;
-					break;
-				}
+				s_shrineManager = GameObject.Find(ManagerNameCandidates[i]);
+				if (s_shrineManager != null) return;
 			}
 		}
 
@@ -163,6 +157,7 @@ namespace Mod.Cheats.ESP
 			var localPlayer = ObjectManager.GetLocalPlayer();
 			if (localPlayer == null) return;
 			var playerPos = localPlayer.transform.position;
+			float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
 			for (int i = 0; i < s_shrineTransforms.Count; i++)
 			{
@@ -170,10 +165,11 @@ namespace Mod.Cheats.ESP
 				if (tr == null) continue;
 				var go = tr.gameObject;
 				if (go == null || !go.activeInHierarchy) continue;
-				if (!IsShrineInteractable(go)) continue; // was used since cache built
+				if (!IsShrineInteractable(go)) continue;
 
 				var pos = tr.position;
-				if (Vector3.Distance(playerPos, pos) > Settings.drawDistance) continue;
+				var delta = pos - playerPos;
+				if (delta.sqrMagnitude > maxDistSq) continue;
 
 				var labelPos = pos; labelPos.y += 0.5f;
 				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : EspUtils.SanitizeLabel(go.name);
