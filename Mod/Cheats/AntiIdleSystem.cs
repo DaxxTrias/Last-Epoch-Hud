@@ -190,11 +190,20 @@ namespace Mod.Cheats
                     _lastWrapperKeySummaryTime = Time.time;
                     try
                     {
-                        var top = _wrapperKeyCounts.OrderByDescending(kv => kv.Value).First();
-                        
-                        if (VerboseKeepaliveLogs)
+                        string? topKey = null;
+                        int topCount = 0;
+                        foreach (var kv in _wrapperKeyCounts)
+                        {
+                            if (kv.Value > topCount)
+                            {
+                                topKey = kv.Key;
+                                topCount = kv.Value;
+                            }
+                        }
+
+                        if (VerboseKeepaliveLogs && topKey != null)
 #pragma warning disable CS0162 // Unreachable code detected
-                            MelonLogger.Msg($"[AntiIdle] Wrapper traffic: top={top.Key} count={top.Value} (window ~60s)");
+                            MelonLogger.Msg($"[AntiIdle] Wrapper traffic: top={topKey} count={topCount} (window ~60s)");
 #pragma warning restore CS0162 // Unreachable code detected
 
                         _wrapperKeyCounts.Clear();
@@ -898,262 +907,220 @@ namespace Mod.Cheats
         #endregion
 
         #region Heartbeat Management
-        
+
+        // Cached reflection bindings for heartbeat reset (resolved once per client type)
+        private static bool _hbCacheResolved;
+        private static Type? _hbCacheForType;
+        private static FieldInfo? _hbField;           // m_lastHeartbeat on client
+        private static PropertyInfo? _hbProp;          // m_lastHeartbeat property on client
+        private static FieldInfo? _hbAltField;         // any double field containing "heartbeat"
+        private static FieldInfo? _hbNetPeerField;     // field on client whose type contains "NetPeer"
+        private static FieldInfo? _hbNpField;          // m_lastHeartbeat on NetPeer
+        private static PropertyInfo? _hbNpProp;        // m_lastHeartbeat property on NetPeer
+        private static MethodInfo[]? _hbMethods;       // heartbeat/keepalive/ping methods
+        private static MethodInfo[]? _hbSetters;       // setter methods with heartbeat in name
+
+        private static double ReadAsDouble(object? value)
+        {
+            if (value == null) return double.NaN;
+            try { return Convert.ToDouble(value); } catch { return double.NaN; }
+        }
+
+        private static FieldInfo? FindFieldRecursive(Type type, string name)
+        {
+            for (var t = type; t != null; t = t.BaseType!)
+            {
+                var fi = t.GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                if (fi != null) return fi;
+            }
+            return null;
+        }
+
+        private static List<FieldInfo> GetAllInstanceFields(Type type)
+        {
+            var result = new List<FieldInfo>();
+            for (var t = type; t != null; t = t.BaseType!)
+            {
+                foreach (var f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    result.Add(f);
+            }
+            return result;
+        }
+
+        private static void ResolveHeartbeatBindings(Type clientType)
+        {
+            if (_hbCacheResolved && _hbCacheForType == clientType) return;
+            _hbCacheResolved = true;
+            _hbCacheForType = clientType;
+
+            _hbField = FindFieldRecursive(clientType, "m_lastHeartbeat");
+            _hbProp = clientType.GetProperty("m_lastHeartbeat", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+
+            var allFields = GetAllInstanceFields(clientType);
+
+            _hbAltField = null;
+            _hbNetPeerField = null;
+            for (int i = 0; i < allFields.Count; i++)
+            {
+                var f = allFields[i];
+                if (_hbAltField == null && f.FieldType == typeof(double) && f.Name.IndexOf("heartbeat", StringComparison.OrdinalIgnoreCase) >= 0)
+                    _hbAltField = f;
+                if (_hbNetPeerField == null && f.FieldType.Name.Contains("NetPeer"))
+                    _hbNetPeerField = f;
+            }
+
+            // Resolve NetPeer-level heartbeat bindings if we found the peer field
+            _hbNpField = null;
+            _hbNpProp = null;
+            if (_hbNetPeerField != null)
+            {
+                var peerType = _hbNetPeerField.FieldType;
+                _hbNpField = FindFieldRecursive(peerType, "m_lastHeartbeat");
+                _hbNpProp = peerType.GetProperty("m_lastHeartbeat", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+            }
+
+            // Resolve heartbeat/keepalive methods
+            var methods = clientType.GetMethods();
+            var hbMethodList = new List<MethodInfo>();
+            var setterList = new List<MethodInfo>();
+            for (int i = 0; i < methods.Length; i++)
+            {
+                var m = methods[i];
+                var nameLower = m.Name.ToLowerInvariant();
+                if ((nameLower.Contains("heartbeat") || nameLower.Contains("keepalive") || nameLower.Contains("ping"))
+                    && !nameLower.StartsWith("get_"))
+                {
+                    hbMethodList.Add(m);
+                }
+                if (nameLower.Contains("set") && nameLower.Contains("heartbeat"))
+                {
+                    setterList.Add(m);
+                }
+            }
+            _hbMethods = hbMethodList.Count > 0 ? hbMethodList.ToArray() : null;
+            _hbSetters = setterList.Count > 0 ? setterList.ToArray() : null;
+        }
+
         private static void ResetHeartbeatTimer()
         {
             try
             {
                 if (_netMultiClient == null) return;
-                
+
                 var clientType = _netMultiClient.GetType();
-                
-                // Method 1: Try direct field/property reset FIRST (most reliable)
-                
+                ResolveHeartbeatBindings(clientType);
+
                 bool resetSucceeded = false;
                 var nowSeconds = GetNetworkNowSeconds();
-                
-                // Helper: recursive base-class field lookup
-                static FieldInfo? FindFieldRecursive(Type type, string name)
-                {
-                    for (var t = type; t != null; t = t.BaseType!)
-                    {
-                        var fi = t.GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                        if (fi != null) return fi;
-                    }
-                    return null;
-                }
-                
-                // Helper: enumerate all instance fields across type hierarchy
-                static IEnumerable<FieldInfo> GetAllInstanceFields(Type type)
-                {
-                    for (var t = type; t != null; t = t.BaseType!)
-                    {
-                        foreach (var f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
-                            yield return f;
-                    }
-                }
-                
-                // Try field by exact name (search hierarchy)
-                var lastHeartbeatField = FindFieldRecursive(clientType, "m_lastHeartbeat");
-                
-                // Try property by exact name on current type (fallback)
-                var lastHeartbeatProperty = clientType.GetProperty("m_lastHeartbeat",
-                    BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
 
-                static double ReadAsDouble(object? value)
-                {
-                    if (value == null) return double.NaN;
-                    try { return Convert.ToDouble(value); } catch { return double.NaN; }
-                }
-                
-                if (lastHeartbeatField != null)
+                // Try direct field
+                if (_hbField != null)
                 {
                     try
                     {
-                        var before = ReadAsDouble(lastHeartbeatField.GetValue(_netMultiClient));
-                        lastHeartbeatField.SetValue(_netMultiClient, nowSeconds);
-                        var after = ReadAsDouble(lastHeartbeatField.GetValue(_netMultiClient));
-                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                            MelonLogger.Msg($"[AntiIdle] Heartbeat FIELD write: {before:F3} -> {after:F3} (target {nowSeconds:F3})");
-#pragma warning restore CS0162 // Unreachable code detected
+                        _hbField.SetValue(_netMultiClient, nowSeconds);
+                        var after = ReadAsDouble(_hbField.GetValue(_netMultiClient));
                         resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
                     }
-                    catch (Exception ex)
-                    {
-                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                            MelonLogger.Msg($"[AntiIdle] Heartbeat FIELD write failed: {ex.Message}");
-#pragma warning restore CS0162 // Unreachable code detected
-                    }
+                    catch { }
                 }
-                else if (lastHeartbeatProperty != null && lastHeartbeatProperty.CanWrite)
+
+                // Try direct property
+                if (!resetSucceeded && _hbProp != null && _hbProp.CanWrite)
                 {
                     try
                     {
-                        var before = ReadAsDouble(lastHeartbeatProperty.GetValue(_netMultiClient));
-                        lastHeartbeatProperty.SetValue(_netMultiClient, nowSeconds); // Set to current network time
-                        var after = ReadAsDouble(lastHeartbeatProperty.GetValue(_netMultiClient));
-                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                            MelonLogger.Msg($"[AntiIdle] Heartbeat PROPERTY write: {before:F3} -> {after:F3} (target {nowSeconds:F3})");
-#pragma warning restore CS0162 // Unreachable code detected
+                        _hbProp.SetValue(_netMultiClient, nowSeconds);
+                        var after = ReadAsDouble(_hbProp.GetValue(_netMultiClient));
                         resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
                     }
-                    catch (Exception ex)
-                    {
-                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                            MelonLogger.Msg($"[AntiIdle] Heartbeat PROPERTY write failed: {ex.Message}");
-#pragma warning restore CS0162 // Unreachable code detected
-                    }
+                    catch { }
                 }
-                
-                // If still not successful, try alternative fields on NetMultiClient (search hierarchy)
-                if (!resetSucceeded)
+
+                // Try alternative heartbeat field
+                if (!resetSucceeded && _hbAltField != null)
                 {
-                    var allFields = GetAllInstanceFields(clientType);
-                    var altField = allFields.FirstOrDefault(f =>
-                        f.Name.ToLowerInvariant().Contains("heartbeat") &&
-                        f.FieldType == typeof(double));
-                    if (altField != null)
+                    try
                     {
-                        try
-                        {
-                            var before = ReadAsDouble(altField.GetValue(_netMultiClient));
-                            altField.SetValue(_netMultiClient, nowSeconds);
-                            var after = ReadAsDouble(altField.GetValue(_netMultiClient));
-                            if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                                MelonLogger.Msg($"[AntiIdle] Heartbeat ALT FIELD write: {before:F3} -> {after:F3} (target {nowSeconds:F3})");
-#pragma warning restore CS0162 // Unreachable code detected
-                            resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
-                        }
-                        catch (Exception ex)
-                        {
-                            if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                                MelonLogger.Msg($"[AntiIdle] Heartbeat ALT FIELD write failed: {ex.Message}");
-#pragma warning restore CS0162 // Unreachable code detected
-                        }
+                        _hbAltField.SetValue(_netMultiClient, nowSeconds);
+                        var after = ReadAsDouble(_hbAltField.GetValue(_netMultiClient));
+                        resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
                     }
+                    catch { }
                 }
-                
-                // If still not successful, try to find NetPeer and reset its m_lastHeartbeat
-                if (!resetSucceeded)
+
+                // Try NetPeer heartbeat
+                if (!resetSucceeded && _hbNetPeerField != null)
                 {
-                    var netPeerField = GetAllInstanceFields(clientType)
-                        .FirstOrDefault(f => f.FieldType.Name.Contains("NetPeer"));
-                    if (netPeerField != null)
+                    try
                     {
-                        var netPeerInstance = netPeerField.GetValue(_netMultiClient);
+                        var netPeerInstance = _hbNetPeerField.GetValue(_netMultiClient);
                         if (netPeerInstance != null)
                         {
                             SetNetPeer(netPeerInstance);
-                            var netPeerType = netPeerInstance.GetType();
-                            var npHeartbeatField = FindFieldRecursive(netPeerType, "m_lastHeartbeat");
-                            var npHeartbeatProperty = netPeerType.GetProperty("m_lastHeartbeat", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                            if (npHeartbeatField != null || (npHeartbeatProperty != null && npHeartbeatProperty.CanWrite))
+                            if (_hbNpField != null)
                             {
-                                try
-                                {
-                                    double before = double.NaN;
-                                    double after = double.NaN;
-                                    if (npHeartbeatField != null)
-                                    {
-                                        before = ReadAsDouble(npHeartbeatField.GetValue(netPeerInstance));
-                                        npHeartbeatField.SetValue(netPeerInstance, nowSeconds);
-                                        after = ReadAsDouble(npHeartbeatField.GetValue(netPeerInstance));
-                                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                                            MelonLogger.Msg($"[AntiIdle] NetPeer FIELD write: {before:F3} -> {after:F3} (target {nowSeconds:F3})");
-#pragma warning restore CS0162 // Unreachable code detected
-                                    }
-                                    else if (npHeartbeatProperty != null)
-                                    {
-                                        before = ReadAsDouble(npHeartbeatProperty.GetValue(netPeerInstance));
-                                        npHeartbeatProperty.SetValue(netPeerInstance, nowSeconds);
-                                        after = ReadAsDouble(npHeartbeatProperty.GetValue(netPeerInstance));
-                                        if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                                            MelonLogger.Msg($"[AntiIdle] NetPeer PROPERTY write: {before:F3} -> {after:F3} (target {nowSeconds:F3})");
-#pragma warning restore CS0162 // Unreachable code detected
-                                    }
-                                    resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
-                                }
-                                catch (Exception ex)
-                                {
-                                    if (VerboseHeartbeatLogs)
-#pragma warning disable CS0162 // Unreachable code detected
-                                        MelonLogger.Msg($"[AntiIdle] NetPeer heartbeat write failed: {ex.Message}");
-#pragma warning restore CS0162 // Unreachable code detected
-                                }
+                                _hbNpField.SetValue(netPeerInstance, nowSeconds);
+                                var after = ReadAsDouble(_hbNpField.GetValue(netPeerInstance));
+                                resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
+                            }
+                            else if (_hbNpProp != null && _hbNpProp.CanWrite)
+                            {
+                                _hbNpProp.SetValue(netPeerInstance, nowSeconds);
+                                var after = ReadAsDouble(_hbNpProp.GetValue(netPeerInstance));
+                                resetSucceeded = !double.IsNaN(after) && Math.Abs(after - nowSeconds) <= 1.5;
                             }
                         }
                     }
+                    catch { }
                 }
-                
-                // If still not successful, try to find and call methods as last resort
-                if (!resetSucceeded)
+
+                // Try heartbeat/keepalive/ping methods
+                if (!resetSucceeded && _hbMethods != null)
                 {
-                    // Method 2: Try to find and call a heartbeat method (quiet)
-                    var heartbeatMethods = clientType.GetMethods()
-                        .Where(m => (m.Name.ToLowerInvariant().Contains("heartbeat") ||
-                                   m.Name.ToLowerInvariant().Contains("keepalive") ||
-                                   m.Name.ToLowerInvariant().Contains("ping")) &&
-                               !m.Name.ToLowerInvariant().StartsWith("get_"))
-                        .ToArray();
-                    
-                    foreach (var method in heartbeatMethods)
+                    for (int i = 0; i < _hbMethods.Length; i++)
                     {
                         try
                         {
-                            method.Invoke(_netMultiClient, null);
+                            _hbMethods[i].Invoke(_netMultiClient, null);
                             resetSucceeded = true;
                             break;
                         }
-                        catch (Exception ex)
-                        {
-                            MelonLogger.Msg($"[AntiIdle] Heartbeat method call failed: {ex.Message}");
-                        }
+                        catch { }
                     }
                 }
-                
-                // Method 3 (informational): Log setter methods that look related
-                if (!resetSucceeded)
+
+                // Try setter methods with heartbeat in name
+                if (!resetSucceeded && _hbSetters != null)
                 {
-                    var setterMethods = clientType.GetMethods()
-                        .Where(m => m.Name.ToLowerInvariant().Contains("set") &&
-                               m.Name.ToLowerInvariant().Contains("heartbeat"))
-                        .ToArray();
-                    
-                    foreach (var method in setterMethods)
+                    for (int i = 0; i < _hbSetters.Length; i++)
                     {
                         try
                         {
-                            var parameters = method.GetParameters();
-                            if (parameters.Length == 1 && parameters[0].ParameterType == typeof(double))
+                            var ps = _hbSetters[i].GetParameters();
+                            if (ps.Length == 1 && ps[0].ParameterType == typeof(double))
                             {
-                                method.Invoke(_netMultiClient, new object[] { nowSeconds });
+                                _hbSetters[i].Invoke(_netMultiClient, new object[] { nowSeconds });
                                 resetSucceeded = true;
                                 break;
                             }
-                            else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(float))
+                            else if (ps.Length == 1 && ps[0].ParameterType == typeof(float))
                             {
-                                method.Invoke(_netMultiClient, new object[] { (float)nowSeconds });
+                                _hbSetters[i].Invoke(_netMultiClient, new object[] { (float)nowSeconds });
                                 resetSucceeded = true;
                                 break;
                             }
-                            else if (parameters.Length == 0)
+                            else if (ps.Length == 0)
                             {
-                                method.Invoke(_netMultiClient, null);
+                                _hbSetters[i].Invoke(_netMultiClient, null);
                                 resetSucceeded = true;
                                 break;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            MelonLogger.Msg($"[AntiIdle] Setter call failed: {ex.Message}");
-                        }
+                        catch { }
                     }
-                }
-                
-                // Method 4 (informational): Find SendMessage for potential synthetic keepalive in future
-                if (!resetSucceeded)
-                {
-                    var sendMessageMethod = clientType.GetMethod("SendMessage");
-                    if (sendMessageMethod != null)
-                    {
-                        // Found SendMessage; keep in mind for future keepalive
-                    }
-                }
-                
-                if (!resetSucceeded)
-                {
-                    // No heartbeat reset method succeeded
                 }
 
-                // Best-effort: also reset timeout-related state on the primary server connection
                 TryResetTimeoutOnConnection(nowSeconds);
             }
             catch (Exception e)
