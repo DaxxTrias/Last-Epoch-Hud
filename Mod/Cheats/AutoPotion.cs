@@ -18,6 +18,12 @@ namespace Mod.Cheats
         private static float _lastUseTime = 0f;
         private static bool _componentsInitialized = false;
         private static int _lastKnownRemainingPotions = -1; // -1 unknown, >=0 known
+
+        // Cached reflection for potion-count fallback paths
+        private static bool _potionReflectionResolved = false;
+        private static System.Reflection.PropertyInfo? _healthPotionsProp;
+        private static System.Reflection.FieldInfo? _healthPotionsField;
+        private static System.Reflection.PropertyInfo? _localPlayerPotionsProp;
         
         // Configuration constants
         private const float DEFAULT_COOLDOWN_SECONDS = 1.0f;
@@ -153,38 +159,54 @@ namespace Mod.Cheats
                     catch { }
                 }
 
-                // Fallback: PlayerHealth introspection
-                if (_cachedPlayerHealth != null)
-                {
-                    var t = _cachedPlayerHealth.GetType();
-                    var prop = t.GetProperty("healthPotionsRemaining") ?? t.GetProperty("HealthPotionsRemaining") ?? t.GetProperty("currentFlasks") ?? t.GetProperty("CurrentFlasks");
-                    if (prop != null)
-                    {
-                        var val = prop.GetValue(_cachedPlayerHealth);
-                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
-                    }
-                    var field = t.GetField("healthPotionsRemaining") ?? t.GetField("HealthPotionsRemaining") ?? t.GetField("currentFlasks") ?? t.GetField("CurrentFlasks");
-                    if (field != null)
-                    {
-                        var val = field.GetValue(_cachedPlayerHealth);
-                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
-                    }
-                }
+                // Fallback: cached reflection on PlayerHealth / LocalPlayer
+                ResolvePotionReflection();
 
-                // Fallback: LocalPlayer introspection
-                if (_cachedLocalPlayer != null)
+                if (_healthPotionsProp != null && _cachedPlayerHealth != null)
                 {
-                    var t = _cachedLocalPlayer.GetType();
-                    var prop = t.GetProperty("HealthPotions") ?? t.GetProperty("Potions") ?? t.GetProperty("Flasks");
-                    if (prop != null)
-                    {
-                        var val = prop.GetValue(_cachedLocalPlayer);
-                        if (val != null && int.TryParse(val.ToString(), out var n)) return n;
-                    }
+                    var val = _healthPotionsProp.GetValue(_cachedPlayerHealth);
+                    if (val != null && int.TryParse(val.ToString(), out var n)) return n;
+                }
+                if (_healthPotionsField != null && _cachedPlayerHealth != null)
+                {
+                    var val = _healthPotionsField.GetValue(_cachedPlayerHealth);
+                    if (val != null && int.TryParse(val.ToString(), out var n)) return n;
+                }
+                if (_localPlayerPotionsProp != null && _cachedLocalPlayer != null)
+                {
+                    var val = _localPlayerPotionsProp.GetValue(_cachedLocalPlayer);
+                    if (val != null && int.TryParse(val.ToString(), out var n)) return n;
                 }
             }
             catch { }
             return null;
+        }
+
+        private static void ResolvePotionReflection()
+        {
+            if (_potionReflectionResolved) return;
+            _potionReflectionResolved = true;
+
+            if (_cachedPlayerHealth != null)
+            {
+                var t = _cachedPlayerHealth.GetType();
+                _healthPotionsProp = t.GetProperty("healthPotionsRemaining")
+                    ?? t.GetProperty("HealthPotionsRemaining")
+                    ?? t.GetProperty("currentFlasks")
+                    ?? t.GetProperty("CurrentFlasks");
+                _healthPotionsField = t.GetField("healthPotionsRemaining")
+                    ?? t.GetField("HealthPotionsRemaining")
+                    ?? t.GetField("currentFlasks")
+                    ?? t.GetField("CurrentFlasks");
+            }
+
+            if (_cachedLocalPlayer != null)
+            {
+                var t = _cachedLocalPlayer.GetType();
+                _localPlayerPotionsProp = t.GetProperty("HealthPotions")
+                    ?? t.GetProperty("Potions")
+                    ?? t.GetProperty("Flasks");
+            }
         }
 
         /// <summary>
@@ -328,6 +350,10 @@ namespace Mod.Cheats
             _cachedHealthPotion = null;
             _componentsInitialized = false;
             _lastKnownRemainingPotions = -1;
+            _potionReflectionResolved = false;
+            _healthPotionsProp = null;
+            _healthPotionsField = null;
+            _localPlayerPotionsProp = null;
             MelonLogger.Msg("AutoPotion: Component cache cleared");
         }
 
