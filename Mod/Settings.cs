@@ -29,6 +29,7 @@ namespace Mod
         // Simple Anti-Idle (UI pulse)
         public static bool useSimpleAntiIdle = false; // Invoke UI key handlers instead of crafting packets
         public static float simpleAntiIdleInterval = 300f; // Default 5 minutes
+        public static bool forceIsIdleFalseFallback = false; // Optional fallback: force IsIdle getters false in online mode
 
         // Anti-Idle suppression controls
         public static bool suppressKeepAliveOnActivity = true; // Pause synthetic keepalive when user activity is detected

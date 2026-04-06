@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Linq;
 using HarmonyLib;
 using Il2Cpp;
+using Mod.Utils;
 
 namespace Mod.Cheats
 {
@@ -42,6 +43,15 @@ namespace Mod.Cheats
         private static float _nextSimplePulseAt = 0f;
         private static float _nextInputNotifyAt = 0f;
         private static MethodInfo? _miSendInputPerformed;
+        private static bool _legacySendMethodResolved;
+        private static bool _inputNotifyBindingsResolved;
+        private static Type? _epochInputManagerType;
+        private static MethodInfo? _miEpochSendInputPerformed;
+        private static PropertyInfo? _piEpochInstance;
+        private static FieldInfo? _fiEpochInstance;
+        private static object? _epochInputManagerCachedInstance;
+        private static bool _loggedNoEpochType;
+        private static bool _loggedNoEpochSendMethod;
         private static bool _loggedNoSendMethod;
         
         // Cache last observed delivery + channel from real traffic
@@ -882,25 +892,171 @@ namespace Mod.Cheats
         {
             try
             {
-                if (_miSendInputPerformed == null)
+                ResolveInputNotifyBindings();
+
+                if (TryNotifyViaEpochInputManager())
                 {
-                    var t = typeof(PlayerSync);
-                    _miSendInputPerformed = AccessTools.Method(t, "SendInputActionPerformedNotificationToServer");
-                    if (_miSendInputPerformed == null && !_loggedNoSendMethod)
-                    {
-                        _loggedNoSendMethod = true;
-                        MelonLogger.Warning("[AntiIdle] PlayerSync.SendInputActionPerformedNotificationToServer not found");
-                        return;
-                    }
+                    MelonLogger.Msg("[AntiIdle] Server input notify invoked via EpochInputManager");
+                    return;
                 }
 
-                _miSendInputPerformed?.Invoke(null, null); // static, parameterless
-                // if (VerboseKeepaliveLogs)
-                    MelonLogger.Msg("[AntiIdle] Server input notify invoked");
+                if (_miSendInputPerformed != null)
+                {
+                    _miSendInputPerformed.Invoke(null, null); // static, parameterless legacy path
+                    MelonLogger.Msg("[AntiIdle] Server input notify invoked via PlayerSync (legacy)");
+                    return;
+                }
+
+                if (!_loggedNoSendMethod)
+                {
+                    _loggedNoSendMethod = true;
+                    MelonLogger.Warning("[AntiIdle] Input notify method not found (EpochInputManager + PlayerSync)");
+                }
             }
             catch (Exception e)
             {
                 MelonLogger.Error($"[AntiIdle] ServerInputNotify error: {e.Message}");
+            }
+        }
+
+        private static void ResolveInputNotifyBindings()
+        {
+            try
+            {
+                if (_inputNotifyBindingsResolved)
+                    return;
+
+                _inputNotifyBindingsResolved = true;
+
+                // Newer builds route idle-input notification through EpochInputManager.
+                _epochInputManagerType = TypeLookup.FindType(
+                    "Il2Cpp.EpochInputManager",
+                    "EpochInputManager",
+                    "Il2CppLE.EpochInputManager",
+                    "Il2CppLE.Input.EpochInputManager");
+
+                if (_epochInputManagerType != null)
+                {
+                    _miEpochSendInputPerformed = AccessTools.Method(_epochInputManagerType, "SendInputActionPerformed", Type.EmptyTypes);
+                    if (_miEpochSendInputPerformed == null)
+                    {
+                        // Fallback: tolerate signature drift as long as we find parameterless method.
+                        var methods = AccessTools.GetDeclaredMethods(_epochInputManagerType);
+                        for (int i = 0; i < methods.Count; i++)
+                        {
+                            var method = methods[i];
+                            if (method.Name == "SendInputActionPerformed" && method.GetParameters().Length == 0)
+                            {
+                                _miEpochSendInputPerformed = method;
+                                break;
+                            }
+                        }
+                    }
+
+                    _piEpochInstance = _epochInputManagerType.GetProperty(
+                        "Instance",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+                    var staticFields = _epochInputManagerType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    for (int i = 0; i < staticFields.Length; i++)
+                    {
+                        var field = staticFields[i];
+                        if (!field.FieldType.IsAssignableFrom(_epochInputManagerType))
+                            continue;
+
+                        if (string.Equals(field.Name, "Instance", StringComparison.Ordinal)
+                            || string.Equals(field.Name, "instance", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(field.Name, "s_instance", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(field.Name, "_instance", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _fiEpochInstance = field;
+                            break;
+                        }
+                    }
+
+                    if (_miEpochSendInputPerformed == null && !_loggedNoEpochSendMethod)
+                    {
+                        _loggedNoEpochSendMethod = true;
+                        MelonLogger.Warning("[AntiIdle] EpochInputManager.SendInputActionPerformed not found");
+                    }
+                }
+                else if (!_loggedNoEpochType)
+                {
+                    _loggedNoEpochType = true;
+                    MelonLogger.Warning("[AntiIdle] EpochInputManager type not found");
+                }
+
+                if (!_legacySendMethodResolved)
+                {
+                    _legacySendMethodResolved = true;
+                    _miSendInputPerformed = AccessTools.Method(typeof(PlayerSync), "SendInputActionPerformedNotificationToServer", Type.EmptyTypes);
+                    if (_miSendInputPerformed == null)
+                    {
+                        MelonLogger.Warning("[AntiIdle] PlayerSync.SendInputActionPerformedNotificationToServer not found");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"[AntiIdle] ResolveInputNotifyBindings error: {e.Message}");
+            }
+        }
+
+        private static bool TryNotifyViaEpochInputManager()
+        {
+            try
+            {
+                if (_miEpochSendInputPerformed == null || _epochInputManagerType == null)
+                    return false;
+
+                var instance = GetEpochInputManagerInstance();
+                if (instance == null)
+                    return false;
+
+                _miEpochSendInputPerformed.Invoke(instance, null);
+                return true;
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"[AntiIdle] EpochInputManager notify error: {e.Message}");
+                return false;
+            }
+        }
+
+        private static object? GetEpochInputManagerInstance()
+        {
+            if (_epochInputManagerType == null)
+                return null;
+
+            if (_epochInputManagerCachedInstance is UnityEngine.Object cachedUnityObject && cachedUnityObject != null)
+                return _epochInputManagerCachedInstance;
+
+            if (_epochInputManagerCachedInstance != null && !(_epochInputManagerCachedInstance is UnityEngine.Object))
+                return _epochInputManagerCachedInstance;
+
+            try
+            {
+                object? instance = null;
+                if (_piEpochInstance != null)
+                {
+                    instance = _piEpochInstance.GetValue(null, null);
+                }
+
+                if (instance == null && _fiEpochInstance != null)
+                {
+                    instance = _fiEpochInstance.GetValue(null);
+                }
+
+                if (instance != null)
+                {
+                    _epochInputManagerCachedInstance = instance;
+                }
+
+                return instance;
+            }
+            catch
+            {
+                return null;
             }
         }
 

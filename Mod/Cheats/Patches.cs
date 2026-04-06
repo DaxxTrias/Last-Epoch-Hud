@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using MelonLoader;
 using Il2Cpp;
 // using Il2CppDMM;
@@ -1011,7 +1011,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        if (Settings.useSimpleAntiIdle && Settings.forceIsIdleFalseFallback && !ObjectManager.IsOfflineMode())
                         {
                             if (__result)
                             {
@@ -1039,7 +1039,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        if (Settings.useSimpleAntiIdle && Settings.forceIsIdleFalseFallback && !ObjectManager.IsOfflineMode())
                         {
                             if (__result)
                             {

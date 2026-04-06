@@ -245,6 +245,9 @@ namespace Mod
 					{
 						GUILayout.Label("Pulse Interval (s): " + Settings.simpleAntiIdleInterval.ToString("F0"));
 						Settings.simpleAntiIdleInterval = GUILayout.HorizontalSlider(Settings.simpleAntiIdleInterval, 60f, 900f);
+						Settings.forceIsIdleFalseFallback = GUILayout.Toggle(
+							Settings.forceIsIdleFalseFallback,
+							"Force IsIdle FALSE Fallback (higher risk)");
 
 						// Suppression controls (shared)
 						Settings.suppressKeepAliveOnActivity = GUILayout.Toggle(Settings.suppressKeepAliveOnActivity, "Suppress When Actively Playing");

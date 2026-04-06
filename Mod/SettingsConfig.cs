@@ -78,6 +78,7 @@ namespace Mod
 		// private static MelonPreferences_Entry<float>? _networkActivitySuppressionSeconds;
 		private static MelonPreferences_Entry<bool>? _useSimpleAntiIdle;
 		private static MelonPreferences_Entry<float>? _simpleAntiIdleInterval;
+		private static MelonPreferences_Entry<bool>? _forceIsIdleFalseFallback;
 
 		// Entries - AutoDisconnect
 		private static MelonPreferences_Entry<bool>? _useAutoDisconnect;
@@ -177,6 +178,7 @@ namespace Mod
 			_antiIdleInterval = _antiIdle.CreateEntry("AntiIdleIntervalSeconds", Settings.antiIdleInterval);
 			_useSimpleAntiIdle = _antiIdle.CreateEntry("UseSimpleAntiIdle", Settings.useSimpleAntiIdle);
 			_simpleAntiIdleInterval = _antiIdle.CreateEntry("SimpleAntiIdleIntervalSeconds", Settings.simpleAntiIdleInterval);
+			_forceIsIdleFalseFallback = _antiIdle.CreateEntry("ForceIsIdleFalseFallback", Settings.forceIsIdleFalseFallback);
 			_suppressKeepAliveOnActivity = _antiIdle.CreateEntry("SuppressKeepAliveOnActivity", Settings.suppressKeepAliveOnActivity);
 			_activitySuppressionSeconds = _antiIdle.CreateEntry("ActivitySuppressionSeconds", Settings.activitySuppressionSeconds);
 			_sceneChangeSuppressionSeconds = _antiIdle.CreateEntry("SceneChangeSuppressionSeconds", Settings.sceneChangeSuppressionSeconds);
@@ -257,6 +259,7 @@ namespace Mod
 			Settings.antiIdleInterval = Clamp(_antiIdleInterval!.Value, 10f, 600f);
 			Settings.useSimpleAntiIdle = _useSimpleAntiIdle!.Value;
 			Settings.simpleAntiIdleInterval = Clamp(_simpleAntiIdleInterval!.Value, 60f, 1800f);
+			Settings.forceIsIdleFalseFallback = _forceIsIdleFalseFallback!.Value;
 			Settings.suppressKeepAliveOnActivity = _suppressKeepAliveOnActivity!.Value;
 			Settings.activitySuppressionSeconds = Clamp(_activitySuppressionSeconds!.Value, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(_sceneChangeSuppressionSeconds!.Value, 0f, 600f);
@@ -334,6 +337,7 @@ namespace Mod
 			_antiIdleInterval!.Value = Settings.antiIdleInterval;
 			_useSimpleAntiIdle!.Value = Settings.useSimpleAntiIdle;
 			_simpleAntiIdleInterval!.Value = Settings.simpleAntiIdleInterval;
+			_forceIsIdleFalseFallback!.Value = Settings.forceIsIdleFalseFallback;
 			_suppressKeepAliveOnActivity!.Value = Settings.suppressKeepAliveOnActivity;
 			_activitySuppressionSeconds!.Value = Settings.activitySuppressionSeconds;
 			_sceneChangeSuppressionSeconds!.Value = Settings.sceneChangeSuppressionSeconds;
@@ -539,6 +543,7 @@ namespace Mod
 			public float activitySuppressionSeconds { get; set; }
 			public float sceneChangeSuppressionSeconds { get; set; }
 			public float networkActivitySuppressionSeconds { get; set; }
+			public bool forceIsIdleFalseFallback { get; set; }
 			public bool useAutoDisconnect { get; set; }
 			public float autoDisconnectHealthPercent { get; set; }
 			public float autoDisconnectCooldownSeconds { get; set; }
@@ -603,6 +608,7 @@ namespace Mod
 				useAnyWaypoint = Settings.useAnyWaypoint,
 				useAntiIdle = Settings.useAntiIdle,
 				antiIdleInterval = Settings.antiIdleInterval,
+				forceIsIdleFalseFallback = Settings.forceIsIdleFalseFallback,
 				suppressKeepAliveOnActivity = Settings.suppressKeepAliveOnActivity,
 				activitySuppressionSeconds = Settings.activitySuppressionSeconds,
 				sceneChangeSuppressionSeconds = Settings.sceneChangeSuppressionSeconds,
@@ -670,6 +676,7 @@ namespace Mod
 			Settings.useAnyWaypoint = s.useAnyWaypoint;
 			Settings.useAntiIdle = s.useAntiIdle;
 			Settings.antiIdleInterval = Clamp(s.antiIdleInterval, 10f, 600f);
+			Settings.forceIsIdleFalseFallback = s.forceIsIdleFalseFallback;
 			Settings.suppressKeepAliveOnActivity = s.suppressKeepAliveOnActivity;
 			Settings.activitySuppressionSeconds = Clamp(s.activitySuppressionSeconds, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(s.sceneChangeSuppressionSeconds, 0f, 600f);
