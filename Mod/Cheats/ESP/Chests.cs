@@ -78,6 +78,7 @@ namespace Mod.Cheats.ESP
 
 		private static void TryFindManager()
 		{
+			//TODO: check necropolis in imperial era, potential false positives
 			if (s_chestManager != null) return;
 			if (Time.frameCount < s_nextManagerSearchFrame) return;
 			s_nextManagerSearchFrame = Time.frameCount + ManagerSearchIntervalFrames;
