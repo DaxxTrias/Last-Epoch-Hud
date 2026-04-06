@@ -1002,6 +1002,120 @@ namespace Mod.Cheats.Patches
 
             #region networking / anti-idle patches
 
+            [HarmonyPatch]
+            public class EpochInputManager_Awake
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "Awake", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Postfix(object __instance)
+                {
+                    try
+                    {
+                        EpochInputManagerBridge.RegisterKnownInstance(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.Awake Postfix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class EpochInputManager_OnDestroy
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "OnDestroy", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance)
+                {
+                    try
+                    {
+                        EpochInputManagerBridge.ClearKnownInstance(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.OnDestroy Prefix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class EpochInputManager_CheckIdleInput
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "CheckIdleInput", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Postfix(object __instance)
+                {
+                    try
+                    {
+                        EpochInputManagerBridge.OnCheckIdleInputObserved(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.CheckIdleInput Postfix error: {e.Message}");
+                    }
+                }
+            }
+
             // Force game idle flags to false when Simple Anti-Idle is enabled
             [HarmonyPatch(typeof(ClientStateController), "get_IsIdle")]
             public class ClientStateController_IsIdle
