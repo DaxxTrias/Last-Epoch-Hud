@@ -248,7 +248,7 @@ namespace Mod
 						Settings.simpleAntiIdleInterval = GUILayout.HorizontalSlider(Settings.simpleAntiIdleInterval, 60f, 900f);
 						Settings.forceIsIdleFalseFallback = GUILayout.Toggle(
 							Settings.forceIsIdleFalseFallback,
-							"Force IsIdle FALSE Fallback (higher risk)");
+							"Force IsIdle FALSE Fallback (high risk)");
 
 						// Suppression controls (shared)
 						Settings.suppressKeepAliveOnActivity = GUILayout.Toggle(Settings.suppressKeepAliveOnActivity, "Suppress When Actively Playing");

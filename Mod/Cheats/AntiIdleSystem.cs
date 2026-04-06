@@ -42,8 +42,6 @@ namespace Mod.Cheats
         // private static float _lastSyntheticKeepAlive = 0f;
         private static float _nextSimplePulseAt = 0f;
         private static float _nextInputNotifyAt = 0f;
-        private static MethodInfo? _miSendInputPerformed;
-        private static bool _legacySendMethodResolved;
         private static bool _loggedNoSendMethod;
         
         // Cache last observed delivery + channel from real traffic
@@ -884,50 +882,21 @@ namespace Mod.Cheats
         {
             try
             {
-                ResolveInputNotifyBindings();
-
                 if (EpochInputManagerBridge.TrySendInputActionPerformed())
                 {
                     MelonLogger.Msg("[AntiIdle] Server input notify invoked via EpochInputManager");
                     return;
                 }
 
-                if (_miSendInputPerformed != null)
-                {
-                    _miSendInputPerformed.Invoke(null, null); // static, parameterless legacy path
-                    MelonLogger.Msg("[AntiIdle] Server input notify invoked via PlayerSync (legacy)");
-                    return;
-                }
-
                 if (!_loggedNoSendMethod)
                 {
                     _loggedNoSendMethod = true;
-                    MelonLogger.Warning("[AntiIdle] Input notify method not found (EpochInputManager + PlayerSync)");
+                    MelonLogger.Warning("[AntiIdle] Input notify method not found (EpochInputManager)");
                 }
             }
             catch (Exception e)
             {
                 MelonLogger.Error($"[AntiIdle] ServerInputNotify error: {e.Message}");
-            }
-        }
-
-        private static void ResolveInputNotifyBindings()
-        {
-            try
-            {
-                if (_legacySendMethodResolved)
-                    return;
-
-                _legacySendMethodResolved = true;
-                _miSendInputPerformed = AccessTools.Method(typeof(PlayerSync), "SendInputActionPerformedNotificationToServer", Type.EmptyTypes);
-                if (_miSendInputPerformed == null)
-                {
-                    MelonLogger.Warning("[AntiIdle] PlayerSync.SendInputActionPerformedNotificationToServer not found");
-                }
-            }
-            catch (Exception e)
-            {
-                MelonLogger.Error($"[AntiIdle] ResolveInputNotifyBindings error: {e.Message}");
             }
         }
 
