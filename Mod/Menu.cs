@@ -5,6 +5,7 @@ using MelonLoader;
 using Mod.Cheats;
 using Mod.Cheats.ESP;
 using Mod.Game;
+using Mod.Utils;
 
 namespace Mod
 {
@@ -346,6 +347,9 @@ namespace Mod
 					AntiIdleSystem.OnMenuOpened();
 				}
 			}
+
+			// Keep gameplay input blocked while the mod menu is visible.
+			EpochInputManagerBridge.TrySetButtonPressBlocked(guiVisible);
 
 			// Debug key for auto-potion system (F12)
 			if (Input.GetKeyDown(KeyCode.F12))
