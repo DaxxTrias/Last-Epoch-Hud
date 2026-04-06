@@ -26,12 +26,16 @@ namespace Mod.Cheats.ESP
             var localPlayer = ObjectManager.GetLocalPlayer();
             if (localPlayer == null || localPlayer.transform == null) return;
 
+            var playerPos = localPlayer.transform.position;
+            float maxDistSq = Settings.drawDistance * Settings.drawDistance;
+
             foreach (var item in GroundItemVisuals.all._list)
             {
-                // Ensure the item is active in the scene.
                 if (item?.gameObject == null || !item.gameObject.activeInHierarchy) continue;
 
-                if (Vector3.Distance(localPlayer.transform.position, item.transform.position) > Settings.drawDistance) continue;
+                var itemPos = item.transform.position;
+                var delta = itemPos - playerPos;
+                if (delta.sqrMagnitude > maxDistSq) continue;
 
                 if (Settings.useLootFilter)
                 {
@@ -41,7 +45,6 @@ namespace Mod.Cheats.ESP
 
                 var rarity = ResolveItemRarity(item);
 
-                // Ensure rarity is not null before calling ShouldDrawItemRarity.
                 if (string.IsNullOrEmpty(rarity) || !Settings.ShouldDrawItemRarity(rarity))
                 {
                     continue;
@@ -49,8 +52,8 @@ namespace Mod.Cheats.ESP
 
                 var color = Drawing.ItemRarityToColor(rarity);
 
-                ESP.AddLine(localPlayer.transform.position, item.transform.position, color);
-                ESP.AddString(item.itemData.FullName, item.transform.position, color);
+                ESP.AddLine(playerPos, itemPos, color);
+                ESP.AddString(item.itemData.FullName, itemPos, color);
             }
         }
 
