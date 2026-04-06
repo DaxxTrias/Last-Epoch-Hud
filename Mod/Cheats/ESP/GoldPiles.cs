@@ -1,4 +1,4 @@
-﻿using Il2Cpp;
+using Il2Cpp;
 using Mod.Game;
 using UnityEngine;
 using Color = UnityEngine.Color;
@@ -7,25 +7,32 @@ namespace Mod.Cheats.ESP
 {
     internal class GoldPiles
     {
+        private const string GoldSuffix = " Gold";
+
         public static void GatherGoldPiles()
         {
             if (!Settings.DrawGoldPiles() || Settings.useLootFilter) return;
             if (GroundGoldVisuals.all == null) return;
 
+            var localPlayer = ObjectManager.GetLocalPlayer();
+            if (localPlayer == null || localPlayer.transform == null) return;
+
+            var playerPos = localPlayer.transform.position;
+            float maxDistSq = Settings.drawDistance * Settings.drawDistance;
+
             foreach (var item in GroundGoldVisuals.all._list)
             {
                 if (item?.gameObject == null || !item.gameObject.activeInHierarchy) continue;
-                //if (item.goldValue < 50) continue;
 
-                var localPlayer = ObjectManager.GetLocalPlayer();
-                if (localPlayer?.transform == null) continue;
+                var itemPos = item.transform.position;
+                var delta = itemPos - playerPos;
+                if (delta.sqrMagnitude > maxDistSq) continue;
 
-                if (Vector3.Distance(localPlayer.transform.position, item.transform.position) > Settings.drawDistance) continue;
-
-                ESP.AddLine(localPlayer.transform.position, item.transform.position, Color.white);
-                ESP.AddString(item.goldValue.ToString() + " Gold", item.transform.position, Color.white);
+                ESP.AddLine(playerPos, itemPos, Color.white);
+                ESP.AddString(string.Concat(item.goldValue.ToString(), GoldSuffix), itemPos, Color.white);
             }
         }
+
         public static void OnUpdate()
         {
             if (ObjectManager.HasPlayer())
