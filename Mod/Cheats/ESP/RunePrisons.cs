@@ -71,9 +71,8 @@ namespace Mod.Cheats.ESP
 			s_needsScan = true;
 		}
 
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (!ObjectManager.HasPlayer()) return;
 			if (!Settings.espShowRunePrisons) return;
 
 			if (s_needsScan && Time.unscaledTime >= s_nextScanTime)
@@ -108,8 +107,6 @@ namespace Mod.Cheats.ESP
 				}
 			}
 
-			var player = ObjectManager.GetLocalPlayer();
-			if (player == null) return;
 			var p = player.transform.position;
 			float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 

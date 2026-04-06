@@ -19,14 +19,11 @@ namespace Mod.Cheats.ESP
             "Exalted"
         };
 
-        public static void GatherItems()
+        public static void GatherItems(GameObject player)
         {
             if (GroundItemVisuals.all == null) return;
 
-            var localPlayer = ObjectManager.GetLocalPlayer();
-            if (localPlayer == null || localPlayer.transform == null) return;
-
-            var playerPos = localPlayer.transform.position;
+            var playerPos = player.transform.position;
             float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
             foreach (var item in GroundItemVisuals.all._list)
@@ -56,6 +53,8 @@ namespace Mod.Cheats.ESP
                 ESP.AddString(item.itemData.FullName, itemPos, color);
             }
         }
+
+        // Unused import cleanup: ObjectManager no longer called directly
 
         private static string? ResolveItemRarity(GroundItemVisuals item)
         {
@@ -159,12 +158,9 @@ namespace Mod.Cheats.ESP
             return null;
         }
 
-        public static void OnUpdate()
+        public static void OnUpdate(GameObject player)
         {
-            if (ObjectManager.HasPlayer())
-            {
-                GatherItems();
-            }
+            GatherItems(player);
         }
     }
 }

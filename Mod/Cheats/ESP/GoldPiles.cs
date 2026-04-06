@@ -9,15 +9,12 @@ namespace Mod.Cheats.ESP
     {
         private const string GoldSuffix = " Gold";
 
-        public static void GatherGoldPiles()
+        public static void GatherGoldPiles(GameObject player)
         {
             if (!Settings.DrawGoldPiles() || Settings.useLootFilter) return;
             if (GroundGoldVisuals.all == null) return;
 
-            var localPlayer = ObjectManager.GetLocalPlayer();
-            if (localPlayer == null || localPlayer.transform == null) return;
-
-            var playerPos = localPlayer.transform.position;
+            var playerPos = player.transform.position;
             float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
             foreach (var item in GroundGoldVisuals.all._list)
@@ -33,12 +30,9 @@ namespace Mod.Cheats.ESP
             }
         }
 
-        public static void OnUpdate()
+        public static void OnUpdate(GameObject player)
         {
-            if (ObjectManager.HasPlayer())
-            {
-                GatherGoldPiles();
-            }
+            GatherGoldPiles(player);
         }
     }
 }

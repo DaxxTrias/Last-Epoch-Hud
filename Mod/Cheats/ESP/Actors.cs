@@ -70,12 +70,9 @@ namespace Mod.Cheats.ESP
 			return Drawing.AlignmentToColor(alignmentName);
 		}
 
-		public static void GatherActors()
+		public static void GatherActors(GameObject localPlayer)
 		{
 			if (ActorManager.instance == null) return;
-
-			var localPlayer = ObjectManager.GetLocalPlayer();
-			if (localPlayer == null) return;
 
 			foreach (var visual in ActorManager.instance.visuals)
 			{
@@ -139,12 +136,9 @@ namespace Mod.Cheats.ESP
 			}
 		}
 		
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (ObjectManager.HasPlayer())
-			{
-				GatherActors();
-			}
+			GatherActors(player);
 		}
 	}
 }

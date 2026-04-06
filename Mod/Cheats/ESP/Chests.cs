@@ -401,17 +401,14 @@ namespace Mod.Cheats.ESP
 			}
 		}
 
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (!ObjectManager.HasPlayer()) return;
 			if (!Settings.espShowChests) return;
 
 			BeginRebuildIfNeeded();
 			ProcessRebuildBatch();
 			if (s_chestTransforms.Count == 0) return;
 
-			var player = ObjectManager.GetLocalPlayer();
-			if (player == null) return;
 			var playerPos = player.transform.position;
 			float maxDist = Settings.drawDistance;
 			float maxDistSq = maxDist * maxDist;

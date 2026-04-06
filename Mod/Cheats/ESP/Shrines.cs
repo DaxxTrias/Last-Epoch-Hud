@@ -146,17 +146,14 @@ namespace Mod.Cheats.ESP
 			}
 		}
 
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (!ObjectManager.HasPlayer()) return;
 			if (!Settings.espShowShrines) return;
 
 			RebuildShrineCacheIfNeeded();
 			if (s_shrineTransforms.Count == 0) return;
 
-			var localPlayer = ObjectManager.GetLocalPlayer();
-			if (localPlayer == null) return;
-			var playerPos = localPlayer.transform.position;
+			var playerPos = player.transform.position;
 			float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
 			for (int i = 0; i < s_shrineTransforms.Count; i++)
@@ -173,12 +170,6 @@ namespace Mod.Cheats.ESP
 
 				var labelPos = pos; labelPos.y += 0.5f;
 				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : EspUtils.SanitizeLabel(go.name);
-
-				// Respect global specials toggle and per-special whitelist
-				// If user provided a whitelist, honor it; otherwise draw all shrines
-				bool draw = true;
-				try { draw = Settings.ShouldDrawShrine(name) || true; } catch (Exception) { draw = true; }
-				if (!draw) continue;
 
 				if (Settings.showESPLines) ESP.AddLine(playerPos, pos, ShrineColor);
 				if (Settings.showESPLabels) ESP.AddString(name, labelPos, ShrineColor);
