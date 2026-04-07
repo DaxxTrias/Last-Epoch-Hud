@@ -23,12 +23,14 @@ namespace Mod.Cheats
 
 		private static Type? s_cachedDamageNumberType;
 		private static FieldInfo? s_tmpField;
+		private static PropertyInfo? s_tmpProperty;
 		private static PropertyInfo? s_tmpTextProperty;
 		private static bool s_loggedTypeShape;
 		private static bool s_loggedTextBinding;
 
 		private static float s_periodStartAt = -1f;
 		private static int s_periodAwakeCount;
+		private static int s_periodInitCount;
 		private static int s_periodSendCount;
 		private static int s_periodDestroyCount;
 
@@ -54,6 +56,42 @@ namespace Mod.Cheats
 				return;
 
 			Observe(__instance, __originalMethod, phase: "Postfix");
+		}
+
+		public static void OnInitPostfix(object __instance, MethodBase? __originalMethod)
+		{
+			if (!Settings.enableDamageNumberDiagnostics || __originalMethod == null)
+				return;
+
+			try
+			{
+				float now = Time.unscaledTime;
+				if (s_periodStartAt <= 0f)
+					s_periodStartAt = now;
+
+				int id = TryGetInstanceId(__instance);
+				DamageNumberState? state = null;
+				if (id != 0)
+				{
+					state = GetOrCreateState(id);
+					state.LastSeenAt = now;
+					CaptureRendererData(state, __instance);
+				}
+
+				s_periodInitCount++;
+				string overloadKey = BuildInitOverloadKey(__originalMethod);
+				Log.InfoThrottled(
+					LogSource.Hooks,
+					$"DamageNumber.Init.{overloadKey}",
+					$"[DamageNumberDiag] Init observed ({overloadKey}) (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}').",
+					TimeSpan.FromSeconds(2));
+
+				MaybeEmitPeriodSummary(now, "Postfix", "Init");
+			}
+			catch
+			{
+				// diagnostics best effort
+			}
 		}
 
 		private static void Observe(object __instance, MethodBase __originalMethod, string phase)
@@ -149,6 +187,7 @@ namespace Mod.Cheats
 
 			s_cachedDamageNumberType = instanceType;
 			s_tmpField = null;
+			s_tmpProperty = null;
 			s_tmpTextProperty = null;
 
 			// Avoid AccessTools.Field warnings by resolving manually.
@@ -158,7 +197,14 @@ namespace Mod.Cheats
 				?? FindFieldRecursive(instanceType, "textMeshPro")
 				?? FindFirstTextLikeField(instanceType);
 
-			if (s_tmpField != null && TryResolveTextProperty(s_tmpField.FieldType, out var textProp))
+			s_tmpProperty = FindPropertyRecursive(instanceType, "tmp")
+				?? FindPropertyRecursive(instanceType, "_tmp")
+				?? FindPropertyRecursive(instanceType, "textMesh")
+				?? FindPropertyRecursive(instanceType, "textMeshPro")
+				?? FindFirstTextLikeProperty(instanceType);
+
+			Type? tmpContainerType = s_tmpField?.FieldType ?? s_tmpProperty?.PropertyType;
+			if (tmpContainerType != null && TryResolveTextProperty(tmpContainerType, out var textProp))
 			{
 				s_tmpTextProperty = textProp;
 			}
@@ -199,6 +245,43 @@ namespace Mod.Cheats
 			return null;
 		}
 
+		private static PropertyInfo? FindPropertyRecursive(Type type, string name)
+		{
+			for (var t = type; t != null; t = t.BaseType)
+			{
+				var property = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+				if (property == null || property.GetIndexParameters().Length != 0)
+					continue;
+
+				return property;
+			}
+
+			return null;
+		}
+
+		private static PropertyInfo? FindFirstTextLikeProperty(Type type)
+		{
+			for (var t = type; t != null; t = t.BaseType)
+			{
+				var properties = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+				for (int i = 0; i < properties.Length; i++)
+				{
+					var p = properties[i];
+					if (p.GetIndexParameters().Length != 0)
+						continue;
+
+					string typeName = p.PropertyType.FullName ?? p.PropertyType.Name;
+					if (typeName.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) >= 0
+						|| typeName.IndexOf("TextMesh", StringComparison.OrdinalIgnoreCase) >= 0)
+					{
+						return p;
+					}
+				}
+			}
+
+			return null;
+		}
+
 		private static bool TryResolveTextProperty(Type targetType, out PropertyInfo? textProperty)
 		{
 			textProperty = null;
@@ -221,12 +304,21 @@ namespace Mod.Cheats
 		private static bool TryReadTextFromBoundField(object instance, out string? text)
 		{
 			text = null;
-			if (s_tmpField == null || s_tmpTextProperty == null)
+			if ((s_tmpField == null && s_tmpProperty == null) || s_tmpTextProperty == null)
 				return false;
 
 			try
 			{
-				var tmp = s_tmpField.GetValue(instance);
+				object? tmp = null;
+				if (s_tmpField != null)
+				{
+					tmp = s_tmpField.GetValue(instance);
+				}
+				else if (s_tmpProperty != null)
+				{
+					tmp = s_tmpProperty.GetValue(instance);
+				}
+
 				if (tmp == null)
 					return false;
 
@@ -379,8 +471,10 @@ namespace Mod.Cheats
 
 			string fieldName = s_tmpField?.Name ?? "<none>";
 			string fieldType = s_tmpField?.FieldType.FullName ?? "<none>";
-			string propName = s_tmpTextProperty?.Name ?? "<none>";
-			Log.Info(LogSource.Hooks, $"[DamageNumberDiag] Text binding: field={fieldName}:{fieldType}, textProp={propName} on {instanceType.FullName ?? instanceType.Name}");
+			string tmpPropName = s_tmpProperty?.Name ?? "<none>";
+			string tmpPropType = s_tmpProperty?.PropertyType.FullName ?? "<none>";
+			string textPropName = s_tmpTextProperty?.Name ?? "<none>";
+			Log.Info(LogSource.Hooks, $"[DamageNumberDiag] Text binding: field={fieldName}:{fieldType}, tmpProp={tmpPropName}:{tmpPropType}, textProp={textPropName} on {instanceType.FullName ?? instanceType.Name}");
 		}
 
 		private static int TryGetInstanceId(object? instance)
@@ -417,6 +511,7 @@ namespace Mod.Cheats
 			s_summaryBuilder.Append("[DamageNumberDiag] 5s summary")
 				.Append(" offline=").Append(ObjectManager.IsOfflineMode())
 				.Append(" awake=").Append(s_periodAwakeCount)
+				.Append(" init=").Append(s_periodInitCount)
 				.Append(" send=").Append(s_periodSendCount)
 				.Append(" destroy=").Append(s_periodDestroyCount)
 				.Append(" tracked=").Append(s_states.Count)
@@ -427,6 +522,7 @@ namespace Mod.Cheats
 
 			s_periodStartAt = now;
 			s_periodAwakeCount = 0;
+			s_periodInitCount = 0;
 			s_periodSendCount = 0;
 			s_periodDestroyCount = 0;
 		}
@@ -436,6 +532,30 @@ namespace Mod.Cheats
 			if (state == null || string.IsNullOrWhiteSpace(state.Text))
 				return "-";
 			return state.Text;
+		}
+
+		private static string BuildInitOverloadKey(MethodBase method)
+		{
+			try
+			{
+				var ps = method.GetParameters();
+				if (ps.Length == 0)
+					return "none";
+
+				var sb = new StringBuilder(96);
+				for (int i = 0; i < ps.Length; i++)
+				{
+					if (i > 0)
+						sb.Append(',');
+					sb.Append(ps[i].ParameterType.Name);
+				}
+
+				return sb.ToString();
+			}
+			catch
+			{
+				return "unknown";
+			}
 		}
 	}
 }

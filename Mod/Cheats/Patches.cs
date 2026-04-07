@@ -734,6 +734,82 @@ namespace Mod.Cheats.Patches
                     MelonLogger.Warning($"[LeHud.Hooks]  DamageNumber diagnostics {phase} not found.");
                 }
             }
+
+            [HarmonyPatch]
+            public class DamageNumber_InitDiagnostics
+            {
+                private static List<System.Reflection.MethodBase>? s_targets;
+                private static bool s_loggedMissing;
+                private static readonly bool s_enableInitDiagnostics = false;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    // Disabled for safety: patching DamageNumber.Init currently causes IL2CPP access violations.
+                    // Keep the implementation for future controlled experiments.
+                    if (!s_enableInitDiagnostics)
+                        return false;
+
+                    try
+                    {
+                        var damageNumberType = TypeLookup.FindType(
+                            "Il2Cpp.DamageNumber",
+                            "DamageNumber",
+                            "Il2CppLE.DamageNumber");
+                        if (damageNumberType == null)
+                        {
+                            LogMissingBinding("type");
+                            return false;
+                        }
+
+                        s_targets = AccessTools.GetDeclaredMethods(damageNumberType)
+                            .Where(m =>
+                                !m.IsStatic
+                                && !m.IsAbstract
+                                && string.Equals(m.Name, "Init", StringComparison.Ordinal)
+                                && (m.GetParameters().Length == 4 || m.GetParameters().Length == 10))
+                            .Cast<System.Reflection.MethodBase>()
+                            .ToList();
+
+                        if (s_targets.Count == 0)
+                        {
+                            LogMissingBinding("methods");
+                            return false;
+                        }
+
+                        MelonLogger.Msg($"[LeHud.Hooks]  DamageNumber Init diagnostics hooks bound ({s_targets.Count} overloads)");
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  DamageNumber Init diagnostics Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethods]
+                public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
+
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
+                {
+                    try
+                    {
+                        DamageNumberDiagnostics.OnInitPostfix(__instance, __originalMethod);
+                    }
+                    catch
+                    {
+                        // Keep diagnostics hooks non-fatal.
+                    }
+                }
+
+                private static void LogMissingBinding(string phase)
+                {
+                    if (s_loggedMissing)
+                        return;
+                    s_loggedMissing = true;
+                    MelonLogger.Warning($"[LeHud.Hooks]  DamageNumber Init diagnostics {phase} not found.");
+                }
+            }
             #endregion
 
             #region waypoint patches
