@@ -172,6 +172,21 @@ namespace Mod.Cheats
 
 		public static void OnUpdate()
 		{
+			if (!Settings.enableDpsMeter)
+			{
+				ResetInternal();
+				s_sourceMode = DpsSourceMode.None;
+				return;
+			}
+
+			// Treat player-loss as a session boundary: clear all stats, including peaks.
+			if (!ObjectManager.HasPlayer())
+			{
+				ResetInternal();
+				s_sourceMode = DpsSourceMode.None;
+				return;
+			}
+
 			var currentMode = GetCurrentMode();
 			if (currentMode != s_sourceMode)
 			{
@@ -195,7 +210,7 @@ namespace Mod.Cheats
 			float resetAfter = Mathf.Max(2f, Settings.dpsMeterInactivityResetSeconds);
 			if (now - s_lastHitAt >= resetAfter)
 			{
-				ResetInternal();
+				ResetForInactivity();
 			}
 		}
 
@@ -255,6 +270,16 @@ namespace Mod.Cheats
 			s_onlineAcceptedEvents = 0;
 			s_onlineSkippedDuplicateEvents = 0;
 			s_onlineRejectedParseEvents = 0;
+		}
+
+		private static void ResetForInactivity()
+		{
+			// Keep session peaks until scene change or player-loss.
+			float preservedPeakHit = s_peakHit;
+			float preservedPeakDps = s_peakDps;
+			ResetInternal();
+			s_peakHit = preservedPeakHit;
+			s_peakDps = preservedPeakDps;
 		}
 
 		private static void EnsurePanelAnchored()
@@ -363,9 +388,6 @@ namespace Mod.Cheats
 
 		private static DpsSourceMode GetCurrentMode()
 		{
-			if (!Settings.enableDpsMeter)
-				return DpsSourceMode.None;
-
 			if (ObjectManager.IsOfflineMode())
 				return DpsSourceMode.OfflineRelay;
 
