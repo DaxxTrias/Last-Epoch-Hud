@@ -14,6 +14,8 @@ namespace Mod.Utils
         private static Type? s_epochInputManagerType;
         private static MethodInfo? s_miSendInputActionPerformed;
         private static PropertyInfo? s_piButtonPressBlocked;
+        private static PropertyInfo? s_piMouseBlocked;
+        private static FieldInfo? s_fiMouseBlocked;
         private static PropertyInfo? s_piInstance;
         private static FieldInfo? s_fiInstance;
         private static object? s_cachedInstance;
@@ -23,6 +25,7 @@ namespace Mod.Utils
         private static bool s_loggedNoType;
         private static bool s_loggedNoSendMethod;
         private static bool s_loggedNoButtonBlockedProperty;
+        private static bool s_loggedNoMouseBlockedMember;
         private static bool s_loggedNoInstanceAccessor;
         private static bool s_loggedNoIdleNotificationField;
         private static bool s_loggedNoIdleWarnAfterField;
@@ -30,6 +33,9 @@ namespace Mod.Utils
         private static bool s_hasAppliedButtonBlockState;
         private static bool s_lastAppliedButtonBlockState;
         private static object? s_lastAppliedButtonBlockInstance;
+        private static bool s_hasAppliedMouseBlockState;
+        private static bool s_lastAppliedMouseBlockState;
+        private static object? s_lastAppliedMouseBlockInstance;
 
         private static Type? s_idleBindingsForType;
         private static FieldInfo? s_fiLastInputActionNotificationTime;
@@ -126,6 +132,70 @@ namespace Mod.Utils
             }
         }
 
+        public static bool TrySetMenuInputBlocked(bool blocked)
+        {
+            bool keyboardSet = TrySetButtonPressBlocked(blocked);
+            bool mouseSet = TrySetMouseInputBlocked(blocked);
+            return keyboardSet || mouseSet;
+        }
+
+        private static bool TrySetMouseInputBlocked(bool blocked)
+        {
+            try
+            {
+                EnsureBindings();
+                if (s_epochInputManagerType == null)
+                {
+                    return false;
+                }
+
+                object? instance = GetEpochInputManagerInstance();
+                if (instance == null)
+                {
+                    return false;
+                }
+
+                if (s_hasAppliedMouseBlockState
+                    && ReferenceEquals(s_lastAppliedMouseBlockInstance, instance)
+                    && s_lastAppliedMouseBlockState == blocked)
+                {
+                    return true;
+                }
+
+                bool success = false;
+                if (s_piMouseBlocked != null && s_piMouseBlocked.CanWrite)
+                {
+                    s_piMouseBlocked.SetValue(instance, blocked, null);
+                    success = true;
+                }
+                else if (s_fiMouseBlocked != null && s_fiMouseBlocked.FieldType == typeof(bool))
+                {
+                    s_fiMouseBlocked.SetValue(instance, blocked);
+                    success = true;
+                }
+
+                if (!success)
+                {
+                    if (!s_loggedNoMouseBlockedMember)
+                    {
+                        s_loggedNoMouseBlockedMember = true;
+                        MelonLoader.MelonLogger.Warning("[LEHud] EpochInputManager mouse-block member not found");
+                    }
+                    return false;
+                }
+
+                s_lastAppliedMouseBlockInstance = instance;
+                s_lastAppliedMouseBlockState = blocked;
+                s_hasAppliedMouseBlockState = true;
+                return true;
+            }
+            catch (Exception e)
+            {
+                MelonLoader.MelonLogger.Error($"[LEHud] EpochInputManager mouse block set failed: {e.Message}");
+                return false;
+            }
+        }
+
         public static void RegisterKnownInstance(object? instance)
         {
             if (instance == null)
@@ -149,6 +219,8 @@ namespace Mod.Utils
                 s_cachedInstance = null;
                 s_lastAppliedButtonBlockInstance = null;
                 s_hasAppliedButtonBlockState = false;
+                s_lastAppliedMouseBlockInstance = null;
+                s_hasAppliedMouseBlockState = false;
             }
         }
 
@@ -275,6 +347,8 @@ namespace Mod.Utils
         private static void ResolveBindingsForType(Type epochInputManagerType)
         {
             s_epochInputManagerType = epochInputManagerType;
+            s_piInstance = null;
+            s_fiInstance = null;
             s_miSendInputActionPerformed = AccessTools.Method(s_epochInputManagerType, "SendInputActionPerformed", Type.EmptyTypes);
             if (s_miSendInputActionPerformed == null)
             {
@@ -293,6 +367,31 @@ namespace Mod.Utils
             s_piButtonPressBlocked = s_epochInputManagerType.GetProperty(
                 "ButtonPressBlocked",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            s_piMouseBlocked = FindBoolProperty(s_epochInputManagerType,
+                "MouseButtonPressBlocked",
+                "MousePressBlocked",
+                "MouseInputBlocked",
+                "BlockMouseInput",
+                "IsMouseBlocked");
+
+            s_fiMouseBlocked = FindBoolField(s_epochInputManagerType,
+                "mouseButtonPressBlocked",
+                "_mouseButtonPressBlocked",
+                "mousePressBlocked",
+                "_mousePressBlocked",
+                "mouseInputBlocked",
+                "_mouseInputBlocked",
+                "blockMouseInput",
+                "_blockMouseInput",
+                "isMouseBlocked",
+                "_isMouseBlocked");
+
+            if (s_piMouseBlocked == null && s_fiMouseBlocked == null)
+            {
+                s_piMouseBlocked = FindFirstBoolPropertyWithAllTokens(s_epochInputManagerType, "mouse", "block");
+                s_fiMouseBlocked = FindFirstBoolFieldWithAllTokens(s_epochInputManagerType, "mouse", "block");
+            }
 
             s_piInstance = s_epochInputManagerType.GetProperty(
                 "Instance",
@@ -396,6 +495,110 @@ namespace Mod.Utils
             }
 
             return null;
+        }
+
+        private static FieldInfo? FindBoolField(Type type, params string[] names)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            for (int i = 0; i < names.Length; i++)
+            {
+                var fi = type.GetField(names[i], flags);
+                if (fi != null && fi.FieldType == typeof(bool))
+                    return fi;
+            }
+
+            var allFields = type.GetFields(flags);
+            for (int i = 0; i < allFields.Length; i++)
+            {
+                var f = allFields[i];
+                if (f.FieldType != typeof(bool))
+                    continue;
+
+                for (int j = 0; j < names.Length; j++)
+                {
+                    if (NameMatchesCandidate(f.Name, names[j]))
+                        return f;
+                }
+            }
+
+            return null;
+        }
+
+        private static PropertyInfo? FindBoolProperty(Type type, params string[] names)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            for (int i = 0; i < names.Length; i++)
+            {
+                var pi = type.GetProperty(names[i], flags);
+                if (pi != null && pi.PropertyType == typeof(bool))
+                    return pi;
+            }
+
+            var allProps = type.GetProperties(flags);
+            for (int i = 0; i < allProps.Length; i++)
+            {
+                var p = allProps[i];
+                if (p.PropertyType != typeof(bool))
+                    continue;
+
+                for (int j = 0; j < names.Length; j++)
+                {
+                    if (NameMatchesCandidate(p.Name, names[j]))
+                        return p;
+                }
+            }
+
+            return null;
+        }
+
+        private static FieldInfo? FindFirstBoolFieldWithAllTokens(Type type, params string[] tokens)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var allFields = type.GetFields(flags);
+            for (int i = 0; i < allFields.Length; i++)
+            {
+                var f = allFields[i];
+                if (f.FieldType != typeof(bool))
+                    continue;
+                if (NameContainsAllTokens(f.Name, tokens))
+                    return f;
+            }
+
+            return null;
+        }
+
+        private static PropertyInfo? FindFirstBoolPropertyWithAllTokens(Type type, params string[] tokens)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var allProps = type.GetProperties(flags);
+            for (int i = 0; i < allProps.Length; i++)
+            {
+                var p = allProps[i];
+                if (p.PropertyType != typeof(bool) || !p.CanWrite)
+                    continue;
+                if (NameContainsAllTokens(p.Name, tokens))
+                    return p;
+            }
+
+            return null;
+        }
+
+        private static bool NameContainsAllTokens(string memberName, params string[] tokens)
+        {
+            string normalizedMember = NormalizeIdentifier(memberName);
+            if (normalizedMember.Length == 0)
+                return false;
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                string token = NormalizeIdentifier(tokens[i]);
+                if (token.Length == 0)
+                    continue;
+                if (normalizedMember.IndexOf(token, StringComparison.OrdinalIgnoreCase) < 0)
+                    return false;
+            }
+
+            return true;
         }
 
         private static bool NameMatchesCandidate(string memberName, string candidate)

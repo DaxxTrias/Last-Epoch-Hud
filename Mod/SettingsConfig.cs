@@ -63,6 +63,7 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _minimapZoomUnlock;
 		private static MelonPreferences_Entry<bool>? _playerLantern;
 		private static MelonPreferences_Entry<bool>? _useAnyWaypoint;
+		private static MelonPreferences_Entry<bool>? _blockMenuInputWhenOpen;
 
 		// Entries - AutoPotion
 		private static MelonPreferences_Entry<bool>? _useAutoPot;
@@ -169,6 +170,7 @@ namespace Mod
 			_minimapZoomUnlock = _patches.CreateEntry("MinimapZoomUnlock", Settings.minimapZoomUnlock);
 			_playerLantern = _patches.CreateEntry("PlayerLantern", Settings.playerLantern);
 			_useAnyWaypoint = _patches.CreateEntry("UseAnyWaypoint", Settings.useAnyWaypoint);
+			_blockMenuInputWhenOpen = _patches.CreateEntry("BlockMenuInputWhenOpen", Settings.blockMenuInputWhenOpen);
 
 			_useAutoPot = _autoPotion.CreateEntry("UseAutoPot", Settings.useAutoPot);
 			_autoHealthPotion = _autoPotion.CreateEntry("AutoHealthPotionPercent", Settings.autoHealthPotion);
@@ -250,6 +252,7 @@ namespace Mod
 			Settings.minimapZoomUnlock = _minimapZoomUnlock!.Value;
 			Settings.playerLantern = _playerLantern!.Value;
 			Settings.useAnyWaypoint = _useAnyWaypoint!.Value;
+			Settings.blockMenuInputWhenOpen = _blockMenuInputWhenOpen!.Value;
 
 			Settings.useAutoPot = _useAutoPot!.Value;
 			Settings.autoHealthPotion = Clamp(_autoHealthPotion!.Value, 0f, 100f);
@@ -328,6 +331,7 @@ namespace Mod
 			_minimapZoomUnlock!.Value = Settings.minimapZoomUnlock;
 			_playerLantern!.Value = Settings.playerLantern;
 			_useAnyWaypoint!.Value = Settings.useAnyWaypoint;
+			_blockMenuInputWhenOpen!.Value = Settings.blockMenuInputWhenOpen;
 
 			_useAutoPot!.Value = Settings.useAutoPot;
 			_autoHealthPotion!.Value = Settings.autoHealthPotion;
@@ -537,6 +541,7 @@ namespace Mod
 			public bool minimapZoomUnlock { get; set; }
 			public bool playerLantern { get; set; }
 			public bool useAnyWaypoint { get; set; }
+			public bool blockMenuInputWhenOpen { get; set; }
 			public bool useAntiIdle { get; set; }
 			public float antiIdleInterval { get; set; }
 			public bool suppressKeepAliveOnActivity { get; set; }
@@ -606,6 +611,7 @@ namespace Mod
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
 				playerLantern = Settings.playerLantern,
 				useAnyWaypoint = Settings.useAnyWaypoint,
+				blockMenuInputWhenOpen = Settings.blockMenuInputWhenOpen,
 				useAntiIdle = Settings.useAntiIdle,
 				antiIdleInterval = Settings.antiIdleInterval,
 				forceIsIdleFalseFallback = Settings.forceIsIdleFalseFallback,
@@ -674,6 +680,7 @@ namespace Mod
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;
 			Settings.playerLantern = s.playerLantern;
 			Settings.useAnyWaypoint = s.useAnyWaypoint;
+			Settings.blockMenuInputWhenOpen = s.blockMenuInputWhenOpen;
 			Settings.useAntiIdle = s.useAntiIdle;
 			Settings.antiIdleInterval = Clamp(s.antiIdleInterval, 10f, 600f);
 			Settings.forceIsIdleFalseFallback = s.forceIsIdleFalseFallback;

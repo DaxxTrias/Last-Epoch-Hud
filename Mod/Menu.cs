@@ -187,6 +187,10 @@ namespace Mod
 				if (Settings.playerLantern != previousPlayerLantern)
 					GameMods.playerLantern();
 
+				Settings.blockMenuInputWhenOpen = GUILayout.Toggle(
+					Settings.blockMenuInputWhenOpen,
+					"Block Game Input While Menu Open (Keyboard + Mouse)");
+
 				#region spacing
 				GUILayout.Space(10);
 				#endregion
@@ -348,8 +352,9 @@ namespace Mod
 				}
 			}
 
-			// Keep gameplay input blocked while the mod menu is visible.
-			EpochInputManagerBridge.TrySetButtonPressBlocked(guiVisible);
+			// Optional input-blocking: blocks gameplay keyboard + mouse while menu is visible.
+			bool shouldBlockGameInput = Settings.blockMenuInputWhenOpen && guiVisible;
+			EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
 
 			// Debug key for auto-potion system (F12)
 			if (Input.GetKeyDown(KeyCode.F12))

@@ -17,6 +17,7 @@ namespace Mod
         public static bool minimapZoomUnlock = true;
         public static bool playerLantern = true;
         public static bool useAnyWaypoint = false;
+        public static bool blockMenuInputWhenOpen = false; // Block keyboard/mouse gameplay input while menu is visible
         public static bool useAntiIdle = false;
         // public static bool debugESPNames = false;
 
