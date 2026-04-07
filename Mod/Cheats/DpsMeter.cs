@@ -5,6 +5,16 @@ namespace Mod.Cheats
 {
 	internal static class DpsMeter
 	{
+		private const int HitEventHit = 1;
+		private const int HitEventCrit = 2;
+		private const int HitEventKill = 4;
+		private const int HitEventFreeze = 8;
+		private const int HitEventStun = 16;
+		private const int HitEventBlock = 32;
+		private const int HitEventMeleeHit = 64;
+		private const int HitEventParry = 128;
+		private const int HitEventSuperCrit = 256;
+
 		private readonly struct HitSample
 		{
 			public readonly float Time;
@@ -19,13 +29,23 @@ namespace Mod.Cheats
 
 		private static readonly Queue<HitSample> s_recentHits = new Queue<HitSample>(256);
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
-		private static Rect s_panelRect = new Rect(0f, 88f, 300f, 198f);
+		private static Rect s_panelRect = new Rect(0f, 88f, 320f, 252f);
 
 		private static bool s_panelAnchored;
 		private static int s_lastScreenWidth;
 		private static float s_recentDamage;
 		private static float s_totalDamage;
+		private static int s_totalEvents;
 		private static int s_totalHits;
+		private static int s_inferredMisses;
+		private static int s_critEvents;
+		private static int s_superCritEvents;
+		private static int s_killEvents;
+		private static int s_blockEvents;
+		private static int s_parryEvents;
+		private static int s_freezeEvents;
+		private static int s_stunEvents;
+		private static int s_meleeHitEvents;
 		private static float s_peakHit;
 		private static float s_minHit = float.MaxValue;
 		private static float s_currentDps;
@@ -34,10 +54,49 @@ namespace Mod.Cheats
 		private static float s_firstHitAt = -1f;
 		private static float s_lastHitAt = -1f;
 
-		public static void OnDamageSample(object source, float damage)
+		public static void OnDamageEvent(object source, float damage, int hitEvents)
 		{
 			_ = source;
-			if (!Settings.enableDpsMeter || damage <= 0f || float.IsNaN(damage) || float.IsInfinity(damage))
+			if (!Settings.enableDpsMeter || float.IsNaN(damage) || float.IsInfinity(damage))
+				return;
+
+			s_totalEvents++;
+
+			bool isSuperCrit = HasFlag(hitEvents, HitEventSuperCrit);
+			bool isCrit = HasFlag(hitEvents, HitEventCrit);
+			bool hasHitFlag = HasFlag(hitEvents, HitEventHit) || isCrit || isSuperCrit;
+			bool hasDamage = damage > 0f;
+
+			if (isSuperCrit)
+			{
+				s_superCritEvents++;
+				s_critEvents++;
+			}
+			else if (isCrit)
+			{
+				s_critEvents++;
+			}
+
+			if (HasFlag(hitEvents, HitEventKill))
+				s_killEvents++;
+			if (HasFlag(hitEvents, HitEventBlock))
+				s_blockEvents++;
+			if (HasFlag(hitEvents, HitEventParry))
+				s_parryEvents++;
+			if (HasFlag(hitEvents, HitEventFreeze))
+				s_freezeEvents++;
+			if (HasFlag(hitEvents, HitEventStun))
+				s_stunEvents++;
+			if (HasFlag(hitEvents, HitEventMeleeHit))
+				s_meleeHitEvents++;
+
+			// Approximation: treat no-hit-flag + no-damage as a miss-like event.
+			if (!hasHitFlag && !hasDamage)
+			{
+				s_inferredMisses++;
+			}
+
+			if (!hasDamage)
 				return;
 
 			float now = Time.unscaledTime;
@@ -107,7 +166,17 @@ namespace Mod.Cheats
 			s_recentHits.Clear();
 			s_recentDamage = 0f;
 			s_totalDamage = 0f;
+			s_totalEvents = 0;
 			s_totalHits = 0;
+			s_inferredMisses = 0;
+			s_critEvents = 0;
+			s_superCritEvents = 0;
+			s_killEvents = 0;
+			s_blockEvents = 0;
+			s_parryEvents = 0;
+			s_freezeEvents = 0;
+			s_stunEvents = 0;
+			s_meleeHitEvents = 0;
 			s_peakHit = 0f;
 			s_minHit = float.MaxValue;
 			s_currentDps = 0f;
@@ -168,6 +237,10 @@ namespace Mod.Cheats
 			}
 
 			s_textBuilder.Append("Hits: ").Append(s_totalHits).Append('\n');
+			s_textBuilder.Append("Events: ").Append(s_totalEvents).Append(" | Misses~: ").Append(s_inferredMisses).Append('\n');
+			s_textBuilder.Append("Crits: ").Append(s_critEvents).Append(" (Super: ").Append(s_superCritEvents).Append(')').Append('\n');
+			s_textBuilder.Append("Kills: ").Append(s_killEvents).Append(" | Block: ").Append(s_blockEvents).Append(" | Parry: ").Append(s_parryEvents).Append('\n');
+			s_textBuilder.Append("Freeze: ").Append(s_freezeEvents).Append(" | Stun: ").Append(s_stunEvents).Append(" | MeleeHit: ").Append(s_meleeHitEvents).Append('\n');
 			s_textBuilder.Append("Total Damage: ").Append(FormatNumber(s_totalDamage)).Append('\n');
 			s_textBuilder.Append("Current DPS: ").Append(FormatNumber(s_currentDps)).Append('\n');
 			s_textBuilder.Append("Average DPS: ").Append(FormatNumber(avgDps)).Append('\n');
@@ -198,6 +271,11 @@ namespace Mod.Cheats
 			if (value >= 1_000f)
 				return (value / 1_000f).ToString("F2") + "k";
 			return value.ToString("F1");
+		}
+
+		private static bool HasFlag(int value, int flag)
+		{
+			return (value & flag) != 0;
 		}
 	}
 }

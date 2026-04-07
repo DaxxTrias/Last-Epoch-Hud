@@ -573,7 +573,13 @@ namespace Mod.Cheats.Patches
                         if (!TryGetDamage(__args[0], out float damage))
                             return;
 
-                        DpsMeter.OnDamageSample(__instance, damage);
+                        int hitEvents = 0;
+                        if (__args.Length > 1)
+                        {
+                            TryGetHitEventFlags(__args[1], out hitEvents);
+                        }
+
+                        DpsMeter.OnDamageEvent(__instance, damage, hitEvents);
                     }
                     catch
                     {
@@ -609,6 +615,30 @@ namespace Mod.Cheats.Patches
                     catch
                     {
                         return false;
+                    }
+                }
+
+                private static bool TryGetHitEventFlags(object? value, out int flags)
+                {
+                    flags = 0;
+                    if (value == null)
+                        return false;
+
+                    try
+                    {
+                        flags = Convert.ToInt32(value);
+                        return true;
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            return int.TryParse(value.ToString(), out flags);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
                     }
                 }
 
