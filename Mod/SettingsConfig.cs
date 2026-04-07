@@ -39,6 +39,7 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _dpsMeterWindowSeconds;
 		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
 		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
+		private static MelonPreferences_Entry<bool>? _enableDpsMeterOnlineRaw;
 		private static MelonPreferences_Entry<bool>? _enableDamageNumberDiagnostics;
 
 		// Entries - ESP
@@ -153,6 +154,7 @@ namespace Mod
 			_dpsMeterWindowSeconds = _general.CreateEntry("DpsMeterWindowSeconds", Settings.dpsMeterWindowSeconds);
 			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
 			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
+			_enableDpsMeterOnlineRaw = _general.CreateEntry("EnableDpsMeterOnlineRaw", Settings.enableDpsMeterOnlineRaw);
 			_enableDamageNumberDiagnostics = _general.CreateEntry("EnableDamageNumberDiagnostics", Settings.enableDamageNumberDiagnostics);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
@@ -240,6 +242,7 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(_dpsMeterWindowSeconds!.Value, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
 			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
+			Settings.enableDpsMeterOnlineRaw = _enableDpsMeterOnlineRaw!.Value;
 			Settings.enableDamageNumberDiagnostics = _enableDamageNumberDiagnostics!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
@@ -324,6 +327,7 @@ namespace Mod
 			_dpsMeterWindowSeconds!.Value = Settings.dpsMeterWindowSeconds;
 			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
 			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
+			_enableDpsMeterOnlineRaw!.Value = Settings.enableDpsMeterOnlineRaw;
 			_enableDamageNumberDiagnostics!.Value = Settings.enableDamageNumberDiagnostics;
 
 			_showESPLines!.Value = Settings.showESPLines;
@@ -560,6 +564,7 @@ namespace Mod
 			public float dpsMeterWindowSeconds { get; set; }
 			public float dpsMeterInactivityResetSeconds { get; set; }
 			public bool dpsMeterAutoReset { get; set; }
+			public bool enableDpsMeterOnlineRaw { get; set; }
 			public bool enableDamageNumberDiagnostics { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
@@ -635,6 +640,7 @@ namespace Mod
 				dpsMeterWindowSeconds = Settings.dpsMeterWindowSeconds,
 				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
 				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
+				enableDpsMeterOnlineRaw = Settings.enableDpsMeterOnlineRaw,
 				enableDamageNumberDiagnostics = Settings.enableDamageNumberDiagnostics,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
@@ -709,6 +715,7 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(s.dpsMeterWindowSeconds, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
 			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
+			Settings.enableDpsMeterOnlineRaw = s.enableDpsMeterOnlineRaw;
 			Settings.enableDamageNumberDiagnostics = s.enableDamageNumberDiagnostics;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;

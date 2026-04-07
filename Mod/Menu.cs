@@ -172,7 +172,10 @@ namespace Mod
 				if (dpsMeterSubDropdown)
 				{
 					bool wasEnabled = Settings.enableDpsMeter;
-					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay (Offline Only)");
+					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay");
+					Settings.enableDpsMeterOnlineRaw = GUILayout.Toggle(
+						Settings.enableDpsMeterOnlineRaw,
+						"Allow Online Raw Source (Unfiltered)");
 					Settings.enableDamageNumberDiagnostics = GUILayout.Toggle(
 						Settings.enableDamageNumberDiagnostics,
 						"Enable DamageNumber Diagnostics (Verbose Logs)");
@@ -199,13 +202,17 @@ namespace Mod
 						}
 					}
 
-					if (!ObjectManager.IsOfflineMode())
+					if (!ObjectManager.IsOfflineMode() && !Settings.enableDpsMeterOnlineRaw)
 					{
-						GUILayout.Label("DPS meter is currently unavailable in online mode.");
+						GUILayout.Label("Online meter disabled. Enable 'Online Raw Source' to collect from damage-number text.");
+					}
+					if (!ObjectManager.IsOfflineMode() && Settings.enableDpsMeterOnlineRaw)
+					{
+						GUILayout.Label("Online Raw includes all visible damage numbers (incoming + outgoing).");
 					}
 					if (Settings.enableDamageNumberDiagnostics)
 					{
-						GUILayout.Label("DamageNumber diagnostics are active. Check Melon logs for Init/renderer summaries.");
+						GUILayout.Label("DamageNumber diagnostics are active. Check Melon logs for renderer summaries.");
 					}
 				}
 			}

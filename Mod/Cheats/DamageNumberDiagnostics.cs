@@ -38,7 +38,7 @@ namespace Mod.Cheats
 
 		public static void OnPrefix(object __instance, MethodBase? __originalMethod)
 		{
-			if (!Settings.enableDamageNumberDiagnostics || __originalMethod == null)
+			if (!IsActive() || __originalMethod == null)
 				return;
 
 			if (!string.Equals(__originalMethod.Name, "OnDestroy", StringComparison.Ordinal))
@@ -49,7 +49,7 @@ namespace Mod.Cheats
 
 		public static void OnPostfix(object __instance, MethodBase? __originalMethod)
 		{
-			if (!Settings.enableDamageNumberDiagnostics || __originalMethod == null)
+			if (!IsActive() || __originalMethod == null)
 				return;
 
 			if (string.Equals(__originalMethod.Name, "OnDestroy", StringComparison.Ordinal))
@@ -112,7 +112,10 @@ namespace Mod.Cheats
 					s_periodAwakeCount++;
 					if (state != null)
 						state.LastSeenAt = now;
-					Log.InfoThrottled(LogSource.Hooks, "DamageNumber.Awake", "[DamageNumberDiag] Awake observed.", TimeSpan.FromSeconds(3));
+					if (Settings.enableDamageNumberDiagnostics)
+					{
+						Log.InfoThrottled(LogSource.Hooks, "DamageNumber.Awake", "[DamageNumberDiag] Awake observed.", TimeSpan.FromSeconds(3));
+					}
 					break;
 				case "SendPropertiesToRenderer":
 					s_periodSendCount++;
@@ -122,17 +125,27 @@ namespace Mod.Cheats
 						state.LastSeenAt = now;
 						CaptureRendererData(state, __instance);
 					}
-					Log.InfoThrottled(
-						LogSource.Hooks,
-						"DamageNumber.SendPropertiesToRenderer",
-						$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}').",
-						SendLogInterval);
+					if (state != null && !string.IsNullOrWhiteSpace(state.Text))
+					{
+						DpsMeter.OnOnlineDamageTextSample(__instance, state.Text);
+					}
+					if (Settings.enableDamageNumberDiagnostics)
+					{
+						Log.InfoThrottled(
+							LogSource.Hooks,
+							"DamageNumber.SendPropertiesToRenderer",
+							$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}').",
+							SendLogInterval);
+					}
 					break;
 				case "OnDestroy":
 					s_periodDestroyCount++;
 					if (id != 0)
 						s_states.Remove(id);
-					Log.InfoThrottled(LogSource.Hooks, "DamageNumber.OnDestroy", "[DamageNumberDiag] OnDestroy observed.", TimeSpan.FromSeconds(3));
+					if (Settings.enableDamageNumberDiagnostics)
+					{
+						Log.InfoThrottled(LogSource.Hooks, "DamageNumber.OnDestroy", "[DamageNumberDiag] OnDestroy observed.", TimeSpan.FromSeconds(3));
+					}
 					break;
 			}
 
@@ -390,6 +403,8 @@ namespace Mod.Cheats
 
 		private static void LogTypeShape(Type instanceType)
 		{
+			if (!Settings.enableDamageNumberDiagnostics)
+				return;
 			if (s_loggedTypeShape)
 				return;
 			s_loggedTypeShape = true;
@@ -465,6 +480,8 @@ namespace Mod.Cheats
 
 		private static void LogResolvedBindings(Type instanceType)
 		{
+			if (!Settings.enableDamageNumberDiagnostics)
+				return;
 			if (s_loggedTextBinding)
 				return;
 			s_loggedTextBinding = true;
@@ -504,6 +521,8 @@ namespace Mod.Cheats
 
 		private static void MaybeEmitPeriodSummary(float now, string phase, string lastMethod)
 		{
+			if (!Settings.enableDamageNumberDiagnostics)
+				return;
 			if (now - s_periodStartAt < 5f)
 				return;
 
@@ -532,6 +551,12 @@ namespace Mod.Cheats
 			if (state == null || string.IsNullOrWhiteSpace(state.Text))
 				return "-";
 			return state.Text;
+		}
+
+		private static bool IsActive()
+		{
+			return Settings.enableDamageNumberDiagnostics
+				|| (Settings.enableDpsMeter && Settings.enableDpsMeterOnlineRaw);
 		}
 
 		private static string BuildInitOverloadKey(MethodBase method)
