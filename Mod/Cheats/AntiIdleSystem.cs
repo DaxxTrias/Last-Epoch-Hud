@@ -27,20 +27,12 @@ namespace Mod.Cheats
         private static object? _serverConnection;
         private static object? _netPeer;
         private static object? _clientNetworkService;
-        private static object? _uiBaseObj;
-        private static MethodInfo? _miSettingsKeyDown;
-        private static MethodInfo? _miMapKeyDown;
-        private static MethodInfo? _miControllerCloseAllKeyDown;
-        // private static readonly bool _loggedNoUi;
-        private static bool _loggedNoTarget;
-        
         // State tracking
         private static bool _isInitialized = false;
         private static float _lastStatusCheck = 0f;
         private static float _lastHeartbeat = 0f;
         private static float _lastAntiIdleAction = 0f;
         // private static float _lastSyntheticKeepAlive = 0f;
-        private static float _nextSimplePulseAt = 0f;
         private static float _nextInputNotifyAt = 0f;
         private static bool _loggedNoSendMethod;
         
@@ -61,10 +53,6 @@ namespace Mod.Cheats
         // Configuration
         private const float STATUS_CHECK_INTERVAL = 5f;    // Check connection status every 5 seconds
         private const float HEARTBEAT_INTERVAL = 30f;      // Send heartbeat every 30 seconds
-        private const float ANTI_IDLE_ACTION_INTERVAL = 120f; // Perform anti-idle action every 60 seconds
-        private const float SYNTHETIC_KEEPALIVE_MIN_INTERVAL = 15f; // Safety floor
-        private const float SYNTHETIC_SUPPRESSION_CAP = 60f; // Max time we will honor suppression without sending a keepalive
-        
         // Status tracking
         private static string? _lastConnectionStatus;
         private static int _consecutiveIdleDetections = 0;
@@ -74,9 +62,6 @@ namespace Mod.Cheats
 
         // Activity suppression
         private static float _suppressSyntheticUntil = 0f;
-#pragma warning disable CS0414 // Naming Styles
-        private static readonly bool _wasSuppressedLastTick = false; // TODO: Remove this if not needed by server notif invoke
-#pragma warning restore CS0414 // Naming Styles
         private static float _lastInputCheck = 0f;
         private const float INPUT_CHECK_INTERVAL = 0.25f; // 4x per second
         private static Vector3 _lastMousePos;
@@ -115,13 +100,8 @@ namespace Mod.Cheats
                 // Simple Anti-Idle UI pulse/notify
                 if (Settings.useSimpleAntiIdle)
                 {
-                    if (_nextSimplePulseAt <= 0f)
-                        ScheduleNextPulse();
-
                     if (_nextInputNotifyAt <= 0f)
                         ScheduleNextInputNotify();
-
-                    // UI pulse currently disabled
 
                     if (Time.time >= _nextInputNotifyAt)
                     {
@@ -554,23 +534,6 @@ namespace Mod.Cheats
         }
 
         /// <summary>
-        /// Provided from UIBase.Awake patch; enables simple anti-idle pulses.
-        /// </summary>
-        public static void SetUIBase(object ui)
-        {
-            try
-            {
-                _uiBaseObj = ui;
-                if (ui != null)
-                    CacheUiDelegates(ui.GetType());
-            }
-            catch (Exception e)
-            {
-                MelonLogger.Error($"AntiIdleSystem.SetUIBase error: {e.Message}");
-            }
-        }
-        
-        /// <summary>
         /// Clear stored connections (called by patches)
         /// </summary>
         public static void ClearConnections()
@@ -605,15 +568,8 @@ namespace Mod.Cheats
                 _lastMousePosInitialized = false;
                 if (Settings.useSimpleAntiIdle)
                 {
-                    // First pulse sooner to verify behavior quickly
-                    _nextSimplePulseAt = Time.time + UnityEngine.Random.Range(20f, 40f);
-                    MelonLogger.Msg("[AntiIdle] Simple pulse scheduled shortly (~20-40s)");
                     _nextInputNotifyAt = Time.time + UnityEngine.Random.Range(25f, 45f);
                     MelonLogger.Msg("[AntiIdle] Server input notify scheduled shortly (~25-45s)");
-                }
-                else
-                {
-                    ScheduleNextPulse();
                 }
             }
             catch (Exception e)
@@ -789,15 +745,7 @@ namespace Mod.Cheats
         
         #endregion
         
-        #region Simple UI Pulse
-
-        private static void ScheduleNextPulse()
-        {
-            var baseInterval = Mathf.Max(Settings.simpleAntiIdleInterval, 60f);
-            var jitter = UnityEngine.Random.Range(-10f, 10f);
-            _nextSimplePulseAt = Time.time + Mathf.Max(30f, baseInterval + jitter);
-            MelonLogger.Msg($"[AntiIdle] Next simple pulse scheduled in {(_nextSimplePulseAt - Time.time):F0}s");
-        }
+        #region Simple Input Notify
 
         private static void ScheduleNextInputNotify()
         {
@@ -806,16 +754,6 @@ namespace Mod.Cheats
             var jitter = UnityEngine.Random.Range(-8f, 8f);
             _nextInputNotifyAt = Time.time + Mathf.Max(30f, baseInterval * 0.75f + jitter);
             MelonLogger.Msg($"[AntiIdle] Next server input notify in {(_nextInputNotifyAt - Time.time):F0}s");
-        }
-
-        private static bool IsSimplePulseAllowed()
-        {
-            if (!Settings.useSimpleAntiIdle) return false;
-            // Allow pulses regardless of OS window focus
-            // if (!Application.isFocused) return false;
-            
-            if (Settings.suppressKeepAliveOnActivity && Time.time < _suppressSyntheticUntil) return false;
-            return true; // Allow pulses regardless of network and focus; UI activity is harmless
         }
 
         private static bool IsInputNotifyAllowed()
@@ -829,53 +767,6 @@ namespace Mod.Cheats
         {
             if (!Settings.suppressKeepAliveOnActivity) return 0f;
             return Mathf.Max(0f, _suppressSyntheticUntil - Time.time);
-        }
-
-        private static void CacheUiDelegates(Type uiType)
-        {
-            try
-            {
-                _miSettingsKeyDown ??= AccessTools.Method(uiType, "SettingsKeyDown");
-                _miMapKeyDown ??= AccessTools.Method(uiType, "MapKeyDown");
-                _miControllerCloseAllKeyDown ??= AccessTools.Method(uiType, "ControllerCloseAllKeyDown");
-                if (_miSettingsKeyDown == null && _miMapKeyDown == null && _miControllerCloseAllKeyDown == null && !_loggedNoTarget)
-                {
-                    _loggedNoTarget = true;
-                    MelonLogger.Warning("[AntiIdle] Simple pulse: no UIBase *KeyDown targets found");
-                }
-            }
-            catch (Exception e)
-            {
-                MelonLogger.Error($"[AntiIdle] CacheUiDelegates error: {e.Message}");
-            }
-        }
-
-        private static void TrySimplePulse()
-        {
-            try
-            {
-                // Disabled; kept for future experiments
-                // var ui = _uiBaseObj;
-                // if (ui == null)
-                // {
-                //     if (!_loggedNoUi)
-                //     {
-                //         _loggedNoUi = true;
-                //         MelonLogger.Warning("[AntiIdle] Simple pulse skipped: UIBase not set yet");
-                //     }
-                //     return;
-                // }
-                // CacheUiDelegates(ui.GetType());
-                // if (_miSettingsKeyDown != null) { _miSettingsKeyDown.Invoke(ui, null); _miSettingsKeyDown.Invoke(ui, null); }
-                // else if (_miMapKeyDown != null) { _miMapKeyDown.Invoke(ui, null); _miMapKeyDown.Invoke(ui, null); }
-                // else if (_miControllerCloseAllKeyDown != null) { _miControllerCloseAllKeyDown.Invoke(ui, null); }
-                // RegisterActivity(Settings.activitySuppressionSeconds, "ui-pulse");
-                // if (VerboseKeepaliveLogs) MelonLogger.Msg("[AntiIdle] Simple UI pulse invoked");
-            }
-            catch (Exception e)
-            {
-                MelonLogger.Error($"[AntiIdle] SimplePulse error: {e.Message}");
-            }
         }
 
         private static void TryServerInputNotify()
