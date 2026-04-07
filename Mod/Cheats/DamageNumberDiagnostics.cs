@@ -13,6 +13,8 @@ namespace Mod.Cheats
 		private sealed class DamageNumberState
 		{
 			public string Text = string.Empty;
+			public Color LastColor = Color.white;
+			public bool HasLastColor;
 			public float LastSeenAt;
 			public float LastDeepTextProbeAt;
 			public int SendCount;
@@ -25,6 +27,7 @@ namespace Mod.Cheats
 		private static FieldInfo? s_tmpField;
 		private static PropertyInfo? s_tmpProperty;
 		private static PropertyInfo? s_tmpTextProperty;
+		private static PropertyInfo? s_tmpColorProperty;
 		private static bool s_loggedTypeShape;
 		private static bool s_loggedTextBinding;
 
@@ -127,14 +130,14 @@ namespace Mod.Cheats
 					}
 					if (state != null && !string.IsNullOrWhiteSpace(state.Text))
 					{
-						DpsMeter.OnOnlineDamageTextSample(__instance, state.Text);
+						DpsMeter.OnOnlineDamageTextSample(__instance, state.Text, state.HasLastColor ? state.LastColor : null);
 					}
 					if (Settings.enableDamageNumberDiagnostics)
 					{
 						Log.InfoThrottled(
 							LogSource.Hooks,
 							"DamageNumber.SendPropertiesToRenderer",
-							$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}').",
+							$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}', color={SafeStateColor(state)}).",
 							SendLogInterval);
 					}
 					break;
@@ -173,8 +176,14 @@ namespace Mod.Cheats
 				if (TryReadTextFromBoundField(instance, out string? boundText))
 				{
 					state.Text = boundText!;
-					return;
 				}
+				if (TryReadColorFromBoundField(instance, out var boundColor))
+				{
+					state.LastColor = boundColor;
+					state.HasLastColor = true;
+				}
+				if (!string.IsNullOrWhiteSpace(state.Text))
+					return;
 
 				// Slow fallback probe (rate-limited): inspect child components for text-bearing fields.
 				float now = Time.unscaledTime;
@@ -202,6 +211,7 @@ namespace Mod.Cheats
 			s_tmpField = null;
 			s_tmpProperty = null;
 			s_tmpTextProperty = null;
+			s_tmpColorProperty = null;
 
 			// Avoid AccessTools.Field warnings by resolving manually.
 			s_tmpField = FindFieldRecursive(instanceType, "tmp")
@@ -220,6 +230,10 @@ namespace Mod.Cheats
 			if (tmpContainerType != null && TryResolveTextProperty(tmpContainerType, out var textProp))
 			{
 				s_tmpTextProperty = textProp;
+			}
+			if (tmpContainerType != null && TryResolveColorProperty(tmpContainerType, out var colorProp))
+			{
+				s_tmpColorProperty = colorProp;
 			}
 
 			LogTypeShape(instanceType);
@@ -314,6 +328,25 @@ namespace Mod.Cheats
 			}
 		}
 
+		private static bool TryResolveColorProperty(Type targetType, out PropertyInfo? colorProperty)
+		{
+			colorProperty = null;
+			try
+			{
+				colorProperty = targetType.GetProperty("color", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				if (colorProperty != null)
+					return true;
+
+				colorProperty = targetType.GetProperty("Color", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				return colorProperty != null;
+			}
+			catch
+			{
+				colorProperty = null;
+				return false;
+			}
+		}
+
 		private static bool TryReadTextFromBoundField(object instance, out string? text)
 		{
 			text = null;
@@ -350,6 +383,51 @@ namespace Mod.Cheats
 			{
 				return false;
 			}
+		}
+
+		private static bool TryReadColorFromBoundField(object instance, out Color color)
+		{
+			color = default;
+			if ((s_tmpField == null && s_tmpProperty == null) || s_tmpColorProperty == null)
+				return false;
+
+			try
+			{
+				object? tmp = null;
+				if (s_tmpField != null)
+				{
+					tmp = s_tmpField.GetValue(instance);
+				}
+				else if (s_tmpProperty != null)
+				{
+					tmp = s_tmpProperty.GetValue(instance);
+				}
+
+				if (tmp == null)
+					return false;
+
+				var value = s_tmpColorProperty.GetValue(tmp);
+				if (value == null)
+					return false;
+
+				if (value is Color c)
+				{
+					color = c;
+					return true;
+				}
+
+				if (value is Color32 c32)
+				{
+					color = c32;
+					return true;
+				}
+			}
+			catch
+			{
+				// diagnostics best effort
+			}
+
+			return false;
 		}
 
 		private static bool TryReadTextFromHierarchy(GameObject root, out string? text)
@@ -491,7 +569,8 @@ namespace Mod.Cheats
 			string tmpPropName = s_tmpProperty?.Name ?? "<none>";
 			string tmpPropType = s_tmpProperty?.PropertyType.FullName ?? "<none>";
 			string textPropName = s_tmpTextProperty?.Name ?? "<none>";
-			Log.Info(LogSource.Hooks, $"[DamageNumberDiag] Text binding: field={fieldName}:{fieldType}, tmpProp={tmpPropName}:{tmpPropType}, textProp={textPropName} on {instanceType.FullName ?? instanceType.Name}");
+			string colorPropName = s_tmpColorProperty?.Name ?? "<none>";
+			Log.Info(LogSource.Hooks, $"[DamageNumberDiag] Text binding: field={fieldName}:{fieldType}, tmpProp={tmpPropName}:{tmpPropType}, textProp={textPropName}, colorProp={colorPropName} on {instanceType.FullName ?? instanceType.Name}");
 		}
 
 		private static int TryGetInstanceId(object? instance)
@@ -551,6 +630,13 @@ namespace Mod.Cheats
 			if (state == null || string.IsNullOrWhiteSpace(state.Text))
 				return "-";
 			return state.Text;
+		}
+
+		private static string SafeStateColor(DamageNumberState? state)
+		{
+			if (state == null || !state.HasLastColor)
+				return "-";
+			return $"{state.LastColor.r:F2},{state.LastColor.g:F2},{state.LastColor.b:F2},{state.LastColor.a:F2}";
 		}
 
 		private static bool IsActive()

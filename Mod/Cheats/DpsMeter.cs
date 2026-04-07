@@ -77,6 +77,10 @@ namespace Mod.Cheats
 		private static int s_onlineAcceptedEvents;
 		private static int s_onlineSkippedDuplicateEvents;
 		private static int s_onlineRejectedParseEvents;
+		private static int s_onlineColorSamples;
+		private static int s_onlineColorCritEvents;
+		private static Color s_onlineLastColor;
+		private static bool s_onlineHasLastColor;
 
 		public static void OnDamageEvent(object source, float damage, int hitEvents)
 		{
@@ -140,7 +144,7 @@ namespace Mod.Cheats
 			RefreshDps();
 		}
 
-		public static void OnOnlineDamageTextSample(object source, string? text)
+		public static void OnOnlineDamageTextSample(object source, string? text, Color? textColor)
 		{
 			if (GetCurrentMode() != DpsSourceMode.OnlineRaw)
 				return;
@@ -168,6 +172,16 @@ namespace Mod.Cheats
 			s_onlineAcceptedEvents++;
 			s_totalEvents++;
 			RegisterHit(damage, now);
+			if (textColor.HasValue)
+			{
+				s_onlineColorSamples++;
+				s_onlineLastColor = textColor.Value;
+				s_onlineHasLastColor = true;
+				if (IsLikelyCritColor(textColor.Value))
+				{
+					s_onlineColorCritEvents++;
+				}
+			}
 		}
 
 		public static void OnUpdate()
@@ -270,6 +284,10 @@ namespace Mod.Cheats
 			s_onlineAcceptedEvents = 0;
 			s_onlineSkippedDuplicateEvents = 0;
 			s_onlineRejectedParseEvents = 0;
+			s_onlineColorSamples = 0;
+			s_onlineColorCritEvents = 0;
+			s_onlineLastColor = default;
+			s_onlineHasLastColor = false;
 		}
 
 		private static void ResetForInactivity()
@@ -347,6 +365,12 @@ namespace Mod.Cheats
 					.Append(" | Accepted: ").Append(s_onlineAcceptedEvents).Append('\n');
 				s_textBuilder.Append("Dupes: ").Append(s_onlineSkippedDuplicateEvents)
 					.Append(" | Rejected: ").Append(s_onlineRejectedParseEvents).Append('\n');
+				s_textBuilder.Append("Crits~(color): ").Append(s_onlineColorCritEvents)
+					.Append(" / ").Append(s_onlineColorSamples).Append('\n');
+				if (s_onlineHasLastColor)
+				{
+					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
+				}
 				s_textBuilder.Append("Note: includes all visible damage numbers.\n");
 			}
 			s_textBuilder.Append("Total Damage: ").Append(FormatNumber(s_totalDamage)).Append('\n');
@@ -538,6 +562,19 @@ namespace Mod.Cheats
 
 			damage = value * multiplier;
 			return !float.IsNaN(damage) && !float.IsInfinity(damage);
+		}
+
+		private static bool IsLikelyCritColor(Color color)
+		{
+			Color.RGBToHSV(color, out float h, out float s, out float v);
+			float hueDegrees = h * 360f;
+			bool yellowBand = hueDegrees >= 35f && hueDegrees <= 75f;
+			return yellowBand && s >= 0.35f && v >= 0.5f;
+		}
+
+		private static string FormatColor(Color color)
+		{
+			return $"{color.r:F2},{color.g:F2},{color.b:F2},{color.a:F2}";
 		}
 	}
 }
