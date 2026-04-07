@@ -11,6 +11,7 @@ namespace Mod.Cheats
         private const float BoostDurationSeconds = 60f;
         private const float LookupRetrySeconds = 1f;
         private const float ErrorLogCooldownSeconds = 5f;
+        private const float RevealRadiusComparisonEpsilon = 0.01f;
         private const string MinimapCanvasName = "DMMap Canvas";
 
         private static Minimap? s_minimap;
@@ -68,8 +69,18 @@ namespace Mod.Cheats
 
             if (TryGetRevealRadius(minimap, out float originalRevealRadius))
             {
-                s_originalRevealRadius = originalRevealRadius;
-                s_hasOriginalRevealRadius = true;
+                if (IsBoostRevealRadius(originalRevealRadius))
+                {
+                    // Edge case: if we read while a previous pulse is still active,
+                    // never treat the boost value as the scene's baseline.
+                    s_originalRevealRadius = DefaultRevealRadius;
+                    s_hasOriginalRevealRadius = false;
+                }
+                else
+                {
+                    s_originalRevealRadius = originalRevealRadius;
+                    s_hasOriginalRevealRadius = true;
+                }
             }
 
             if (!TrySetRevealRadius(minimap, BoostRevealRadius))
@@ -93,6 +104,9 @@ namespace Mod.Cheats
                 return;
 
             float restoreValue = s_hasOriginalRevealRadius ? s_originalRevealRadius : DefaultRevealRadius;
+            if (IsBoostRevealRadius(restoreValue))
+                restoreValue = DefaultRevealRadius;
+
             if (!TrySetRevealRadius(minimap, restoreValue))
                 return;
 
@@ -173,6 +187,11 @@ namespace Mod.Cheats
                 LogErrorThrottled($"[MapHack] Failed setting RevealRadius: {e.Message}");
                 return false;
             }
+        }
+
+        private static bool IsBoostRevealRadius(float value)
+        {
+            return Mathf.Abs(value - BoostRevealRadius) <= RevealRadiusComparisonEpsilon;
         }
 
         private static void LogErrorThrottled(string message)
