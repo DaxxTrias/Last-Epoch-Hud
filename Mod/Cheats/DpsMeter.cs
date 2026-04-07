@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Mod.Game;
+using Mod.Utils;
 using UnityEngine;
 
 namespace Mod.Cheats
@@ -53,6 +54,7 @@ namespace Mod.Cheats
 		private static readonly Queue<HitSample> s_recentHits = new Queue<HitSample>(256);
 		private static readonly Dictionary<int, OnlineSampleState> s_onlineStates = new Dictionary<int, OnlineSampleState>(128);
 		private static readonly List<int> s_onlinePruneBuffer = new List<int>(64);
+		private static readonly Dictionary<uint, int> s_onlineColorHistogram = new Dictionary<uint, int>(24);
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
 		private static Rect s_panelRect = new Rect(0f, 88f, DefaultPanelWidth, DefaultPanelHeight);
 
@@ -83,10 +85,6 @@ namespace Mod.Cheats
 		private static float s_minDps = float.MaxValue;
 		private static float s_firstHitAt = -1f;
 		private static float s_lastHitAt = -1f;
-		private static int s_onlineObservedEvents;
-		private static int s_onlineAcceptedEvents;
-		private static int s_onlineSkippedDuplicateEvents;
-		private static int s_onlineRejectedParseEvents;
 		private static int s_onlineColorSamples;
 		private static int s_onlineColorCritEvents;
 		private static Color s_onlineLastColor;
@@ -159,27 +157,16 @@ namespace Mod.Cheats
 			if (GetCurrentMode() != DpsSourceMode.OnlineRaw)
 				return;
 
-			s_onlineObservedEvents++;
 			if (string.IsNullOrWhiteSpace(text) || !TryParseDamageText(text, out float damage) || damage <= 0f)
-			{
-				s_onlineRejectedParseEvents++;
 				return;
-			}
 
 			if (!TryGetSourceInstanceId(source, out int instanceId))
-			{
-				s_onlineRejectedParseEvents++;
 				return;
-			}
 
 			float now = Time.unscaledTime;
 			if (!ShouldAcceptOnlineSample(instanceId, text!, now))
-			{
-				s_onlineSkippedDuplicateEvents++;
 				return;
-			}
 
-			s_onlineAcceptedEvents++;
 			s_totalEvents++;
 			RegisterHit(damage, now);
 			if (textColor.HasValue)
@@ -187,6 +174,7 @@ namespace Mod.Cheats
 				s_onlineColorSamples++;
 				s_onlineLastColor = textColor.Value;
 				s_onlineHasLastColor = true;
+				RecordOnlineColorSample(textColor.Value);
 				if (IsLikelyCritColor(textColor.Value))
 				{
 					s_onlineColorCritEvents++;
@@ -198,6 +186,7 @@ namespace Mod.Cheats
 		{
 			if (!Settings.enableDpsMeter)
 			{
+				MaybeLogOnlineColorSummary("disabled");
 				ResetInternal();
 				s_sourceMode = DpsSourceMode.None;
 				return;
@@ -206,6 +195,7 @@ namespace Mod.Cheats
 			// Treat player-loss as a session boundary: clear all stats, including peaks.
 			if (!ObjectManager.HasPlayer())
 			{
+				MaybeLogOnlineColorSummary("player-lost");
 				ResetInternal();
 				s_sourceMode = DpsSourceMode.None;
 				return;
@@ -214,6 +204,7 @@ namespace Mod.Cheats
 			var currentMode = GetCurrentMode();
 			if (currentMode != s_sourceMode)
 			{
+				MaybeLogOnlineColorSummary("mode-changed");
 				ResetInternal();
 				s_sourceMode = currentMode;
 			}
@@ -246,19 +237,22 @@ namespace Mod.Cheats
 			EnsurePanelInitialized();
 			EnsurePanelStyle();
 			s_panelText = BuildOverlayText(Time.unscaledTime);
-			s_panelRect = GUI.Window(PanelWindowId, s_panelRect, DrawPanelWindow, "LEHud DPS Meter");
+			AutoGrowPanelForContent();
+			s_panelRect = GUI.Window(PanelWindowId, s_panelRect, (GUI.WindowFunction)DrawPanelWindow, "LEHud DPS Meter");
 			ClampPanelToScreen();
 			SyncPanelToSettings();
 		}
 
 		public static void OnSceneChanged()
 		{
+			MaybeLogOnlineColorSummary("scene-changed");
 			ResetInternal();
 			s_sourceMode = DpsSourceMode.None;
 		}
 
 		public static void Reset()
 		{
+			MaybeLogOnlineColorSummary("manual");
 			ResetInternal();
 		}
 
@@ -276,6 +270,7 @@ namespace Mod.Cheats
 			s_recentHits.Clear();
 			s_onlineStates.Clear();
 			s_onlinePruneBuffer.Clear();
+			s_onlineColorHistogram.Clear();
 			s_recentDamage = 0f;
 			s_totalDamage = 0f;
 			s_totalEvents = 0;
@@ -296,10 +291,6 @@ namespace Mod.Cheats
 			s_minDps = float.MaxValue;
 			s_firstHitAt = -1f;
 			s_lastHitAt = -1f;
-			s_onlineObservedEvents = 0;
-			s_onlineAcceptedEvents = 0;
-			s_onlineSkippedDuplicateEvents = 0;
-			s_onlineRejectedParseEvents = 0;
 			s_onlineColorSamples = 0;
 			s_onlineColorCritEvents = 0;
 			s_onlineLastColor = default;
@@ -311,6 +302,7 @@ namespace Mod.Cheats
 			// Keep session peaks until scene change or player-loss.
 			float preservedPeakHit = s_peakHit;
 			float preservedPeakDps = s_peakDps;
+			MaybeLogOnlineColorSummary("inactivity");
 			ResetInternal();
 			s_peakHit = preservedPeakHit;
 			s_peakDps = preservedPeakDps;
@@ -352,6 +344,19 @@ namespace Mod.Cheats
 				wordWrap = true,
 				clipping = TextClipping.Clip
 			};
+		}
+
+		private static void AutoGrowPanelForContent()
+		{
+			if (!Settings.dpsMeterPanelLocked || s_panelLabelStyle == null)
+				return;
+
+			float availableWidth = Mathf.Max(120f, s_panelRect.width - 16f);
+			float neededHeight = s_panelLabelStyle.CalcHeight(new GUIContent(s_panelText), availableWidth) + 34f;
+			if (neededHeight > s_panelRect.height)
+			{
+				s_panelRect.height = neededHeight;
+			}
 		}
 
 		private static void DrawPanelWindow(int windowId)
@@ -471,16 +476,16 @@ namespace Mod.Cheats
 			}
 			else if (s_sourceMode == DpsSourceMode.OnlineRaw)
 			{
-				s_textBuilder.Append("Observed: ").Append(s_onlineObservedEvents)
-					.Append(" | Accepted: ").Append(s_onlineAcceptedEvents).Append('\n');
-				s_textBuilder.Append("Dupes: ").Append(s_onlineSkippedDuplicateEvents)
-					.Append(" | Rejected: ").Append(s_onlineRejectedParseEvents).Append('\n');
+				float critPercent = s_totalHits > 0
+					? (100f * s_onlineColorCritEvents / s_totalHits)
+					: 0f;
 				s_textBuilder.Append("Crits~(color): ").Append(s_onlineColorCritEvents)
-					.Append(" / ").Append(s_onlineColorSamples).Append('\n');
+					.Append(" | Crit %: ").Append(critPercent.ToString("F1", CultureInfo.InvariantCulture)).Append('%').Append('\n');
 				if (s_onlineHasLastColor)
 				{
 					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
 				}
+				AppendOnlineCalibrationText();
 				s_textBuilder.Append("Note: includes all visible damage numbers.\n");
 			}
 			s_textBuilder.Append("Total Damage: ").Append(FormatNumber(s_totalDamage)).Append('\n');
@@ -685,6 +690,104 @@ namespace Mod.Cheats
 		private static string FormatColor(Color color)
 		{
 			return $"{color.r:F2},{color.g:F2},{color.b:F2},{color.a:F2}";
+		}
+
+		private static void RecordOnlineColorSample(Color color)
+		{
+			uint key = ColorToKey(color);
+			if (s_onlineColorHistogram.TryGetValue(key, out int count))
+			{
+				s_onlineColorHistogram[key] = count + 1;
+				return;
+			}
+
+			if (s_onlineColorHistogram.Count >= 24)
+				return;
+
+			s_onlineColorHistogram[key] = 1;
+		}
+
+		private static uint ColorToKey(Color color)
+		{
+			var c32 = (Color32)color;
+			return ((uint)c32.r << 24)
+				| ((uint)c32.g << 16)
+				| ((uint)c32.b << 8)
+				| c32.a;
+		}
+
+		private static Color KeyToColor(uint key)
+		{
+			byte r = (byte)((key >> 24) & 0xFF);
+			byte g = (byte)((key >> 16) & 0xFF);
+			byte b = (byte)((key >> 8) & 0xFF);
+			byte a = (byte)(key & 0xFF);
+			return new Color32(r, g, b, a);
+		}
+
+		private static void AppendOnlineCalibrationText()
+		{
+			if (!TryGetTopOnlineColor(out uint topKey, out int topCount))
+				return;
+
+			var topColor = KeyToColor(topKey);
+			s_textBuilder.Append("Top Color #1: ").Append(FormatColor(topColor)).Append(" x").Append(topCount).Append('\n');
+
+			if (TryGetSecondOnlineColor(topKey, out uint secondKey, out int secondCount))
+			{
+				var secondColor = KeyToColor(secondKey);
+				s_textBuilder.Append("Top Color #2: ").Append(FormatColor(secondColor)).Append(" x").Append(secondCount).Append('\n');
+			}
+		}
+
+		private static bool TryGetTopOnlineColor(out uint colorKey, out int count)
+		{
+			colorKey = 0;
+			count = 0;
+			foreach (var kv in s_onlineColorHistogram)
+			{
+				if (kv.Value <= count)
+					continue;
+				colorKey = kv.Key;
+				count = kv.Value;
+			}
+			return count > 0;
+		}
+
+		private static bool TryGetSecondOnlineColor(uint firstKey, out uint colorKey, out int count)
+		{
+			colorKey = 0;
+			count = 0;
+			foreach (var kv in s_onlineColorHistogram)
+			{
+				if (kv.Key == firstKey || kv.Value <= count)
+					continue;
+				colorKey = kv.Key;
+				count = kv.Value;
+			}
+			return count > 0;
+		}
+
+		private static void MaybeLogOnlineColorSummary(string reason)
+		{
+			if (s_sourceMode != DpsSourceMode.OnlineRaw || s_onlineColorSamples <= 0)
+				return;
+
+			float critPercent = s_totalHits > 0
+				? (100f * s_onlineColorCritEvents / s_totalHits)
+				: 0f;
+			string summary = $"[DpsMeter] Online color summary ({reason}) hits={s_totalHits} crits~={s_onlineColorCritEvents} crit%={critPercent:F1}";
+
+			if (TryGetTopOnlineColor(out uint topKey, out int topCount))
+			{
+				summary += $" | top1={FormatColor(KeyToColor(topKey))}x{topCount}";
+				if (TryGetSecondOnlineColor(topKey, out uint secondKey, out int secondCount))
+				{
+					summary += $" | top2={FormatColor(KeyToColor(secondKey))}x{secondCount}";
+				}
+			}
+
+			Log.InfoThrottled(LogSource.Hooks, $"dps-online-color-summary:{reason}", summary, TimeSpan.FromSeconds(5));
 		}
 	}
 }
