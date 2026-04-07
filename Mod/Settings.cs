@@ -12,6 +12,10 @@ namespace Mod
         public static bool useAutoPot = true;
         public static bool useLootFilter = true;
         public static bool enableNetworkDiagnostics = false; // Verbose receive/send diagnostics for troubleshooting
+        public static bool enableDpsMeter = false;
+        public static float dpsMeterWindowSeconds = 5f;
+        public static float dpsMeterInactivityResetSeconds = 10f;
+        public static bool dpsMeterAutoReset = true;
         public static bool removeFog = true;
         public static bool cameraZoomUnlock = true;
         public static bool minimapZoomUnlock = true;

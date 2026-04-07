@@ -22,6 +22,7 @@ namespace Mod
 		// new dropdowns
 		public static bool automationDropdown = false;
 		public static bool antiIdleSubDropdown = false;
+		public static bool dpsMeterSubDropdown = false;
 		public static bool espDropdown = false;
 		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
 #if DEBUG
@@ -165,6 +166,35 @@ namespace Mod
 					Settings.autoDisconnectCooldownSeconds = GUILayout.HorizontalSlider(Settings.autoDisconnectCooldownSeconds, 1f, 60f);
 
 					Settings.autoDisconnectOnlyWhenNoPotions = GUILayout.Toggle(Settings.autoDisconnectOnlyWhenNoPotions, "Only Disconnect When Out of Potions");
+				}
+
+				dpsMeterSubDropdown = GUILayout.Toggle(dpsMeterSubDropdown, "DPS Meter", "button");
+				if (dpsMeterSubDropdown)
+				{
+					bool wasEnabled = Settings.enableDpsMeter;
+					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay");
+					if (wasEnabled && !Settings.enableDpsMeter)
+					{
+						DpsMeter.Reset();
+					}
+
+					if (Settings.enableDpsMeter)
+					{
+						GUILayout.Label("DPS Window (s): " + Settings.dpsMeterWindowSeconds.ToString("F1"));
+						Settings.dpsMeterWindowSeconds = GUILayout.HorizontalSlider(Settings.dpsMeterWindowSeconds, 1f, 20f);
+
+						Settings.dpsMeterAutoReset = GUILayout.Toggle(Settings.dpsMeterAutoReset, "Auto Reset After Inactivity");
+						if (Settings.dpsMeterAutoReset)
+						{
+							GUILayout.Label("Inactivity Reset (s): " + Settings.dpsMeterInactivityResetSeconds.ToString("F1"));
+							Settings.dpsMeterInactivityResetSeconds = GUILayout.HorizontalSlider(Settings.dpsMeterInactivityResetSeconds, 2f, 60f);
+						}
+
+						if (GUILayout.Button("Reset DPS Stats"))
+						{
+							DpsMeter.Reset();
+						}
+					}
 				}
 			}
 

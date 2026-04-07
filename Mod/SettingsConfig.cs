@@ -35,6 +35,10 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _timeScale;
 		private static MelonPreferences_Entry<bool>? _useLootFilter;
 		private static MelonPreferences_Entry<bool>? _enableNetworkDiagnostics;
+		private static MelonPreferences_Entry<bool>? _enableDpsMeter;
+		private static MelonPreferences_Entry<float>? _dpsMeterWindowSeconds;
+		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
+		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
 
 		// Entries - ESP
 		private static MelonPreferences_Entry<bool>? _showESPLines;
@@ -144,6 +148,10 @@ namespace Mod
 			_timeScale = _general.CreateEntry("TimeScale", Settings.timeScale);
 			_useLootFilter = _general.CreateEntry("UseLootFilter", Settings.useLootFilter);
 			_enableNetworkDiagnostics = _general.CreateEntry("EnableNetworkDiagnostics", Settings.enableNetworkDiagnostics);
+			_enableDpsMeter = _general.CreateEntry("EnableDpsMeter", Settings.enableDpsMeter);
+			_dpsMeterWindowSeconds = _general.CreateEntry("DpsMeterWindowSeconds", Settings.dpsMeterWindowSeconds);
+			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
+			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
 			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
@@ -226,6 +234,10 @@ namespace Mod
 			Settings.timeScale = Clamp(_timeScale!.Value, 0.1f, 10f);
 			Settings.useLootFilter = _useLootFilter!.Value;
 			Settings.enableNetworkDiagnostics = _enableNetworkDiagnostics!.Value;
+			Settings.enableDpsMeter = _enableDpsMeter!.Value;
+			Settings.dpsMeterWindowSeconds = Clamp(_dpsMeterWindowSeconds!.Value, 0.5f, 30f);
+			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
+			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
 			Settings.showESPLabels = _showESPLabels!.Value;
@@ -305,6 +317,10 @@ namespace Mod
 			_timeScale!.Value = Settings.timeScale;
 			_useLootFilter!.Value = Settings.useLootFilter;
 			_enableNetworkDiagnostics!.Value = Settings.enableNetworkDiagnostics;
+			_enableDpsMeter!.Value = Settings.enableDpsMeter;
+			_dpsMeterWindowSeconds!.Value = Settings.dpsMeterWindowSeconds;
+			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
+			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
 
 			_showESPLines!.Value = Settings.showESPLines;
 			_showESPLabels!.Value = Settings.showESPLabels;
@@ -536,6 +552,10 @@ namespace Mod
 			public bool useAutoPot { get; set; }
 			public bool useLootFilter { get; set; }
 			public bool enableNetworkDiagnostics { get; set; }
+			public bool enableDpsMeter { get; set; }
+			public float dpsMeterWindowSeconds { get; set; }
+			public float dpsMeterInactivityResetSeconds { get; set; }
+			public bool dpsMeterAutoReset { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
 			public bool minimapZoomUnlock { get; set; }
@@ -606,6 +626,10 @@ namespace Mod
 				useAutoPot = Settings.useAutoPot,
 				useLootFilter = Settings.useLootFilter,
 				enableNetworkDiagnostics = Settings.enableNetworkDiagnostics,
+				enableDpsMeter = Settings.enableDpsMeter,
+				dpsMeterWindowSeconds = Settings.dpsMeterWindowSeconds,
+				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
+				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
@@ -675,6 +699,10 @@ namespace Mod
 			Settings.useAutoPot = s.useAutoPot;
 			Settings.useLootFilter = s.useLootFilter;
 			Settings.enableNetworkDiagnostics = s.enableNetworkDiagnostics;
+			Settings.enableDpsMeter = s.enableDpsMeter;
+			Settings.dpsMeterWindowSeconds = Clamp(s.dpsMeterWindowSeconds, 0.5f, 30f);
+			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
+			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;

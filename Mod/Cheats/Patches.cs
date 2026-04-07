@@ -506,6 +506,120 @@ namespace Mod.Cheats.Patches
                     }
                 }
             }
+
+            [HarmonyPatch]
+            public class RelayDamageEvents_DamageNumberEvent
+            {
+                private static System.Reflection.MethodBase? s_target;
+                private static bool s_loggedMissing;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var relayType = TypeLookup.FindType(
+                            "Il2Cpp.RelayDamageEvents",
+                            "RelayDamageEvents",
+                            "Il2CppLE.RelayDamageEvents");
+                        if (relayType == null)
+                        {
+                            LogMissingBinding("type");
+                            return false;
+                        }
+
+                        var methods = AccessTools.GetDeclaredMethods(relayType);
+                        for (int i = 0; i < methods.Count; i++)
+                        {
+                            var method = methods[i];
+                            if (!string.Equals(method.Name, "DamageNumberEvent", StringComparison.Ordinal))
+                                continue;
+
+                            var parameters = method.GetParameters();
+                            if (parameters.Length == 0)
+                                continue;
+
+                            if (!IsNumericParameter(parameters[0].ParameterType))
+                                continue;
+
+                            s_target = method;
+                            MelonLogger.Msg($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent bound ({parameters.Length} params)");
+                            return true;
+                        }
+
+                        LogMissingBinding("method");
+                        return false;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        if (!Settings.enableDpsMeter)
+                            return;
+
+                        if (__args == null || __args.Length == 0)
+                            return;
+
+                        if (!TryGetDamage(__args[0], out float damage))
+                            return;
+
+                        DpsMeter.OnDamageSample(__instance, damage);
+                    }
+                    catch
+                    {
+                        // Keep hook non-fatal.
+                    }
+                }
+
+                private static bool IsNumericParameter(Type type)
+                {
+                    return type == typeof(float)
+                        || type == typeof(double)
+                        || type == typeof(int)
+                        || type == typeof(uint)
+                        || type == typeof(long)
+                        || type == typeof(ulong)
+                        || type == typeof(short)
+                        || type == typeof(ushort)
+                        || type == typeof(byte)
+                        || type == typeof(sbyte);
+                }
+
+                private static bool TryGetDamage(object? value, out float damage)
+                {
+                    damage = 0f;
+                    if (value == null)
+                        return false;
+
+                    try
+                    {
+                        damage = Convert.ToSingle(value);
+                        return !float.IsNaN(damage) && !float.IsInfinity(damage);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                private static void LogMissingBinding(string phase)
+                {
+                    if (s_loggedMissing)
+                        return;
+                    s_loggedMissing = true;
+                    MelonLogger.Warning($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent {phase} not found; DPS meter source disabled.");
+                }
+            }
             #endregion
 
             #region waypoint patches
