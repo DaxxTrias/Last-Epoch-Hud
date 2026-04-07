@@ -16,21 +16,12 @@ namespace Mod.Cheats.ESP
 		//        FriendlyNeutral: Seems to be neutral NPCs
 		//        SummonedCorpse: Necromancer summons
 
-		private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
-
-		private static string SanitizeLabel(string? value)
-		{
-			if (string.IsNullOrEmpty(value)) return string.Empty;
-			// Replace control characters that can cause IMGUI clipping or wrapping
-			var sanitized = value.Replace("\r", " ").Replace("\n", " ").Replace("\t", " ");
-			return sanitized.Trim();
-		}
 
 		private static string GetActorName(ActorVisuals actor)
 		{
 			if (actor.isPlayer && actor.UserIdentity != null)
 			{
-				return SanitizeLabel(actor.UserIdentity.Username);
+				return EspUtils.SanitizeLabel(actor.UserIdentity.Username);
 			}
 			else
 			{
@@ -51,17 +42,17 @@ namespace Mod.Cheats.ESP
 
 					if (!string.IsNullOrWhiteSpace(localizedName))
 					{
-						return SanitizeLabel(localizedName);
+						return EspUtils.SanitizeLabel(localizedName);
 					}
 
 					if (!string.IsNullOrWhiteSpace(displayInformation.displayName))
 					{
-						return SanitizeLabel(displayInformation.displayName);
+						return EspUtils.SanitizeLabel(displayInformation.displayName);
 					}
 				}
 			}
 
-			return SanitizeLabel(actor.name);
+			return EspUtils.SanitizeLabel(actor.name);
 		}
 
 		private static Color GetRarityColor(ActorVisuals actor, string alignmentName)
@@ -71,7 +62,7 @@ namespace Mod.Cheats.ESP
 			{
 				if (info.actorClass == DisplayActorClass.Boss) return Color.red;
 				if (info.actorClass == DisplayActorClass.Rare) return Color.yellow;
-				if (info.actorClass == DisplayActorClass.Magic) return MagicLightBlue;
+				if (info.actorClass == DisplayActorClass.Magic) return Drawing.MagicLightBlue;
 				// Normal/other defaults to white
 				return Color.white;
 			}
@@ -79,12 +70,9 @@ namespace Mod.Cheats.ESP
 			return Drawing.AlignmentToColor(alignmentName);
 		}
 
-		public static void GatherActors()
+		public static void GatherActors(GameObject localPlayer)
 		{
 			if (ActorManager.instance == null) return;
-
-			var localPlayer = ObjectManager.GetLocalPlayer();
-			if (localPlayer == null) return;
 
 			foreach (var visual in ActorManager.instance.visuals)
 			{
@@ -148,12 +136,9 @@ namespace Mod.Cheats.ESP
 			}
 		}
 		
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (ObjectManager.HasPlayer())
-			{
-				GatherActors();
-			}
+			GatherActors(player);
 		}
 	}
 }

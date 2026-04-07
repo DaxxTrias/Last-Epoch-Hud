@@ -29,6 +29,7 @@ namespace Mod.Cheats
                     var rootObjects = scene.GetRootGameObjects();
                     foreach (var rootObject in rootObjects)
                     {
+                        //TODO: this method doesn't seem to work for the 'snow fog' in arctic biomes
                         var lights = rootObject.GetComponentsInChildren<HxVolumetricLight>(true);
                         foreach (var light in lights)
                         {

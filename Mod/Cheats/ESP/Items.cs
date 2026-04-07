@@ -19,19 +19,20 @@ namespace Mod.Cheats.ESP
             "Exalted"
         };
 
-        public static void GatherItems()
+        public static void GatherItems(GameObject player)
         {
             if (GroundItemVisuals.all == null) return;
 
-            var localPlayer = ObjectManager.GetLocalPlayer();
-            if (localPlayer == null || localPlayer.transform == null) return;
+            var playerPos = player.transform.position;
+            float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
             foreach (var item in GroundItemVisuals.all._list)
             {
-                // Ensure the item is active in the scene.
                 if (item?.gameObject == null || !item.gameObject.activeInHierarchy) continue;
 
-                if (Vector3.Distance(localPlayer.transform.position, item.transform.position) > Settings.drawDistance) continue;
+                var itemPos = item.transform.position;
+                var delta = itemPos - playerPos;
+                if (delta.sqrMagnitude > maxDistSq) continue;
 
                 if (Settings.useLootFilter)
                 {
@@ -41,7 +42,6 @@ namespace Mod.Cheats.ESP
 
                 var rarity = ResolveItemRarity(item);
 
-                // Ensure rarity is not null before calling ShouldDrawItemRarity.
                 if (string.IsNullOrEmpty(rarity) || !Settings.ShouldDrawItemRarity(rarity))
                 {
                     continue;
@@ -49,10 +49,12 @@ namespace Mod.Cheats.ESP
 
                 var color = Drawing.ItemRarityToColor(rarity);
 
-                ESP.AddLine(localPlayer.transform.position, item.transform.position, color);
-                ESP.AddString(item.itemData.FullName, item.transform.position, color);
+                ESP.AddLine(playerPos, itemPos, color);
+                ESP.AddString(item.itemData.FullName, itemPos, color);
             }
         }
+
+        // Unused import cleanup: ObjectManager no longer called directly
 
         private static string? ResolveItemRarity(GroundItemVisuals item)
         {
@@ -156,12 +158,9 @@ namespace Mod.Cheats.ESP
             return null;
         }
 
-        public static void OnUpdate()
+        public static void OnUpdate(GameObject player)
         {
-            if (ObjectManager.HasPlayer())
-            {
-                GatherItems();
-            }
+            GatherItems(player);
         }
     }
 }

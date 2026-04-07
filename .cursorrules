@@ -28,9 +28,9 @@ The user asks questions about the following:
 - Mod name: `LEHud`; entry class: `Mod.Mod` in `Mod/Mod.cs`; assembly attributes declared in the same file.
 - Single-project layout rooted at `Mod/` with key folders:
   - `Mod/Cheats/` (gameplay patches/features; e.g., `Patches.cs`, `AutoPotion.cs`, `AntiIdleSystem.cs`, `MapHack.cs`)
-  - `Mod/Cheats/ESP/` (ESP-related drawing & logic)
+  - `Mod/Cheats/ESP/` (ESP-related drawing & logic; shared helpers in `EspUtils.cs`)
   - `Mod/Game/` (game-facing helpers; e.g., `ObjectManager.cs`, item filtering)
-  - `Mod/Utils/` (sprites and helpers), `Mod/Drawing.cs` (styles, GUI setup), `Mod/Menu.cs` (IMGUI)
+  - `Mod/Utils/` (sprites, helpers, type lookup), `Mod/Drawing.cs` (styles, GUI setup, shared colors), `Mod/Menu.cs` (IMGUI)
 - Harmony:
   - Harmony ID is `LEHud.Patches`; patches are applied in `OnInitializeMelon()` via `PatchAll(typeof(Mod).Assembly)`.
   - Place new patches under `Mod.Cheats.Patches` (often in `Mod/Cheats/Patches.cs`). Prefer static nested classes per-target with explicit `Prefix/Postfix`.
@@ -39,7 +39,8 @@ The user asks questions about the following:
   - `OnInitializeMelon()` initializes preferences via `SettingsConfig` then applies Harmony patches and verifies IL2CPP targets.
   - `OnLateInitializeMelon()` initializes `Drawing`.
   - `OnUpdate()` is hot-path: calls `ESP.OnUpdate()`, `AutoPotion.OnUpdate()`, `Menu.OnUpdate()`, `MinimapEnemyCircles.Update()`, `AntiIdleSystem.OnUpdate()`, `AutoDisconnect.OnUpdate()` (and `DebugDiagnostics.OnUpdate()` in `#if DEBUG`); avoid allocations and LINQ here.
-  - `OnGUI()` guards reentrancy with a boolean; call `Drawing.SetupGuiStyle()` once per GUI pass; keep allocations minimal.
+  - `ESP.OnUpdate()` fetches the local player **once** via `ObjectManager.GetLocalPlayer()` and passes the `GameObject` to every subsystem (`Items.OnUpdate(player)`, `Actors.OnUpdate(player)`, etc.). Subsystems must **never** re-fetch the player internally — use the passed reference.
+  - `OnGUI()` guards reentrancy with a boolean; call `Drawing.SetupGuiStyle()` once per GUI pass; reuse the cached `GUIContent` instances in `Drawing` (`s_contentA`/`s_contentB`) — never allocate `new GUIContent()` per draw call.
   - Scene lifecycle: both `OnSceneWasLoaded()` and `OnSceneWasInitialized()` call `AutoDisconnect.OnSceneChanged()`; avoid duplicate heavy work in scene callbacks.
   - All Unity API calls must occur on the main thread.
 - Input/keybinds:
@@ -77,6 +78,12 @@ The user asks questions about the following:
   - On application quit, persist preferences (`SettingsConfig.ApplyToPreferencesFromSettings(); Save();`), clean up sprites/drawing, and unpatch via `s_harmony?.UnpatchSelf()`.
 - Drawing/Assets:
   - Use `Drawing` for GUI style setup; use `SpriteManager` and base64 sprites from `SpriteBases` for runtime icons; clean them up on quit.
+  - Shared colors live in `Drawing`: `BloodOrange`, `MagicLightBlue`. Add new shared colors there rather than defining them per-file.
+  - ESP draw primitives (`LineDrawing`, `StringDrawing`) are `readonly struct` to avoid per-frame heap allocations. Keep them value types.
+- ESP shared helpers (`EspUtils`):
+  - `EspUtils.SanitizeLabel(string?)` — use for any user-facing label from IL2CPP (strips control chars, trims). Do not duplicate this logic.
+  - `EspUtils.IsComponentEnabled(Component)` — safe Behaviour.enabled check with IL2CPP fault tolerance. Do not duplicate this logic.
+  - When adding a new ESP subsystem, follow the existing pattern: accept `GameObject player` in `OnUpdate`, use `sqrMagnitude` for distance checks, guard with the relevant `Settings.espShow*` toggle.
 
 ### Code Implementation Guidelines
 
@@ -94,12 +101,12 @@ The user asks questions about the following:
 - **MelonLoader Lifecycle**
   - Use `OnInitializeMelon` to: load & validate config (`SettingsConfig.Init/Load...`), create Harmony instance with `LEHud.Patches`, register patches, verify IL2CPP targets.
   - Use `OnUpdate` for lightweight polling and input handling; keep per-frame work allocation-free.
-  - Use `OnGUI` minimally; reuse styles and `GUIContent` where applicable.
+  - Use `OnGUI` minimally; reuse styles and `Drawing`'s cached `GUIContent` instances — never allocate `new GUIContent()` in draw methods.
   - Ensure clean teardown in `OnApplicationQuit`: unpatch by Harmony ID, dispose singletons, stop coroutines, persist config.
 
 - **Harmony Patching**
   - Prefer narrow, explicit patches: target specific overloads with `MethodType`/argument types.
-  - Cache `MethodInfo`/`FieldInfo` using `AccessTools` at init time; avoid reflection in `Update`.
+  - Cache `MethodInfo`/`FieldInfo` using `AccessTools` at init time; avoid reflection in `Update`. For runtime-resolved types (e.g., `AntiIdleSystem` heartbeat bindings), use a `ResolveXxxBindings(Type)` pattern that runs once per type and stores results in static fields.
   - Prefix returns `bool` to optionally skip original; use `ref` parameters and `__state` for contextual data where needed.
   - Postfix for result adjustments; Transpiler only when unavoidable — document IL intent and include guards.
   - Guard clauses: fast checks to bail out for disabled features or null/invalid states.
@@ -115,6 +122,10 @@ The user asks questions about the following:
   - Minimize allocations in `Update`/render loops; avoid LINQ in hot paths; use pooled collections.
   - Prefer `static readonly` caches; micro-opt only with evidence (logs or profiler data).
   - Add simple frame budgeters (Stopwatch-based) for periodic tasks to avoid stutter where applicable.
+  - Use `sqrMagnitude` instead of `Vector3.Distance` when comparing against a threshold (avoids per-item square root). Pre-compute `maxDistSq = drawDistance * drawDistance` once per frame.
+  - Hoist `ObjectManager.GetLocalPlayer()` and `.transform.position` outside loops — never fetch inside a per-entity iteration.
+  - Cache reflection (`GetProperty`/`GetField`/`GetMethod`) results in static fields; resolve once at init or on first use, not on every call. Reset cached bindings in the relevant `ClearCache()` when the target object changes.
+  - Prefer `readonly struct` over `class` for short-lived data passed through lists (ESP draw commands, etc.) to keep them on the managed heap's backing array instead of as individual GC-tracked objects.
 
 - **Configuration & Telemetry**
   - Use `SettingsConfig` with MelonPreferences-backed categories; default-safe values; hot-reload support via `OnPreferencesLoaded`.
@@ -135,6 +146,7 @@ The user asks questions about the following:
   - Match existing style and formatting; keep names descriptive; avoid deep nesting; prefer guard clauses.
   - Use file-scoped namespaces where consistent with the codebase; otherwise keep braces style consistent with current files.
   - Suffix async methods with `Async`; keep functions small and focused; add XML docs for public APIs.
+  - **DRY**: Before writing a helper method, check if an equivalent already exists in `EspUtils`, `Drawing`, `ObjectManager`, or `Mod.Utils`. If a method is needed by two or more classes, extract it to the appropriate shared location rather than duplicating. When the same data (player ref, player position, draw distance squared) is needed by multiple call sites within a single frame, compute it once and pass it through parameters.
 
 - **Security & Ethics**
   - Do not exfiltrate user data; avoid interacting with multiplayer/anticheat-sensitive code unless explicitly allowed.
@@ -155,4 +167,5 @@ The user asks questions about the following:
 
 - Project: `Mod/Mod.csproj` (`net6.0`, `LangVersion=preview`, `Nullable=enable`, `AllowUnsafeBlocks=true`, `RuntimeIdentifier=win-x64`).
 - References via HintPath to game install: `MelonLoader.dll`, `0Harmony.dll`, `Il2CppInterop.*.dll`, `UnityEngine.*.dll`, `Il2CppLE*.dll`, `Il2CppLidgren.Network.dll`, `Il2CppSteamworks`.
+- Investigation path for early/pre-alpha game files (relative from `Mod/`): `../../Last-Epoch` (assets at `../../Last-Epoch/Assets`). Prefer this relative path over hard links/junctions.
 - Output: copy built DLL to the game `Mods` directory. Ensure paths align with your Steam install.

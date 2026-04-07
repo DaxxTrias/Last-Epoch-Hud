@@ -13,12 +13,6 @@ namespace Mod.Cheats.ESP
 		private static readonly List<string> s_shrineNames = new List<string>(16);
 		private static readonly Color ShrineColor = Drawing.BloodOrange;
 
-		private static string SanitizeLabel(string? value)
-		{
-			if (string.IsNullOrEmpty(value)) return string.Empty;
-			var sanitized = value.Replace("\r", " ").Replace("\n", " ").Replace("\t", " ");
-			return sanitized.Trim();
-		}
 
 		public static void OnSceneChanged()
 		{
@@ -28,28 +22,22 @@ namespace Mod.Cheats.ESP
 			s_shrineNames.Clear();
 		}
 
+		private static readonly string[] ManagerNameCandidates =
+		{
+			"Shrine Placement Manager",
+			"ShrinePlacementManager",
+			"Shrine Manager",
+			"ShrineManager"
+		};
+
 		private static void TryFindManager()
 		{
 			if (s_shrineManager != null) return;
 
-			// Primary: exact-name lookup (observed in inspector)
-			s_shrineManager = GameObject.Find("Shrine Placement Manager");
-			if (s_shrineManager != null) return;
-
-			// Fallback: broader scan for any object that looks like a shrine container
-			// We avoid allocations by iterating transforms
-			var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
-			for (int i = 0; i < allTransforms.Length; i++)
+			for (int i = 0; i < ManagerNameCandidates.Length; i++)
 			{
-				var tr = allTransforms[i];
-				if (tr == null || tr.gameObject == null) continue;
-				var go = tr.gameObject;
-				// Heuristic: manager with multiple children named "Shrine Spot" or containing active shrine clones
-				if (go.name != null && go.name.IndexOf("Shrine", StringComparison.OrdinalIgnoreCase) >= 0 && tr.childCount > 0)
-				{
-					s_shrineManager = go;
-					break;
-				}
+				s_shrineManager = GameObject.Find(ManagerNameCandidates[i]);
+				if (s_shrineManager != null) return;
 			}
 		}
 
@@ -62,13 +50,13 @@ namespace Mod.Cheats.ESP
 				{
 					string? localized = null;
 					try { localized = info.GetLocalizedName(); } catch (Exception) { }
-					if (!string.IsNullOrWhiteSpace(localized)) return SanitizeLabel(localized);
-					if (!string.IsNullOrWhiteSpace(info.displayName)) return SanitizeLabel(info.displayName);
+					if (!string.IsNullOrWhiteSpace(localized)) return EspUtils.SanitizeLabel(localized);
+					if (!string.IsNullOrWhiteSpace(info.displayName)) return EspUtils.SanitizeLabel(info.displayName);
 				}
 			}
 			catch (Exception) { /* Some builds may lack DisplayInformation; fall back to name */ }
 
-			return SanitizeLabel(shrineGo.name);
+			return EspUtils.SanitizeLabel(shrineGo.name);
 		}
 
 		private static bool LooksLikeShrine(GameObject go)
@@ -91,16 +79,6 @@ namespace Mod.Cheats.ESP
 			return false;
 		}
 
-		private static bool IsComponentEnabled(Component comp)
-		{
-			try
-			{
-				var behaviour = comp as Behaviour;
-				if (behaviour != null) return behaviour.enabled;
-			}
-			catch (Exception) { }
-			return true; // assume enabled if unknown
-		}
 
 		private static bool IsShrineInteractable(GameObject go)
 		{
@@ -119,7 +97,7 @@ namespace Mod.Cheats.ESP
 			// var collider = go.GetComponent<BoxCollider>();
 			// if (collider != null) { anyFound = true; anyEnabled |= collider.enabled; }
 			var outline = go.GetComponent<OutlineOnMouseOver>();
-			if (outline != null) { anyFound = true; anyEnabled |= IsComponentEnabled(outline); }
+			if (outline != null) { anyFound = true; anyEnabled |= EspUtils.IsComponentEnabled(outline); }
 
 			// If no known components are present, treat as not interactable to avoid placeholders
 			return anyFound && anyEnabled;
@@ -168,17 +146,15 @@ namespace Mod.Cheats.ESP
 			}
 		}
 
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (!ObjectManager.HasPlayer()) return;
 			if (!Settings.espShowShrines) return;
 
 			RebuildShrineCacheIfNeeded();
 			if (s_shrineTransforms.Count == 0) return;
 
-			var localPlayer = ObjectManager.GetLocalPlayer();
-			if (localPlayer == null) return;
-			var playerPos = localPlayer.transform.position;
+			var playerPos = player.transform.position;
+			float maxDistSq = Settings.drawDistance * Settings.drawDistance;
 
 			for (int i = 0; i < s_shrineTransforms.Count; i++)
 			{
@@ -186,19 +162,14 @@ namespace Mod.Cheats.ESP
 				if (tr == null) continue;
 				var go = tr.gameObject;
 				if (go == null || !go.activeInHierarchy) continue;
-				if (!IsShrineInteractable(go)) continue; // was used since cache built
+				if (!IsShrineInteractable(go)) continue;
 
 				var pos = tr.position;
-				if (Vector3.Distance(playerPos, pos) > Settings.drawDistance) continue;
+				var delta = pos - playerPos;
+				if (delta.sqrMagnitude > maxDistSq) continue;
 
 				var labelPos = pos; labelPos.y += 0.5f;
-				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : SanitizeLabel(go.name);
-
-				// Respect global specials toggle and per-special whitelist
-				// If user provided a whitelist, honor it; otherwise draw all shrines
-				bool draw = true;
-				try { draw = Settings.ShouldDrawShrine(name) || true; } catch (Exception) { draw = true; }
-				if (!draw) continue;
+				var name = (i < s_shrineNames.Count) ? s_shrineNames[i] : EspUtils.SanitizeLabel(go.name);
 
 				if (Settings.showESPLines) ESP.AddLine(playerPos, pos, ShrineColor);
 				if (Settings.showESPLabels) ESP.AddString(name, labelPos, ShrineColor);

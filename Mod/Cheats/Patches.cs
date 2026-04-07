@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using MelonLoader;
 using Il2Cpp;
 // using Il2CppDMM;
@@ -506,6 +506,150 @@ namespace Mod.Cheats.Patches
                     }
                 }
             }
+
+            [HarmonyPatch]
+            public class RelayDamageEvents_DamageNumberEvent
+            {
+                private static System.Reflection.MethodBase? s_target;
+                private static bool s_loggedMissing;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var relayType = TypeLookup.FindType(
+                            "Il2Cpp.RelayDamageEvents",
+                            "RelayDamageEvents",
+                            "Il2CppLE.RelayDamageEvents");
+                        if (relayType == null)
+                        {
+                            LogMissingBinding("type");
+                            return false;
+                        }
+
+                        var methods = AccessTools.GetDeclaredMethods(relayType);
+                        for (int i = 0; i < methods.Count; i++)
+                        {
+                            var method = methods[i];
+                            if (!string.Equals(method.Name, "DamageNumberEvent", StringComparison.Ordinal))
+                                continue;
+
+                            var parameters = method.GetParameters();
+                            if (parameters.Length == 0)
+                                continue;
+
+                            if (!IsNumericParameter(parameters[0].ParameterType))
+                                continue;
+
+                            s_target = method;
+                            MelonLogger.Msg($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent bound ({parameters.Length} params)");
+                            return true;
+                        }
+
+                        LogMissingBinding("method");
+                        return false;
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent Prepare error: {e.Message}");
+                        return false;
+                    }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance, object[] __args)
+                {
+                    try
+                    {
+                        if (!Settings.enableDpsMeter)
+                            return;
+
+                        if (__args == null || __args.Length == 0)
+                            return;
+
+                        if (!TryGetDamage(__args[0], out float damage))
+                            return;
+
+                        int hitEvents = 0;
+                        if (__args.Length > 1)
+                        {
+                            TryGetHitEventFlags(__args[1], out hitEvents);
+                        }
+
+                        DpsMeter.OnDamageEvent(__instance, damage, hitEvents);
+                    }
+                    catch
+                    {
+                        // Keep hook non-fatal.
+                    }
+                }
+
+                private static bool IsNumericParameter(Type type)
+                {
+                    return type == typeof(float)
+                        || type == typeof(double)
+                        || type == typeof(int)
+                        || type == typeof(uint)
+                        || type == typeof(long)
+                        || type == typeof(ulong)
+                        || type == typeof(short)
+                        || type == typeof(ushort)
+                        || type == typeof(byte)
+                        || type == typeof(sbyte);
+                }
+
+                private static bool TryGetDamage(object? value, out float damage)
+                {
+                    damage = 0f;
+                    if (value == null)
+                        return false;
+
+                    try
+                    {
+                        damage = Convert.ToSingle(value);
+                        return !float.IsNaN(damage) && !float.IsInfinity(damage);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                private static bool TryGetHitEventFlags(object? value, out int flags)
+                {
+                    flags = 0;
+                    if (value == null)
+                        return false;
+
+                    try
+                    {
+                        flags = Convert.ToInt32(value);
+                        return true;
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            return int.TryParse(value.ToString(), out flags);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                private static void LogMissingBinding(string phase)
+                {
+                    if (s_loggedMissing)
+                        return;
+                    s_loggedMissing = true;
+                    MelonLogger.Warning($"[LeHud.Hooks]  RelayDamageEvents.DamageNumberEvent {phase} not found; DPS meter source disabled.");
+                }
+            }
             #endregion
 
             #region waypoint patches
@@ -1002,6 +1146,126 @@ namespace Mod.Cheats.Patches
 
             #region networking / anti-idle patches
 
+            [HarmonyPatch]
+            public class EpochInputManager_Awake
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "Awake", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Postfix(object __instance)
+                {
+                    try
+                    {
+                        EpochInputManagerBridge.RegisterKnownInstance(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.Awake Postfix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class EpochInputManager_OnDestroy
+            {
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "OnDestroy", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Prefix(object __instance)
+                {
+                    try
+                    {
+                        EpochInputManagerBridge.ClearKnownInstance(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.OnDestroy Prefix error: {e.Message}");
+                    }
+                }
+            }
+
+            [HarmonyPatch]
+            public class EpochInputManager_CheckIdleInput
+            {
+                // Keep observer/assist code available, but disabled by default.
+                private static readonly bool s_enableObserver = false;
+                private static System.Reflection.MethodBase? s_target;
+
+                [HarmonyPrepare]
+                public static bool Prepare()
+                {
+                    if (!s_enableObserver)
+                        return false;
+
+                    try
+                    {
+                        var t = TypeLookup.FindType(
+                            "Il2Cpp.EpochInputManager",
+                            "EpochInputManager",
+                            "Il2CppLE.EpochInputManager",
+                            "Il2CppLE.Input.EpochInputManager");
+                        if (t == null) return false;
+                        s_target = AccessTools.Method(t, "CheckIdleInput", Type.EmptyTypes);
+                        return s_target != null;
+                    }
+                    catch { return false; }
+                }
+
+                [HarmonyTargetMethod]
+                public static System.Reflection.MethodBase TargetMethod() => s_target!;
+
+                public static void Postfix(object __instance)
+                {
+                    try
+                    {
+                        _ = __instance;
+                        // EpochInputManagerBridge.OnCheckIdleInputObserved(__instance);
+                    }
+                    catch (Exception e)
+                    {
+                        MelonLogger.Error($"[LeHud.Hooks]  EpochInputManager.CheckIdleInput Postfix error: {e.Message}");
+                    }
+                }
+            }
+
             // Force game idle flags to false when Simple Anti-Idle is enabled
             [HarmonyPatch(typeof(ClientStateController), "get_IsIdle")]
             public class ClientStateController_IsIdle
@@ -1011,7 +1275,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        if (Settings.useSimpleAntiIdle && Settings.forceIsIdleFalseFallback && !ObjectManager.IsOfflineMode())
                         {
                             if (__result)
                             {
@@ -1039,7 +1303,7 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        if (Settings.useSimpleAntiIdle && !ObjectManager.IsOfflineMode())
+                        if (Settings.useSimpleAntiIdle && Settings.forceIsIdleFalseFallback && !ObjectManager.IsOfflineMode())
                         {
                             if (__result)
                             {

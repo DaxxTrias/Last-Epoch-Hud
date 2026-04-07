@@ -58,6 +58,7 @@ namespace Mod
 		{
 			//MelonLogger.Msg("OnSceneWasLoaded: " + buildindex.ToString() + " | " + sceneName); // occurs before scene init
 			AutoDisconnect.OnSceneChanged();
+			DpsMeter.OnSceneChanged();
 			GameMods.FogRemover();
 		}
 
@@ -118,6 +119,7 @@ namespace Mod
 				}
 
 				Menu.OnUpdate();
+				DpsMeter.OnUpdate();
 				AntiIdleSystem.OnUpdate(); // Add anti-idle system
 				if (Settings.timeScale != 1.0f)
 					UnityEngine.Time.timeScale = Settings.timeScale;
@@ -150,6 +152,7 @@ namespace Mod
 				Drawing.SetupGuiStyle();
 				Menu.OnGUI();
 				ESP.OnGUI();
+				DpsMeter.OnGUI();
 #if DEBUG
 				DebugDiagnostics.OnGUI();
 #endif

@@ -12,11 +12,16 @@ namespace Mod
         public static bool useAutoPot = true;
         public static bool useLootFilter = true;
         public static bool enableNetworkDiagnostics = false; // Verbose receive/send diagnostics for troubleshooting
+        public static bool enableDpsMeter = false;
+        public static float dpsMeterWindowSeconds = 5f;
+        public static float dpsMeterInactivityResetSeconds = 10f;
+        public static bool dpsMeterAutoReset = true;
         public static bool removeFog = true;
         public static bool cameraZoomUnlock = true;
         public static bool minimapZoomUnlock = true;
         public static bool playerLantern = true;
         public static bool useAnyWaypoint = false;
+        public static bool blockMenuInputWhenOpen = false; // Block keyboard/mouse gameplay input while menu is visible
         public static bool useAntiIdle = false;
         // public static bool debugESPNames = false;
 
@@ -29,6 +34,7 @@ namespace Mod
         // Simple Anti-Idle (UI pulse)
         public static bool useSimpleAntiIdle = false; // Invoke UI key handlers instead of crafting packets
         public static float simpleAntiIdleInterval = 300f; // Default 5 minutes
+        public static bool forceIsIdleFalseFallback = false; // Optional fallback: force IsIdle getters false in online mode
 
         // Anti-Idle suppression controls
         public static bool suppressKeepAliveOnActivity = true; // Pause synthetic keepalive when user activity is detected

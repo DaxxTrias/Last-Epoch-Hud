@@ -398,3 +398,4 @@ FodyWeavers.xsd
 *.sln.iml
 .github
 Mod/Properties/launchSettings.json
+investigation/*

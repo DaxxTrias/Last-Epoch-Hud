@@ -65,7 +65,6 @@ namespace Mod.Cheats
         private static Sprite? spriteBlue;
         private static Sprite? spriteRed;
 
-        private static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
         
         public static void Update()
         {
@@ -276,7 +275,7 @@ namespace Mod.Cheats
             const int baseSize = 16;
             if (spriteWhite == null) spriteWhite = BuildCircleSprite(baseSize, Color.white);
             if (spriteYellow == null) spriteYellow = BuildCircleSprite(baseSize, Color.yellow);
-            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, MagicLightBlue);
+            if (spriteBlue == null) spriteBlue = BuildCircleSprite(baseSize, Drawing.MagicLightBlue);
             if (spriteRed == null) spriteRed = BuildCircleSprite(baseSize, Color.red);
         }
         

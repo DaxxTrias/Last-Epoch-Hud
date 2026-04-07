@@ -35,6 +35,10 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _timeScale;
 		private static MelonPreferences_Entry<bool>? _useLootFilter;
 		private static MelonPreferences_Entry<bool>? _enableNetworkDiagnostics;
+		private static MelonPreferences_Entry<bool>? _enableDpsMeter;
+		private static MelonPreferences_Entry<float>? _dpsMeterWindowSeconds;
+		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
+		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
 
 		// Entries - ESP
 		private static MelonPreferences_Entry<bool>? _showESPLines;
@@ -63,6 +67,7 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _minimapZoomUnlock;
 		private static MelonPreferences_Entry<bool>? _playerLantern;
 		private static MelonPreferences_Entry<bool>? _useAnyWaypoint;
+		private static MelonPreferences_Entry<bool>? _blockMenuInputWhenOpen;
 
 		// Entries - AutoPotion
 		private static MelonPreferences_Entry<bool>? _useAutoPot;
@@ -78,6 +83,7 @@ namespace Mod
 		// private static MelonPreferences_Entry<float>? _networkActivitySuppressionSeconds;
 		private static MelonPreferences_Entry<bool>? _useSimpleAntiIdle;
 		private static MelonPreferences_Entry<float>? _simpleAntiIdleInterval;
+		private static MelonPreferences_Entry<bool>? _forceIsIdleFalseFallback;
 
 		// Entries - AutoDisconnect
 		private static MelonPreferences_Entry<bool>? _useAutoDisconnect;
@@ -142,6 +148,10 @@ namespace Mod
 			_timeScale = _general.CreateEntry("TimeScale", Settings.timeScale);
 			_useLootFilter = _general.CreateEntry("UseLootFilter", Settings.useLootFilter);
 			_enableNetworkDiagnostics = _general.CreateEntry("EnableNetworkDiagnostics", Settings.enableNetworkDiagnostics);
+			_enableDpsMeter = _general.CreateEntry("EnableDpsMeter", Settings.enableDpsMeter);
+			_dpsMeterWindowSeconds = _general.CreateEntry("DpsMeterWindowSeconds", Settings.dpsMeterWindowSeconds);
+			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
+			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
 			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
@@ -168,6 +178,7 @@ namespace Mod
 			_minimapZoomUnlock = _patches.CreateEntry("MinimapZoomUnlock", Settings.minimapZoomUnlock);
 			_playerLantern = _patches.CreateEntry("PlayerLantern", Settings.playerLantern);
 			_useAnyWaypoint = _patches.CreateEntry("UseAnyWaypoint", Settings.useAnyWaypoint);
+			_blockMenuInputWhenOpen = _patches.CreateEntry("BlockMenuInputWhenOpen", Settings.blockMenuInputWhenOpen);
 
 			_useAutoPot = _autoPotion.CreateEntry("UseAutoPot", Settings.useAutoPot);
 			_autoHealthPotion = _autoPotion.CreateEntry("AutoHealthPotionPercent", Settings.autoHealthPotion);
@@ -177,6 +188,7 @@ namespace Mod
 			_antiIdleInterval = _antiIdle.CreateEntry("AntiIdleIntervalSeconds", Settings.antiIdleInterval);
 			_useSimpleAntiIdle = _antiIdle.CreateEntry("UseSimpleAntiIdle", Settings.useSimpleAntiIdle);
 			_simpleAntiIdleInterval = _antiIdle.CreateEntry("SimpleAntiIdleIntervalSeconds", Settings.simpleAntiIdleInterval);
+			_forceIsIdleFalseFallback = _antiIdle.CreateEntry("ForceIsIdleFalseFallback", Settings.forceIsIdleFalseFallback);
 			_suppressKeepAliveOnActivity = _antiIdle.CreateEntry("SuppressKeepAliveOnActivity", Settings.suppressKeepAliveOnActivity);
 			_activitySuppressionSeconds = _antiIdle.CreateEntry("ActivitySuppressionSeconds", Settings.activitySuppressionSeconds);
 			_sceneChangeSuppressionSeconds = _antiIdle.CreateEntry("SceneChangeSuppressionSeconds", Settings.sceneChangeSuppressionSeconds);
@@ -222,6 +234,10 @@ namespace Mod
 			Settings.timeScale = Clamp(_timeScale!.Value, 0.1f, 10f);
 			Settings.useLootFilter = _useLootFilter!.Value;
 			Settings.enableNetworkDiagnostics = _enableNetworkDiagnostics!.Value;
+			Settings.enableDpsMeter = _enableDpsMeter!.Value;
+			Settings.dpsMeterWindowSeconds = Clamp(_dpsMeterWindowSeconds!.Value, 0.5f, 30f);
+			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
+			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
 			Settings.showESPLabels = _showESPLabels!.Value;
@@ -248,6 +264,7 @@ namespace Mod
 			Settings.minimapZoomUnlock = _minimapZoomUnlock!.Value;
 			Settings.playerLantern = _playerLantern!.Value;
 			Settings.useAnyWaypoint = _useAnyWaypoint!.Value;
+			Settings.blockMenuInputWhenOpen = _blockMenuInputWhenOpen!.Value;
 
 			Settings.useAutoPot = _useAutoPot!.Value;
 			Settings.autoHealthPotion = Clamp(_autoHealthPotion!.Value, 0f, 100f);
@@ -257,6 +274,7 @@ namespace Mod
 			Settings.antiIdleInterval = Clamp(_antiIdleInterval!.Value, 10f, 600f);
 			Settings.useSimpleAntiIdle = _useSimpleAntiIdle!.Value;
 			Settings.simpleAntiIdleInterval = Clamp(_simpleAntiIdleInterval!.Value, 60f, 1800f);
+			Settings.forceIsIdleFalseFallback = _forceIsIdleFalseFallback!.Value;
 			Settings.suppressKeepAliveOnActivity = _suppressKeepAliveOnActivity!.Value;
 			Settings.activitySuppressionSeconds = Clamp(_activitySuppressionSeconds!.Value, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(_sceneChangeSuppressionSeconds!.Value, 0f, 600f);
@@ -299,6 +317,10 @@ namespace Mod
 			_timeScale!.Value = Settings.timeScale;
 			_useLootFilter!.Value = Settings.useLootFilter;
 			_enableNetworkDiagnostics!.Value = Settings.enableNetworkDiagnostics;
+			_enableDpsMeter!.Value = Settings.enableDpsMeter;
+			_dpsMeterWindowSeconds!.Value = Settings.dpsMeterWindowSeconds;
+			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
+			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
 
 			_showESPLines!.Value = Settings.showESPLines;
 			_showESPLabels!.Value = Settings.showESPLabels;
@@ -325,6 +347,7 @@ namespace Mod
 			_minimapZoomUnlock!.Value = Settings.minimapZoomUnlock;
 			_playerLantern!.Value = Settings.playerLantern;
 			_useAnyWaypoint!.Value = Settings.useAnyWaypoint;
+			_blockMenuInputWhenOpen!.Value = Settings.blockMenuInputWhenOpen;
 
 			_useAutoPot!.Value = Settings.useAutoPot;
 			_autoHealthPotion!.Value = Settings.autoHealthPotion;
@@ -334,6 +357,7 @@ namespace Mod
 			_antiIdleInterval!.Value = Settings.antiIdleInterval;
 			_useSimpleAntiIdle!.Value = Settings.useSimpleAntiIdle;
 			_simpleAntiIdleInterval!.Value = Settings.simpleAntiIdleInterval;
+			_forceIsIdleFalseFallback!.Value = Settings.forceIsIdleFalseFallback;
 			_suppressKeepAliveOnActivity!.Value = Settings.suppressKeepAliveOnActivity;
 			_activitySuppressionSeconds!.Value = Settings.activitySuppressionSeconds;
 			_sceneChangeSuppressionSeconds!.Value = Settings.sceneChangeSuppressionSeconds;
@@ -528,17 +552,23 @@ namespace Mod
 			public bool useAutoPot { get; set; }
 			public bool useLootFilter { get; set; }
 			public bool enableNetworkDiagnostics { get; set; }
+			public bool enableDpsMeter { get; set; }
+			public float dpsMeterWindowSeconds { get; set; }
+			public float dpsMeterInactivityResetSeconds { get; set; }
+			public bool dpsMeterAutoReset { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
 			public bool minimapZoomUnlock { get; set; }
 			public bool playerLantern { get; set; }
 			public bool useAnyWaypoint { get; set; }
+			public bool blockMenuInputWhenOpen { get; set; }
 			public bool useAntiIdle { get; set; }
 			public float antiIdleInterval { get; set; }
 			public bool suppressKeepAliveOnActivity { get; set; }
 			public float activitySuppressionSeconds { get; set; }
 			public float sceneChangeSuppressionSeconds { get; set; }
 			public float networkActivitySuppressionSeconds { get; set; }
+			public bool forceIsIdleFalseFallback { get; set; }
 			public bool useAutoDisconnect { get; set; }
 			public float autoDisconnectHealthPercent { get; set; }
 			public float autoDisconnectCooldownSeconds { get; set; }
@@ -596,13 +626,19 @@ namespace Mod
 				useAutoPot = Settings.useAutoPot,
 				useLootFilter = Settings.useLootFilter,
 				enableNetworkDiagnostics = Settings.enableNetworkDiagnostics,
+				enableDpsMeter = Settings.enableDpsMeter,
+				dpsMeterWindowSeconds = Settings.dpsMeterWindowSeconds,
+				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
+				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
 				playerLantern = Settings.playerLantern,
 				useAnyWaypoint = Settings.useAnyWaypoint,
+				blockMenuInputWhenOpen = Settings.blockMenuInputWhenOpen,
 				useAntiIdle = Settings.useAntiIdle,
 				antiIdleInterval = Settings.antiIdleInterval,
+				forceIsIdleFalseFallback = Settings.forceIsIdleFalseFallback,
 				suppressKeepAliveOnActivity = Settings.suppressKeepAliveOnActivity,
 				activitySuppressionSeconds = Settings.activitySuppressionSeconds,
 				sceneChangeSuppressionSeconds = Settings.sceneChangeSuppressionSeconds,
@@ -663,13 +699,19 @@ namespace Mod
 			Settings.useAutoPot = s.useAutoPot;
 			Settings.useLootFilter = s.useLootFilter;
 			Settings.enableNetworkDiagnostics = s.enableNetworkDiagnostics;
+			Settings.enableDpsMeter = s.enableDpsMeter;
+			Settings.dpsMeterWindowSeconds = Clamp(s.dpsMeterWindowSeconds, 0.5f, 30f);
+			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
+			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;
 			Settings.playerLantern = s.playerLantern;
 			Settings.useAnyWaypoint = s.useAnyWaypoint;
+			Settings.blockMenuInputWhenOpen = s.blockMenuInputWhenOpen;
 			Settings.useAntiIdle = s.useAntiIdle;
 			Settings.antiIdleInterval = Clamp(s.antiIdleInterval, 10f, 600f);
+			Settings.forceIsIdleFalseFallback = s.forceIsIdleFalseFallback;
 			Settings.suppressKeepAliveOnActivity = s.suppressKeepAliveOnActivity;
 			Settings.activitySuppressionSeconds = Clamp(s.activitySuppressionSeconds, 0f, 600f);
 			Settings.sceneChangeSuppressionSeconds = Clamp(s.sceneChangeSuppressionSeconds, 0f, 600f);

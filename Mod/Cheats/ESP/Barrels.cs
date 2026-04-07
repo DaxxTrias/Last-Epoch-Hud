@@ -38,14 +38,11 @@ namespace Mod.Cheats.ESP
 		private static readonly string[] ActorsMemberNames = { "actors", "Actors" };
 		private static readonly string[] DListBackingNames = { "_list", "list", "List" };
 
-		public static void OnUpdate()
+		public static void OnUpdate(GameObject player)
 		{
-			if (!ObjectManager.HasPlayer()) return;
 			if (!Settings.ShouldDrawNPCAlignment(BarrelAlignmentName)) return;
 
-			var localPlayer = ObjectManager.GetLocalPlayer();
-			if (localPlayer == null) return;
-			var localPos = localPlayer.transform.position;
+			var localPos = player.transform.position;
 			float maxDistance = Settings.drawDistance;
 
 			if (!EnsureReflectionBindings()) return;

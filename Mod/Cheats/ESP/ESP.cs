@@ -1,3 +1,4 @@
+using Mod.Game;
 using UnityEngine;
 
 namespace Mod.Cheats.ESP
@@ -96,13 +97,16 @@ namespace Mod.Cheats.ESP
         public static void OnUpdate()
 		{
 			Clear();
-			Items.OnUpdate();
-			GoldPiles.OnUpdate();
-			Shrines.OnUpdate();
-			RunePrisons.OnUpdate();
-			Chests.OnUpdate();
-			Barrels.OnUpdate();
-			Actors.OnUpdate();
+			var player = ObjectManager.GetLocalPlayer();
+			if (player == null) return;
+
+			Items.OnUpdate(player);
+			GoldPiles.OnUpdate(player);
+			Shrines.OnUpdate(player);
+			RunePrisons.OnUpdate(player);
+			Chests.OnUpdate(player);
+			Barrels.OnUpdate(player);
+			Actors.OnUpdate(player);
 #if DEBUG
 			DebugDiagnostics.OnUpdate();
 #endif

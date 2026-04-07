@@ -14,6 +14,7 @@ namespace Mod
 		// private const int DebugMaxLogsPerFrame = 8;
 
 		public static readonly Color BloodOrange = new Color(1.00f, 0.50f, 0.00f, 1f);
+		public static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
 		private static readonly Vector2 LabelScreenPadding = new Vector2(25f, 25f);
 		private static readonly Color EmphasizedOutlineColor = new Color(0f, 0f, 0f, 0.95f);
 

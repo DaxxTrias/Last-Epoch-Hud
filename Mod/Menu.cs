@@ -5,6 +5,7 @@ using MelonLoader;
 using Mod.Cheats;
 using Mod.Cheats.ESP;
 using Mod.Game;
+using Mod.Utils;
 
 namespace Mod
 {
@@ -21,6 +22,7 @@ namespace Mod
 		// new dropdowns
 		public static bool automationDropdown = false;
 		public static bool antiIdleSubDropdown = false;
+		public static bool dpsMeterSubDropdown = false;
 		public static bool espDropdown = false;
 		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
 #if DEBUG
@@ -165,6 +167,40 @@ namespace Mod
 
 					Settings.autoDisconnectOnlyWhenNoPotions = GUILayout.Toggle(Settings.autoDisconnectOnlyWhenNoPotions, "Only Disconnect When Out of Potions");
 				}
+
+				dpsMeterSubDropdown = GUILayout.Toggle(dpsMeterSubDropdown, "DPS Meter", "button");
+				if (dpsMeterSubDropdown)
+				{
+					bool wasEnabled = Settings.enableDpsMeter;
+					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay (Offline Only)");
+					if (wasEnabled && !Settings.enableDpsMeter)
+					{
+						DpsMeter.Reset();
+					}
+
+					if (Settings.enableDpsMeter)
+					{
+						GUILayout.Label("DPS Window (s): " + Settings.dpsMeterWindowSeconds.ToString("F1"));
+						Settings.dpsMeterWindowSeconds = GUILayout.HorizontalSlider(Settings.dpsMeterWindowSeconds, 1f, 20f);
+
+						Settings.dpsMeterAutoReset = GUILayout.Toggle(Settings.dpsMeterAutoReset, "Auto Reset After Inactivity");
+						if (Settings.dpsMeterAutoReset)
+						{
+							GUILayout.Label("Inactivity Reset (s): " + Settings.dpsMeterInactivityResetSeconds.ToString("F1"));
+							Settings.dpsMeterInactivityResetSeconds = GUILayout.HorizontalSlider(Settings.dpsMeterInactivityResetSeconds, 2f, 60f);
+						}
+
+						if (GUILayout.Button("Reset DPS Stats"))
+						{
+							DpsMeter.Reset();
+						}
+					}
+
+					if (!ObjectManager.IsOfflineMode())
+					{
+						GUILayout.Label("DPS meter is currently unavailable in online mode.");
+					}
+				}
 			}
 
 			GUI.enabled = true;
@@ -185,6 +221,10 @@ namespace Mod
 				Settings.playerLantern = GUILayout.Toggle(Settings.playerLantern, "Player Lantern");
 				if (Settings.playerLantern != previousPlayerLantern)
 					GameMods.playerLantern();
+
+				Settings.blockMenuInputWhenOpen = GUILayout.Toggle(
+					Settings.blockMenuInputWhenOpen,
+					"Block Game Input While Menu Open (Keyboard + Mouse)");
 
 				#region spacing
 				GUILayout.Space(10);
@@ -245,6 +285,9 @@ namespace Mod
 					{
 						GUILayout.Label("Pulse Interval (s): " + Settings.simpleAntiIdleInterval.ToString("F0"));
 						Settings.simpleAntiIdleInterval = GUILayout.HorizontalSlider(Settings.simpleAntiIdleInterval, 60f, 900f);
+						Settings.forceIsIdleFalseFallback = GUILayout.Toggle(
+							Settings.forceIsIdleFalseFallback,
+							"Force IsIdle FALSE Fallback (high risk)");
 
 						// Suppression controls (shared)
 						Settings.suppressKeepAliveOnActivity = GUILayout.Toggle(Settings.suppressKeepAliveOnActivity, "Suppress When Actively Playing");
@@ -343,6 +386,10 @@ namespace Mod
 					AntiIdleSystem.OnMenuOpened();
 				}
 			}
+
+			// Optional input-blocking: blocks gameplay keyboard + mouse while menu is visible.
+			bool shouldBlockGameInput = Settings.blockMenuInputWhenOpen && guiVisible;
+			EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
 
 			// Debug key for auto-potion system (F12)
 			if (Input.GetKeyDown(KeyCode.F12))
