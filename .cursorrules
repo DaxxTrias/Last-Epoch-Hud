@@ -167,4 +167,5 @@ The user asks questions about the following:
 
 - Project: `Mod/Mod.csproj` (`net6.0`, `LangVersion=preview`, `Nullable=enable`, `AllowUnsafeBlocks=true`, `RuntimeIdentifier=win-x64`).
 - References via HintPath to game install: `MelonLoader.dll`, `0Harmony.dll`, `Il2CppInterop.*.dll`, `UnityEngine.*.dll`, `Il2CppLE*.dll`, `Il2CppLidgren.Network.dll`, `Il2CppSteamworks`.
+- Investigation path for early/pre-alpha game files (relative from `Mod/`): `../../Last-Epoch` (assets at `../../Last-Epoch/Assets`). Prefer this relative path over hard links/junctions.
 - Output: copy built DLL to the game `Mods` directory. Ensure paths align with your Steam install.
