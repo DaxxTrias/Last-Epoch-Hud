@@ -40,6 +40,11 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
 		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
 		private static MelonPreferences_Entry<bool>? _enableDpsMeterOnlineRaw;
+		private static MelonPreferences_Entry<bool>? _dpsMeterPanelLocked;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelX;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelY;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelWidth;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelHeight;
 		private static MelonPreferences_Entry<bool>? _enableDamageNumberDiagnostics;
 
 		// Entries - ESP
@@ -155,6 +160,11 @@ namespace Mod
 			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
 			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
 			_enableDpsMeterOnlineRaw = _general.CreateEntry("EnableDpsMeterOnlineRaw", Settings.enableDpsMeterOnlineRaw);
+			_dpsMeterPanelLocked = _general.CreateEntry("DpsMeterPanelLocked", Settings.dpsMeterPanelLocked);
+			_dpsMeterPanelX = _general.CreateEntry("DpsMeterPanelX", Settings.dpsMeterPanelX);
+			_dpsMeterPanelY = _general.CreateEntry("DpsMeterPanelY", Settings.dpsMeterPanelY);
+			_dpsMeterPanelWidth = _general.CreateEntry("DpsMeterPanelWidth", Settings.dpsMeterPanelWidth);
+			_dpsMeterPanelHeight = _general.CreateEntry("DpsMeterPanelHeight", Settings.dpsMeterPanelHeight);
 			_enableDamageNumberDiagnostics = _general.CreateEntry("EnableDamageNumberDiagnostics", Settings.enableDamageNumberDiagnostics);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
@@ -243,6 +253,11 @@ namespace Mod
 			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
 			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
 			Settings.enableDpsMeterOnlineRaw = _enableDpsMeterOnlineRaw!.Value;
+			Settings.dpsMeterPanelLocked = _dpsMeterPanelLocked!.Value;
+			Settings.dpsMeterPanelX = Clamp(_dpsMeterPanelX!.Value, -1f, 10000f);
+			Settings.dpsMeterPanelY = Clamp(_dpsMeterPanelY!.Value, -1f, 10000f);
+			Settings.dpsMeterPanelWidth = Clamp(_dpsMeterPanelWidth!.Value, 280f, 1400f);
+			Settings.dpsMeterPanelHeight = Clamp(_dpsMeterPanelHeight!.Value, 220f, 1400f);
 			Settings.enableDamageNumberDiagnostics = _enableDamageNumberDiagnostics!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
@@ -328,6 +343,11 @@ namespace Mod
 			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
 			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
 			_enableDpsMeterOnlineRaw!.Value = Settings.enableDpsMeterOnlineRaw;
+			_dpsMeterPanelLocked!.Value = Settings.dpsMeterPanelLocked;
+			_dpsMeterPanelX!.Value = Settings.dpsMeterPanelX;
+			_dpsMeterPanelY!.Value = Settings.dpsMeterPanelY;
+			_dpsMeterPanelWidth!.Value = Settings.dpsMeterPanelWidth;
+			_dpsMeterPanelHeight!.Value = Settings.dpsMeterPanelHeight;
 			_enableDamageNumberDiagnostics!.Value = Settings.enableDamageNumberDiagnostics;
 
 			_showESPLines!.Value = Settings.showESPLines;
@@ -565,6 +585,11 @@ namespace Mod
 			public float dpsMeterInactivityResetSeconds { get; set; }
 			public bool dpsMeterAutoReset { get; set; }
 			public bool enableDpsMeterOnlineRaw { get; set; }
+			public bool dpsMeterPanelLocked { get; set; }
+			public float dpsMeterPanelX { get; set; }
+			public float dpsMeterPanelY { get; set; }
+			public float dpsMeterPanelWidth { get; set; }
+			public float dpsMeterPanelHeight { get; set; }
 			public bool enableDamageNumberDiagnostics { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
@@ -641,6 +666,11 @@ namespace Mod
 				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
 				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
 				enableDpsMeterOnlineRaw = Settings.enableDpsMeterOnlineRaw,
+				dpsMeterPanelLocked = Settings.dpsMeterPanelLocked,
+				dpsMeterPanelX = Settings.dpsMeterPanelX,
+				dpsMeterPanelY = Settings.dpsMeterPanelY,
+				dpsMeterPanelWidth = Settings.dpsMeterPanelWidth,
+				dpsMeterPanelHeight = Settings.dpsMeterPanelHeight,
 				enableDamageNumberDiagnostics = Settings.enableDamageNumberDiagnostics,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
@@ -716,6 +746,11 @@ namespace Mod
 			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
 			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
 			Settings.enableDpsMeterOnlineRaw = s.enableDpsMeterOnlineRaw;
+			Settings.dpsMeterPanelLocked = s.dpsMeterPanelLocked;
+			Settings.dpsMeterPanelX = Clamp(s.dpsMeterPanelX, -1f, 10000f);
+			Settings.dpsMeterPanelY = Clamp(s.dpsMeterPanelY, -1f, 10000f);
+			Settings.dpsMeterPanelWidth = Clamp(s.dpsMeterPanelWidth, 280f, 1400f);
+			Settings.dpsMeterPanelHeight = Clamp(s.dpsMeterPanelHeight, 220f, 1400f);
 			Settings.enableDamageNumberDiagnostics = s.enableDamageNumberDiagnostics;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;

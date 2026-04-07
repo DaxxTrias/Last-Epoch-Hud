@@ -17,6 +17,11 @@ namespace Mod
         public static float dpsMeterInactivityResetSeconds = 10f;
         public static bool dpsMeterAutoReset = true;
         public static bool enableDpsMeterOnlineRaw = false;
+        public static bool dpsMeterPanelLocked = true;
+        public static float dpsMeterPanelX = -1f; // -1 anchors to right side on first load
+        public static float dpsMeterPanelY = 88f;
+        public static float dpsMeterPanelWidth = 360f;
+        public static float dpsMeterPanelHeight = 320f;
         public static bool enableDamageNumberDiagnostics = false;
         public static bool removeFog = true;
         public static bool cameraZoomUnlock = true;

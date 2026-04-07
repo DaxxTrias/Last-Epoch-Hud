@@ -25,6 +25,12 @@ namespace Mod.Cheats
 		private const int HitEventSuperCrit = 256;
 		private const float OnlineSameTextGapSeconds = 0.25f;
 		private const float OnlineStateTtlSeconds = 12f;
+		private const int PanelWindowId = 90873;
+		private const float DefaultPanelWidth = 360f;
+		private const float DefaultPanelHeight = 320f;
+		private const float MinPanelWidth = 320f;
+		private const float MinPanelHeight = 250f;
+		private const float ResizeGripSize = 18f;
 
 		private readonly struct HitSample
 		{
@@ -48,11 +54,15 @@ namespace Mod.Cheats
 		private static readonly Dictionary<int, OnlineSampleState> s_onlineStates = new Dictionary<int, OnlineSampleState>(128);
 		private static readonly List<int> s_onlinePruneBuffer = new List<int>(64);
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
-		private static Rect s_panelRect = new Rect(0f, 88f, 320f, 252f);
+		private static Rect s_panelRect = new Rect(0f, 88f, DefaultPanelWidth, DefaultPanelHeight);
 
 		private static DpsSourceMode s_sourceMode;
-		private static bool s_panelAnchored;
+		private static bool s_panelInitialized;
+		private static bool s_panelResizing;
 		private static int s_lastScreenWidth;
+		private static int s_lastScreenHeight;
+		private static string s_panelText = string.Empty;
+		private static GUIStyle? s_panelLabelStyle;
 		private static float s_recentDamage;
 		private static float s_totalDamage;
 		private static int s_totalEvents;
@@ -233,15 +243,12 @@ namespace Mod.Cheats
 			if (GetCurrentMode() == DpsSourceMode.None)
 				return;
 
-			EnsurePanelAnchored();
-
-			GUI.Box(s_panelRect, "LEHud DPS Meter");
-			Rect contentRect = new Rect(
-				s_panelRect.x + 8f,
-				s_panelRect.y + 24f,
-				s_panelRect.width - 16f,
-				s_panelRect.height - 30f);
-			GUI.Label(contentRect, BuildOverlayText(Time.unscaledTime));
+			EnsurePanelInitialized();
+			EnsurePanelStyle();
+			s_panelText = BuildOverlayText(Time.unscaledTime);
+			s_panelRect = GUI.Window(PanelWindowId, s_panelRect, DrawPanelWindow, "LEHud DPS Meter");
+			ClampPanelToScreen();
+			SyncPanelToSettings();
 		}
 
 		public static void OnSceneChanged()
@@ -253,6 +260,15 @@ namespace Mod.Cheats
 		public static void Reset()
 		{
 			ResetInternal();
+		}
+
+		public static void ResetPanelLayout()
+		{
+			Settings.dpsMeterPanelX = -1f;
+			Settings.dpsMeterPanelY = 88f;
+			Settings.dpsMeterPanelWidth = DefaultPanelWidth;
+			Settings.dpsMeterPanelHeight = DefaultPanelHeight;
+			s_panelInitialized = false;
 		}
 
 		private static void ResetInternal()
@@ -300,15 +316,109 @@ namespace Mod.Cheats
 			s_peakDps = preservedPeakDps;
 		}
 
-		private static void EnsurePanelAnchored()
+		private static void EnsurePanelInitialized()
 		{
-			int screenWidth = Screen.width;
-			if (s_panelAnchored && screenWidth > 0 && screenWidth == s_lastScreenWidth)
+			if (!s_panelInitialized)
+			{
+				float width = Mathf.Max(MinPanelWidth, Settings.dpsMeterPanelWidth);
+				float height = Mathf.Max(MinPanelHeight, Settings.dpsMeterPanelHeight);
+				float x = Settings.dpsMeterPanelX;
+				float y = Settings.dpsMeterPanelY;
+
+				if (x < 0f)
+					x = Mathf.Max(10f, Screen.width - width - 14f);
+				if (y < 0f)
+					y = 88f;
+
+				s_panelRect = new Rect(x, y, width, height);
+				s_panelInitialized = true;
+			}
+
+			if (Screen.width != s_lastScreenWidth || Screen.height != s_lastScreenHeight)
+			{
+				ClampPanelToScreen();
+				s_lastScreenWidth = Screen.width;
+				s_lastScreenHeight = Screen.height;
+			}
+		}
+
+		private static void EnsurePanelStyle()
+		{
+			if (s_panelLabelStyle != null)
 				return;
 
-			s_panelRect.x = Mathf.Max(10f, screenWidth - s_panelRect.width - 14f);
-			s_panelAnchored = true;
-			s_lastScreenWidth = screenWidth;
+			s_panelLabelStyle = new GUIStyle(GUI.skin.label)
+			{
+				wordWrap = true,
+				clipping = TextClipping.Clip
+			};
+		}
+
+		private static void DrawPanelWindow(int windowId)
+		{
+			var style = s_panelLabelStyle ?? GUI.skin.label;
+			Rect contentRect = new Rect(8f, 24f, s_panelRect.width - 16f, s_panelRect.height - 32f);
+			GUI.Label(contentRect, s_panelText, style);
+
+			if (!Settings.dpsMeterPanelLocked)
+			{
+				Rect resizeGripRect = new Rect(
+					s_panelRect.width - ResizeGripSize - 2f,
+					s_panelRect.height - ResizeGripSize - 2f,
+					ResizeGripSize,
+					ResizeGripSize);
+				GUI.Box(resizeGripRect, "");
+				ProcessPanelResizing(resizeGripRect);
+				GUI.DragWindow(new Rect(0, 0, s_panelRect.width - ResizeGripSize - 6f, 20f));
+			}
+
+			_ = windowId;
+		}
+
+		private static void ProcessPanelResizing(Rect resizeGripRect)
+		{
+			Event currentEvent = Event.current;
+			switch (currentEvent.type)
+			{
+				case EventType.MouseDown:
+					if (resizeGripRect.Contains(currentEvent.mousePosition))
+					{
+						s_panelResizing = true;
+						currentEvent.Use();
+					}
+					break;
+				case EventType.MouseUp:
+					s_panelResizing = false;
+					break;
+				case EventType.MouseDrag:
+					if (!s_panelResizing)
+						break;
+
+					s_panelRect.width = Mathf.Max(MinPanelWidth, s_panelRect.width + currentEvent.delta.x);
+					s_panelRect.height = Mathf.Max(MinPanelHeight, s_panelRect.height + currentEvent.delta.y);
+					ClampPanelToScreen();
+					currentEvent.Use();
+					break;
+			}
+		}
+
+		private static void ClampPanelToScreen()
+		{
+			s_panelRect.width = Mathf.Max(MinPanelWidth, s_panelRect.width);
+			s_panelRect.height = Mathf.Max(MinPanelHeight, s_panelRect.height);
+
+			float maxX = Mathf.Max(0f, Screen.width - s_panelRect.width);
+			float maxY = Mathf.Max(0f, Screen.height - s_panelRect.height);
+			s_panelRect.x = Mathf.Clamp(s_panelRect.x, 0f, maxX);
+			s_panelRect.y = Mathf.Clamp(s_panelRect.y, 0f, maxY);
+		}
+
+		private static void SyncPanelToSettings()
+		{
+			Settings.dpsMeterPanelX = s_panelRect.x;
+			Settings.dpsMeterPanelY = s_panelRect.y;
+			Settings.dpsMeterPanelWidth = s_panelRect.width;
+			Settings.dpsMeterPanelHeight = s_panelRect.height;
 		}
 
 		private static void PruneWindow(float now)

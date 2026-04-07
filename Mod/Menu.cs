@@ -176,6 +176,9 @@ namespace Mod
 					Settings.enableDpsMeterOnlineRaw = GUILayout.Toggle(
 						Settings.enableDpsMeterOnlineRaw,
 						"Allow Online Raw Source (Unfiltered)");
+					Settings.dpsMeterPanelLocked = GUILayout.Toggle(
+						Settings.dpsMeterPanelLocked,
+						"Lock DPS Panel Position/Size");
 					Settings.enableDamageNumberDiagnostics = GUILayout.Toggle(
 						Settings.enableDamageNumberDiagnostics,
 						"Enable DamageNumber Diagnostics (Verbose Logs)");
@@ -200,8 +203,16 @@ namespace Mod
 						{
 							DpsMeter.Reset();
 						}
+						if (GUILayout.Button("Reset DPS Panel Layout"))
+						{
+							DpsMeter.ResetPanelLayout();
+						}
 					}
 
+					if (!Settings.dpsMeterPanelLocked)
+					{
+						GUILayout.Label("DPS panel unlocked: drag title to move, bottom-right grip to resize.");
+					}
 					if (!ObjectManager.IsOfflineMode() && !Settings.enableDpsMeterOnlineRaw)
 					{
 						GUILayout.Label("Online meter disabled. Enable 'Online Raw Source' to collect from damage-number text.");
