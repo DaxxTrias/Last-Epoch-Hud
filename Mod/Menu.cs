@@ -173,6 +173,9 @@ namespace Mod
 				{
 					bool wasEnabled = Settings.enableDpsMeter;
 					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay (Offline Only)");
+					Settings.enableDamageNumberDiagnostics = GUILayout.Toggle(
+						Settings.enableDamageNumberDiagnostics,
+						"Enable DamageNumber Diagnostics (Verbose Logs)");
 					if (wasEnabled && !Settings.enableDpsMeter)
 					{
 						DpsMeter.Reset();
@@ -199,6 +202,10 @@ namespace Mod
 					if (!ObjectManager.IsOfflineMode())
 					{
 						GUILayout.Label("DPS meter is currently unavailable in online mode.");
+					}
+					if (Settings.enableDamageNumberDiagnostics)
+					{
+						GUILayout.Label("DamageNumber diagnostics are active. Check Melon logs for Init/renderer summaries.");
 					}
 				}
 			}

@@ -39,6 +39,7 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _dpsMeterWindowSeconds;
 		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
 		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
+		private static MelonPreferences_Entry<bool>? _enableDamageNumberDiagnostics;
 
 		// Entries - ESP
 		private static MelonPreferences_Entry<bool>? _showESPLines;
@@ -152,6 +153,7 @@ namespace Mod
 			_dpsMeterWindowSeconds = _general.CreateEntry("DpsMeterWindowSeconds", Settings.dpsMeterWindowSeconds);
 			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
 			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
+			_enableDamageNumberDiagnostics = _general.CreateEntry("EnableDamageNumberDiagnostics", Settings.enableDamageNumberDiagnostics);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
 			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
@@ -238,6 +240,7 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(_dpsMeterWindowSeconds!.Value, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
 			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
+			Settings.enableDamageNumberDiagnostics = _enableDamageNumberDiagnostics!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
 			Settings.showESPLabels = _showESPLabels!.Value;
@@ -321,6 +324,7 @@ namespace Mod
 			_dpsMeterWindowSeconds!.Value = Settings.dpsMeterWindowSeconds;
 			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
 			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
+			_enableDamageNumberDiagnostics!.Value = Settings.enableDamageNumberDiagnostics;
 
 			_showESPLines!.Value = Settings.showESPLines;
 			_showESPLabels!.Value = Settings.showESPLabels;
@@ -556,6 +560,7 @@ namespace Mod
 			public float dpsMeterWindowSeconds { get; set; }
 			public float dpsMeterInactivityResetSeconds { get; set; }
 			public bool dpsMeterAutoReset { get; set; }
+			public bool enableDamageNumberDiagnostics { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
 			public bool minimapZoomUnlock { get; set; }
@@ -630,6 +635,7 @@ namespace Mod
 				dpsMeterWindowSeconds = Settings.dpsMeterWindowSeconds,
 				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
 				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
+				enableDamageNumberDiagnostics = Settings.enableDamageNumberDiagnostics,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
@@ -703,6 +709,7 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(s.dpsMeterWindowSeconds, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
 			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
+			Settings.enableDamageNumberDiagnostics = s.enableDamageNumberDiagnostics;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;
