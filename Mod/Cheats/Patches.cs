@@ -1081,11 +1081,16 @@ namespace Mod.Cheats.Patches
             [HarmonyPatch]
             public class EpochInputManager_CheckIdleInput
             {
+                // Keep observer/assist code available, but disabled by default.
+                private static readonly bool s_enableObserver = false;
                 private static System.Reflection.MethodBase? s_target;
 
                 [HarmonyPrepare]
                 public static bool Prepare()
                 {
+                    if (!s_enableObserver)
+                        return false;
+
                     try
                     {
                         var t = TypeLookup.FindType(
@@ -1107,7 +1112,8 @@ namespace Mod.Cheats.Patches
                 {
                     try
                     {
-                        EpochInputManagerBridge.OnCheckIdleInputObserved(__instance);
+                        _ = __instance;
+                        // EpochInputManagerBridge.OnCheckIdleInputObserved(__instance);
                     }
                     catch (Exception e)
                     {
