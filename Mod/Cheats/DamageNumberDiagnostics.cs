@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using System.Linq;
 using HarmonyLib;
 using Mod.Game;
 using Mod.Utils;
@@ -13,6 +14,7 @@ namespace Mod.Cheats
 		{
 			public string Text = string.Empty;
 			public float LastSeenAt;
+			public float LastDeepTextProbeAt;
 			public int SendCount;
 		}
 
@@ -22,6 +24,8 @@ namespace Mod.Cheats
 		private static Type? s_cachedDamageNumberType;
 		private static FieldInfo? s_tmpField;
 		private static PropertyInfo? s_tmpTextProperty;
+		private static bool s_loggedTypeShape;
+		private static bool s_loggedTextBinding;
 
 		private static float s_periodStartAt = -1f;
 		private static int s_periodAwakeCount;
@@ -114,21 +118,22 @@ namespace Mod.Cheats
 			{
 				var instanceType = instance.GetType();
 				EnsureBindings(instanceType);
-				if (s_tmpField == null)
-					return;
 
-				var tmp = s_tmpField.GetValue(instance);
-				if (tmp == null || s_tmpTextProperty == null)
-					return;
-
-				var textObj = s_tmpTextProperty.GetValue(tmp);
-				if (textObj == null)
-					return;
-
-				string text = Sanitize(textObj.ToString() ?? string.Empty);
-				if (!string.IsNullOrWhiteSpace(text))
+				if (TryReadTextFromBoundField(instance, out string? boundText))
 				{
-					state.Text = text;
+					state.Text = boundText!;
+					return;
+				}
+
+				// Slow fallback probe (rate-limited): inspect child components for text-bearing fields.
+				float now = Time.unscaledTime;
+				if (now - state.LastDeepTextProbeAt < 1.5f)
+					return;
+				state.LastDeepTextProbeAt = now;
+
+				if (instance is Component c && c.gameObject != null && TryReadTextFromHierarchy(c.gameObject, out string? hierarchyText))
+				{
+					state.Text = hierarchyText!;
 				}
 			}
 			catch
@@ -143,13 +148,239 @@ namespace Mod.Cheats
 				return;
 
 			s_cachedDamageNumberType = instanceType;
-			s_tmpField = AccessTools.Field(instanceType, "tmp");
+			s_tmpField = null;
 			s_tmpTextProperty = null;
-			if (s_tmpField != null)
+
+			// Avoid AccessTools.Field warnings by resolving manually.
+			s_tmpField = FindFieldRecursive(instanceType, "tmp")
+				?? FindFieldRecursive(instanceType, "_tmp")
+				?? FindFieldRecursive(instanceType, "textMesh")
+				?? FindFieldRecursive(instanceType, "textMeshPro")
+				?? FindFirstTextLikeField(instanceType);
+
+			if (s_tmpField != null && TryResolveTextProperty(s_tmpField.FieldType, out var textProp))
 			{
-				var tmpType = s_tmpField.FieldType;
-				s_tmpTextProperty = AccessTools.Property(tmpType, "text");
+				s_tmpTextProperty = textProp;
 			}
+
+			LogTypeShape(instanceType);
+			LogResolvedBindings(instanceType);
+		}
+
+		private static FieldInfo? FindFieldRecursive(Type type, string name)
+		{
+			for (var t = type; t != null; t = t.BaseType)
+			{
+				var field = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+				if (field != null)
+					return field;
+			}
+
+			return null;
+		}
+
+		private static FieldInfo? FindFirstTextLikeField(Type type)
+		{
+			for (var t = type; t != null; t = t.BaseType)
+			{
+				var fields = t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+				for (int i = 0; i < fields.Length; i++)
+				{
+					var f = fields[i];
+					string typeName = f.FieldType.FullName ?? f.FieldType.Name;
+					if (typeName.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) >= 0
+						|| typeName.IndexOf("TextMesh", StringComparison.OrdinalIgnoreCase) >= 0)
+					{
+						return f;
+					}
+				}
+			}
+
+			return null;
+		}
+
+		private static bool TryResolveTextProperty(Type targetType, out PropertyInfo? textProperty)
+		{
+			textProperty = null;
+			try
+			{
+				textProperty = targetType.GetProperty("text", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				if (textProperty != null)
+					return true;
+
+				textProperty = targetType.GetProperty("Text", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				return textProperty != null;
+			}
+			catch
+			{
+				textProperty = null;
+				return false;
+			}
+		}
+
+		private static bool TryReadTextFromBoundField(object instance, out string? text)
+		{
+			text = null;
+			if (s_tmpField == null || s_tmpTextProperty == null)
+				return false;
+
+			try
+			{
+				var tmp = s_tmpField.GetValue(instance);
+				if (tmp == null)
+					return false;
+
+				var value = s_tmpTextProperty.GetValue(tmp);
+				if (value == null)
+					return false;
+
+				string parsed = Sanitize(value.ToString() ?? string.Empty);
+				if (string.IsNullOrWhiteSpace(parsed))
+					return false;
+
+				text = parsed;
+				return true;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		private static bool TryReadTextFromHierarchy(GameObject root, out string? text)
+		{
+			text = null;
+			try
+			{
+				var components = root.GetComponentsInChildren<Component>(true);
+				for (int i = 0; i < components.Length; i++)
+				{
+					var comp = components[i];
+					if (comp == null)
+						continue;
+
+					var compType = comp.GetType();
+					string compTypeName = compType.FullName ?? compType.Name;
+					if (compTypeName.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) < 0
+						&& compTypeName.IndexOf("TextMesh", StringComparison.OrdinalIgnoreCase) < 0
+						&& compTypeName.IndexOf("TMP", StringComparison.OrdinalIgnoreCase) < 0)
+					{
+						continue;
+					}
+
+					if (!TryResolveTextProperty(compType, out var textProp) || textProp == null)
+						continue;
+
+					var value = textProp.GetValue(comp);
+					if (value == null)
+						continue;
+
+					string parsed = Sanitize(value.ToString() ?? string.Empty);
+					if (string.IsNullOrWhiteSpace(parsed))
+						continue;
+
+					text = parsed;
+					Log.InfoThrottled(
+						LogSource.Hooks,
+						$"DamageNumberDiag.TextHierarchy.{compTypeName}",
+						$"[DamageNumberDiag] Hierarchy text binding resolved via {compTypeName}.text",
+						TimeSpan.FromSeconds(30));
+					return true;
+				}
+			}
+			catch
+			{
+				// diagnostics best effort
+			}
+
+			return false;
+		}
+
+		private static void LogTypeShape(Type instanceType)
+		{
+			if (s_loggedTypeShape)
+				return;
+			s_loggedTypeShape = true;
+
+			try
+			{
+				var fields = instanceType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				var props = instanceType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+				var methods = instanceType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+					.Where(m => string.Equals(m.Name, "Init", StringComparison.Ordinal))
+					.ToArray();
+
+				var sb = new StringBuilder(900);
+				sb.Append("[DamageNumberDiag] Type shape: ").Append(instanceType.FullName ?? instanceType.Name);
+				sb.Append(" | fields=");
+				int appended = 0;
+				for (int i = 0; i < fields.Length; i++)
+				{
+					var f = fields[i];
+					string ft = f.FieldType.FullName ?? f.FieldType.Name;
+					bool interesting = f.Name.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0
+						|| f.Name.IndexOf("tmp", StringComparison.OrdinalIgnoreCase) >= 0
+						|| f.Name.IndexOf("render", StringComparison.OrdinalIgnoreCase) >= 0
+						|| ft.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) >= 0
+						|| ft.IndexOf("TextMesh", StringComparison.OrdinalIgnoreCase) >= 0
+						|| ft.IndexOf("Renderer", StringComparison.OrdinalIgnoreCase) >= 0;
+					if (!interesting)
+						continue;
+
+					if (appended++ > 0)
+						sb.Append(", ");
+					sb.Append(f.Name).Append(':').Append(ft);
+				}
+
+				sb.Append(" | props=");
+				appended = 0;
+				for (int i = 0; i < props.Length; i++)
+				{
+					var p = props[i];
+					string pt = p.PropertyType.FullName ?? p.PropertyType.Name;
+					bool interesting = p.Name.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0
+						|| p.Name.IndexOf("tmp", StringComparison.OrdinalIgnoreCase) >= 0
+						|| pt.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) >= 0
+						|| pt.IndexOf("TextMesh", StringComparison.OrdinalIgnoreCase) >= 0;
+					if (!interesting)
+						continue;
+
+					if (appended++ > 0)
+						sb.Append(", ");
+					sb.Append(p.Name).Append(':').Append(pt);
+				}
+
+				for (int i = 0; i < methods.Length; i++)
+				{
+					var m = methods[i];
+					var ps = m.GetParameters();
+					sb.Append(" | Init(");
+					for (int p = 0; p < ps.Length; p++)
+					{
+						if (p > 0) sb.Append(", ");
+						sb.Append(ps[p].ParameterType.Name).Append(' ').Append(ps[p].Name);
+					}
+					sb.Append(')');
+				}
+
+				Log.Info(LogSource.Hooks, sb.ToString());
+			}
+			catch (Exception ex)
+			{
+				Log.Warning(LogSource.Hooks, $"[DamageNumberDiag] Type shape probe failed: {ex.GetType().Name} {ex.Message}");
+			}
+		}
+
+		private static void LogResolvedBindings(Type instanceType)
+		{
+			if (s_loggedTextBinding)
+				return;
+			s_loggedTextBinding = true;
+
+			string fieldName = s_tmpField?.Name ?? "<none>";
+			string fieldType = s_tmpField?.FieldType.FullName ?? "<none>";
+			string propName = s_tmpTextProperty?.Name ?? "<none>";
+			Log.Info(LogSource.Hooks, $"[DamageNumberDiag] Text binding: field={fieldName}:{fieldType}, textProp={propName} on {instanceType.FullName ?? instanceType.Name}");
 		}
 
 		private static int TryGetInstanceId(object? instance)
