@@ -1,4 +1,5 @@
 using System.Text;
+using Mod.Game;
 using UnityEngine;
 
 namespace Mod.Cheats
@@ -53,11 +54,12 @@ namespace Mod.Cheats
 		private static float s_minDps = float.MaxValue;
 		private static float s_firstHitAt = -1f;
 		private static float s_lastHitAt = -1f;
+		private static bool s_wasOfflineLastUpdate;
 
 		public static void OnDamageEvent(object source, float damage, int hitEvents)
 		{
 			_ = source;
-			if (!Settings.enableDpsMeter || float.IsNaN(damage) || float.IsInfinity(damage))
+			if (!Settings.enableDpsMeter || !ObjectManager.IsOfflineMode() || float.IsNaN(damage) || float.IsInfinity(damage))
 				return;
 
 			s_totalEvents++;
@@ -121,6 +123,19 @@ namespace Mod.Cheats
 			if (!Settings.enableDpsMeter)
 				return;
 
+			if (!ObjectManager.IsOfflineMode())
+			{
+				if (s_wasOfflineLastUpdate)
+				{
+					ResetInternal();
+				}
+
+				s_wasOfflineLastUpdate = false;
+				return;
+			}
+
+			s_wasOfflineLastUpdate = true;
+
 			float now = Time.unscaledTime;
 			PruneWindow(now);
 			RefreshDps();
@@ -137,7 +152,7 @@ namespace Mod.Cheats
 
 		public static void OnGUI()
 		{
-			if (!Settings.enableDpsMeter)
+			if (!Settings.enableDpsMeter || !ObjectManager.IsOfflineMode())
 				return;
 
 			EnsurePanelAnchored();
@@ -154,6 +169,7 @@ namespace Mod.Cheats
 		public static void OnSceneChanged()
 		{
 			ResetInternal();
+			s_wasOfflineLastUpdate = false;
 		}
 
 		public static void Reset()

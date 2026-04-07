@@ -172,7 +172,7 @@ namespace Mod
 				if (dpsMeterSubDropdown)
 				{
 					bool wasEnabled = Settings.enableDpsMeter;
-					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay");
+					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay (Offline Only)");
 					if (wasEnabled && !Settings.enableDpsMeter)
 					{
 						DpsMeter.Reset();
@@ -194,6 +194,11 @@ namespace Mod
 						{
 							DpsMeter.Reset();
 						}
+					}
+
+					if (!ObjectManager.IsOfflineMode())
+					{
+						GUILayout.Label("DPS meter is currently unavailable in online mode.");
 					}
 				}
 			}
