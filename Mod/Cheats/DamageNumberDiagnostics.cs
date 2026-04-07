@@ -12,11 +12,7 @@ namespace Mod.Cheats
 		private sealed class DamageNumberState
 		{
 			public string Text = string.Empty;
-			public string Style = string.Empty;
-			public string Color = string.Empty;
-			public Vector3 Position;
 			public float LastSeenAt;
-			public int InitCount;
 			public int SendCount;
 		}
 
@@ -29,13 +25,12 @@ namespace Mod.Cheats
 
 		private static float s_periodStartAt = -1f;
 		private static int s_periodAwakeCount;
-		private static int s_periodInitCount;
 		private static int s_periodSendCount;
 		private static int s_periodDestroyCount;
 
 		private static readonly TimeSpan SendLogInterval = TimeSpan.FromSeconds(2);
 
-		public static void OnPrefix(object __instance, object[]? __args, MethodBase? __originalMethod)
+		public static void OnPrefix(object __instance, MethodBase? __originalMethod)
 		{
 			if (!Settings.enableDamageNumberDiagnostics || __originalMethod == null)
 				return;
@@ -43,10 +38,10 @@ namespace Mod.Cheats
 			if (!string.Equals(__originalMethod.Name, "OnDestroy", StringComparison.Ordinal))
 				return;
 
-			Observe(__instance, __args, __originalMethod, phase: "Prefix");
+			Observe(__instance, __originalMethod, phase: "Prefix");
 		}
 
-		public static void OnPostfix(object __instance, object[]? __args, MethodBase? __originalMethod)
+		public static void OnPostfix(object __instance, MethodBase? __originalMethod)
 		{
 			if (!Settings.enableDamageNumberDiagnostics || __originalMethod == null)
 				return;
@@ -54,10 +49,10 @@ namespace Mod.Cheats
 			if (string.Equals(__originalMethod.Name, "OnDestroy", StringComparison.Ordinal))
 				return;
 
-			Observe(__instance, __args, __originalMethod, phase: "Postfix");
+			Observe(__instance, __originalMethod, phase: "Postfix");
 		}
 
-		private static void Observe(object __instance, object[]? __args, MethodBase __originalMethod, string phase)
+		private static void Observe(object __instance, MethodBase __originalMethod, string phase)
 		{
 			float now = Time.unscaledTime;
 			if (s_periodStartAt <= 0f)
@@ -77,16 +72,6 @@ namespace Mod.Cheats
 						state.LastSeenAt = now;
 					Log.InfoThrottled(LogSource.Hooks, "DamageNumber.Awake", "[DamageNumberDiag] Awake observed.", TimeSpan.FromSeconds(3));
 					break;
-				case "Init":
-					s_periodInitCount++;
-					if (state != null)
-					{
-						state.InitCount++;
-						state.LastSeenAt = now;
-						CaptureInitData(state, __args, __originalMethod);
-					}
-					LogInitSample(id, state, __args, __instance, __originalMethod);
-					break;
 				case "SendPropertiesToRenderer":
 					s_periodSendCount++;
 					if (state != null)
@@ -98,7 +83,7 @@ namespace Mod.Cheats
 					Log.InfoThrottled(
 						LogSource.Hooks,
 						"DamageNumber.SendPropertiesToRenderer",
-						$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}).",
+						$"[DamageNumberDiag] SendPropertiesToRenderer observed (offline={ObjectManager.IsOfflineMode()}, id={id}, text='{SafeStateText(state)}').",
 						SendLogInterval);
 					break;
 				case "OnDestroy":
@@ -121,47 +106,6 @@ namespace Mod.Cheats
 			}
 
 			return state;
-		}
-
-		private static void CaptureInitData(DamageNumberState state, object[]? args, MethodBase method)
-		{
-			if (args == null || args.Length == 0)
-				return;
-
-			var parameters = method.GetParameters();
-			int max = Math.Min(parameters.Length, args.Length);
-			for (int i = 0; i < max; i++)
-			{
-				var arg = args[i];
-				if (arg == null)
-					continue;
-
-				string paramName = parameters[i].Name ?? string.Empty;
-				Type paramType = parameters[i].ParameterType;
-
-				if (arg is Vector3 position)
-				{
-					state.Position = position;
-					continue;
-				}
-
-				if (arg is Color color)
-				{
-					state.Color = $"{color.r:F2},{color.g:F2},{color.b:F2},{color.a:F2}";
-					continue;
-				}
-
-				if (arg is string text && !string.IsNullOrWhiteSpace(text))
-				{
-					state.Text = Sanitize(text);
-					continue;
-				}
-
-				if (paramType.IsEnum || paramName.IndexOf("style", StringComparison.OrdinalIgnoreCase) >= 0)
-				{
-					state.Style = Sanitize(arg.ToString() ?? string.Empty);
-				}
-			}
 		}
 
 		private static void CaptureRendererData(DamageNumberState state, object instance)
@@ -218,43 +162,6 @@ namespace Mod.Cheats
 			return 0;
 		}
 
-		private static void LogInitSample(int instanceId, DamageNumberState? state, object[]? args, object instance, MethodBase method)
-		{
-			s_summaryBuilder.Clear();
-			s_summaryBuilder.Append("[DamageNumberDiag] Init ")
-				.Append("id=").Append(instanceId)
-				.Append(" offline=").Append(ObjectManager.IsOfflineMode());
-
-			if (state != null)
-			{
-				if (!string.IsNullOrWhiteSpace(state.Text))
-					s_summaryBuilder.Append(" text='").Append(state.Text).Append('\'');
-				if (!string.IsNullOrWhiteSpace(state.Style))
-					s_summaryBuilder.Append(" style=").Append(state.Style);
-				if (!string.IsNullOrWhiteSpace(state.Color))
-					s_summaryBuilder.Append(" color=").Append(state.Color);
-				s_summaryBuilder.Append(" pos=").Append(FormatVec3(state.Position));
-			}
-
-			AppendInitArgs(s_summaryBuilder, method, args);
-			Log.Info(LogSource.Hooks, s_summaryBuilder.ToString());
-		}
-
-		private static void AppendInitArgs(StringBuilder sb, MethodBase method, object[]? args)
-		{
-			if (args == null || args.Length == 0)
-				return;
-
-			var parameters = method.GetParameters();
-			int max = Math.Min(parameters.Length, args.Length);
-			for (int i = 0; i < max; i++)
-			{
-				string name = parameters[i].Name ?? $"arg{i}";
-				string value = Sanitize(args[i]?.ToString() ?? "null");
-				sb.Append(" | ").Append(name).Append('=').Append(value);
-			}
-		}
-
 		private static string Sanitize(string value)
 		{
 			if (string.IsNullOrWhiteSpace(value))
@@ -270,11 +177,6 @@ namespace Mod.Cheats
 			return new string(chars).Trim();
 		}
 
-		private static string FormatVec3(Vector3 vec)
-		{
-			return $"{vec.x:F1},{vec.y:F1},{vec.z:F1}";
-		}
-
 		private static void MaybeEmitPeriodSummary(float now, string phase, string lastMethod)
 		{
 			if (now - s_periodStartAt < 5f)
@@ -284,7 +186,6 @@ namespace Mod.Cheats
 			s_summaryBuilder.Append("[DamageNumberDiag] 5s summary")
 				.Append(" offline=").Append(ObjectManager.IsOfflineMode())
 				.Append(" awake=").Append(s_periodAwakeCount)
-				.Append(" init=").Append(s_periodInitCount)
 				.Append(" send=").Append(s_periodSendCount)
 				.Append(" destroy=").Append(s_periodDestroyCount)
 				.Append(" tracked=").Append(s_states.Count)
@@ -295,9 +196,15 @@ namespace Mod.Cheats
 
 			s_periodStartAt = now;
 			s_periodAwakeCount = 0;
-			s_periodInitCount = 0;
 			s_periodSendCount = 0;
 			s_periodDestroyCount = 0;
+		}
+
+		private static string SafeStateText(DamageNumberState? state)
+		{
+			if (state == null || string.IsNullOrWhiteSpace(state.Text))
+				return "-";
+			return state.Text;
 		}
 	}
 }

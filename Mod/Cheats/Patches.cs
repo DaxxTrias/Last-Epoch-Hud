@@ -678,7 +678,6 @@ namespace Mod.Cheats.Patches
                                 && !m.IsAbstract
                                 && (string.Equals(m.Name, "Awake", StringComparison.Ordinal)
                                     || string.Equals(m.Name, "OnDestroy", StringComparison.Ordinal)
-                                    || string.Equals(m.Name, "Init", StringComparison.Ordinal)
                                     || string.Equals(m.Name, "SendPropertiesToRenderer", StringComparison.Ordinal)))
                             .Cast<System.Reflection.MethodBase>()
                             .ToList();
@@ -703,11 +702,11 @@ namespace Mod.Cheats.Patches
                 [HarmonyTargetMethods]
                 public static IEnumerable<System.Reflection.MethodBase> TargetMethods() => s_targets ?? Enumerable.Empty<System.Reflection.MethodBase>();
 
-                public static void Prefix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                public static void Prefix(object __instance, System.Reflection.MethodBase __originalMethod)
                 {
                     try
                     {
-                        DamageNumberDiagnostics.OnPrefix(__instance, __args, __originalMethod);
+                        DamageNumberDiagnostics.OnPrefix(__instance, __originalMethod);
                     }
                     catch
                     {
@@ -715,11 +714,11 @@ namespace Mod.Cheats.Patches
                     }
                 }
 
-                public static void Postfix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
+                public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
                 {
                     try
                     {
-                        DamageNumberDiagnostics.OnPostfix(__instance, __args, __originalMethod);
+                        DamageNumberDiagnostics.OnPostfix(__instance, __originalMethod);
                     }
                     catch
                     {
