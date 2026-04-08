@@ -36,6 +36,7 @@ namespace Mod
 				// Initialize preferences and load into Settings before applying patches
 				SettingsConfig.Init();
 				SettingsConfig.LoadIntoSettings();
+				MapHack.InitializeSceneFallback();
 
 				s_harmony = new HarmonyLib.Harmony(HarmonyId);
 				s_harmony.PatchAll(typeof(Mod).Assembly);
@@ -175,6 +176,7 @@ namespace Mod
 				// Persist current runtime settings to preferences on quit
 				SettingsConfig.ApplyToPreferencesFromSettings();
 				SettingsConfig.Save();
+				MapHack.DisposeSceneFallback();
 
 				s_harmony?.UnpatchSelf();
 				MelonLogger.Msg("[LEHud] Harmony patches unpatched on quit");
