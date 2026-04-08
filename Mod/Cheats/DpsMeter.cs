@@ -89,6 +89,12 @@ namespace Mod.Cheats
 		private static int s_onlineColorCritEvents;
 		private static Color s_onlineLastColor;
 		private static bool s_onlineHasLastColor;
+		private static Color s_onlineLearnedNormalColor;
+		private static bool s_onlineHasLearnedNormalColor;
+		private static int s_onlineLearnedNormalCount;
+		private static Color s_onlineLearnedCritColor;
+		private static bool s_onlineHasLearnedCritColor;
+		private static int s_onlineLearnedCritCount;
 
 		public static void OnDamageEvent(object source, float damage, int hitEvents)
 		{
@@ -175,7 +181,8 @@ namespace Mod.Cheats
 				s_onlineLastColor = textColor.Value;
 				s_onlineHasLastColor = true;
 				RecordOnlineColorSample(textColor.Value);
-				if (IsLikelyCritColor(textColor.Value))
+				UpdateOnlineColorCalibration();
+				if (IsLikelyCritColorAdaptive(textColor.Value))
 				{
 					s_onlineColorCritEvents++;
 				}
@@ -295,6 +302,12 @@ namespace Mod.Cheats
 			s_onlineColorCritEvents = 0;
 			s_onlineLastColor = default;
 			s_onlineHasLastColor = false;
+			s_onlineLearnedNormalColor = default;
+			s_onlineHasLearnedNormalColor = false;
+			s_onlineLearnedNormalCount = 0;
+			s_onlineLearnedCritColor = default;
+			s_onlineHasLearnedCritColor = false;
+			s_onlineLearnedCritCount = 0;
 		}
 
 		private static void ResetForInactivity()
@@ -484,6 +497,16 @@ namespace Mod.Cheats
 				if (s_onlineHasLastColor)
 				{
 					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
+				}
+				if (s_onlineHasLearnedNormalColor)
+				{
+					s_textBuilder.Append("Calib Normal: ").Append(FormatColor(s_onlineLearnedNormalColor))
+						.Append(" x").Append(s_onlineLearnedNormalCount).Append('\n');
+				}
+				if (s_onlineHasLearnedCritColor)
+				{
+					s_textBuilder.Append("Calib Crit: ").Append(FormatColor(s_onlineLearnedCritColor))
+						.Append(" x").Append(s_onlineLearnedCritCount).Append('\n');
 				}
 				AppendOnlineCalibrationText();
 				s_textBuilder.Append("Note: includes all visible damage numbers.\n");
@@ -679,12 +702,38 @@ namespace Mod.Cheats
 			return !float.IsNaN(damage) && !float.IsInfinity(damage);
 		}
 
-		private static bool IsLikelyCritColor(Color color)
+		private static bool IsLikelyCritColorAdaptive(Color color)
+		{
+			if (s_onlineHasLearnedCritColor && ColorDistanceRgb(color, s_onlineLearnedCritColor) <= 0.12f)
+				return true;
+			if (s_onlineHasLearnedNormalColor && ColorDistanceRgb(color, s_onlineLearnedNormalColor) <= 0.08f)
+				return false;
+			if (s_onlineHasLearnedNormalColor)
+				return IsLikelyCritAgainstNormal(color, s_onlineLearnedNormalColor);
+			return IsLikelyCritColorFallback(color);
+		}
+
+		private static bool IsLikelyCritColorFallback(Color color)
 		{
 			Color.RGBToHSV(color, out float h, out float s, out float v);
 			float hueDegrees = h * 360f;
 			bool yellowBand = hueDegrees >= 35f && hueDegrees <= 75f;
 			return yellowBand && s >= 0.35f && v >= 0.5f;
+		}
+
+		private static bool IsLikelyCritAgainstNormal(Color sample, Color normal)
+		{
+			Color.RGBToHSV(sample, out float sampleHue, out float sampleSat, out float sampleVal);
+			Color.RGBToHSV(normal, out float normalHue, out float normalSat, out float normalVal);
+
+			float sampleHueDegrees = sampleHue * 360f;
+			float hueDelta = HueDeltaDegrees(sampleHue, normalHue);
+			bool warmBand = sampleHueDegrees >= 30f && sampleHueDegrees <= 80f;
+			bool saturationLift = sampleSat >= Mathf.Max(0.30f, normalSat + 0.15f);
+			bool valueOk = sampleVal >= Mathf.Max(0.35f, normalVal - 0.12f);
+			bool awayFromNormal = hueDelta >= 10f || ColorDistanceRgb(sample, normal) >= 0.10f;
+
+			return warmBand && saturationLift && valueOk && awayFromNormal;
 		}
 
 		private static string FormatColor(Color color)
@@ -707,6 +756,48 @@ namespace Mod.Cheats
 			s_onlineColorHistogram[key] = 1;
 		}
 
+		private static void UpdateOnlineColorCalibration()
+		{
+			if (!TryGetTopOnlineColor(out uint topKey, out int topCount) || topCount < 5)
+			{
+				s_onlineHasLearnedNormalColor = false;
+				s_onlineHasLearnedCritColor = false;
+				return;
+			}
+
+			Color normal = KeyToColor(topKey);
+			s_onlineLearnedNormalColor = normal;
+			s_onlineLearnedNormalCount = topCount;
+			s_onlineHasLearnedNormalColor = true;
+
+			s_onlineHasLearnedCritColor = false;
+			uint bestCritKey = 0;
+			int bestCritCount = 0;
+
+			foreach (var kv in s_onlineColorHistogram)
+			{
+				if (kv.Key == topKey || kv.Value < 3)
+					continue;
+
+				Color candidate = KeyToColor(kv.Key);
+				if (!IsLikelyCritAgainstNormal(candidate, normal))
+					continue;
+
+				if (kv.Value <= bestCritCount)
+					continue;
+
+				bestCritCount = kv.Value;
+				bestCritKey = kv.Key;
+			}
+
+			if (bestCritCount > 0)
+			{
+				s_onlineLearnedCritColor = KeyToColor(bestCritKey);
+				s_onlineLearnedCritCount = bestCritCount;
+				s_onlineHasLearnedCritColor = true;
+			}
+		}
+
 		private static uint ColorToKey(Color color)
 		{
 			var c32 = (Color32)color;
@@ -723,6 +814,21 @@ namespace Mod.Cheats
 			byte b = (byte)((key >> 8) & 0xFF);
 			byte a = (byte)(key & 0xFF);
 			return new Color32(r, g, b, a);
+		}
+
+		private static float ColorDistanceRgb(Color a, Color b)
+		{
+			float dr = a.r - b.r;
+			float dg = a.g - b.g;
+			float db = a.b - b.b;
+			return Mathf.Sqrt((dr * dr) + (dg * dg) + (db * db));
+		}
+
+		private static float HueDeltaDegrees(float hueA, float hueB)
+		{
+			float delta = Mathf.Abs(hueA - hueB);
+			delta = Mathf.Min(delta, 1f - delta);
+			return delta * 360f;
 		}
 
 		private static void AppendOnlineCalibrationText()
@@ -785,6 +891,14 @@ namespace Mod.Cheats
 				{
 					summary += $" | top2={FormatColor(KeyToColor(secondKey))}x{secondCount}";
 				}
+			}
+			if (s_onlineHasLearnedNormalColor)
+			{
+				summary += $" | normal={FormatColor(s_onlineLearnedNormalColor)}x{s_onlineLearnedNormalCount}";
+			}
+			if (s_onlineHasLearnedCritColor)
+			{
+				summary += $" | crit={FormatColor(s_onlineLearnedCritColor)}x{s_onlineLearnedCritCount}";
 			}
 
 			Log.InfoThrottled(LogSource.Hooks, $"dps-online-color-summary:{reason}", summary, TimeSpan.FromSeconds(5));
