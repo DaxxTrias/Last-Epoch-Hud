@@ -131,6 +131,7 @@ namespace Mod.Game
 			s_nextLookupAt = 0f;
 			s_lookupRetryDelay = InitialLookupRetrySeconds;
 			AutoPotion.ClearCache();
+			PlayerHealthReader.ClearCache();
 		}
 	}
 }

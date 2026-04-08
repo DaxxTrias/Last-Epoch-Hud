@@ -40,6 +40,10 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
 		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
 		private static MelonPreferences_Entry<bool>? _enableDpsMeterOnlineRaw;
+		private static MelonPreferences_Entry<int>? _dpsMeterOnlineFilterMode;
+		private static MelonPreferences_Entry<float>? _dpsMeterNearPlayerMeters;
+		private static MelonPreferences_Entry<float>? _dpsMeterFarPlayerMeters;
+		private static MelonPreferences_Entry<float>? _dpsMeterHpDropCorrelationMs;
 		private static MelonPreferences_Entry<bool>? _dpsMeterPanelLocked;
 		private static MelonPreferences_Entry<float>? _dpsMeterPanelX;
 		private static MelonPreferences_Entry<float>? _dpsMeterPanelY;
@@ -160,6 +164,10 @@ namespace Mod
 			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
 			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
 			_enableDpsMeterOnlineRaw = _general.CreateEntry("EnableDpsMeterOnlineRaw", Settings.enableDpsMeterOnlineRaw);
+			_dpsMeterOnlineFilterMode = _general.CreateEntry("DpsMeterOnlineFilterMode", Settings.dpsMeterOnlineFilterMode);
+			_dpsMeterNearPlayerMeters = _general.CreateEntry("DpsMeterNearPlayerMeters", Settings.dpsMeterNearPlayerMeters);
+			_dpsMeterFarPlayerMeters = _general.CreateEntry("DpsMeterFarPlayerMeters", Settings.dpsMeterFarPlayerMeters);
+			_dpsMeterHpDropCorrelationMs = _general.CreateEntry("DpsMeterHpDropCorrelationMs", Settings.dpsMeterHpDropCorrelationMs);
 			_dpsMeterPanelLocked = _general.CreateEntry("DpsMeterPanelLocked", Settings.dpsMeterPanelLocked);
 			_dpsMeterPanelX = _general.CreateEntry("DpsMeterPanelX", Settings.dpsMeterPanelX);
 			_dpsMeterPanelY = _general.CreateEntry("DpsMeterPanelY", Settings.dpsMeterPanelY);
@@ -253,6 +261,12 @@ namespace Mod
 			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
 			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
 			Settings.enableDpsMeterOnlineRaw = _enableDpsMeterOnlineRaw!.Value;
+			Settings.dpsMeterOnlineFilterMode = Math.Clamp(_dpsMeterOnlineFilterMode!.Value, 0, 2);
+			Settings.dpsMeterNearPlayerMeters = Clamp(_dpsMeterNearPlayerMeters!.Value, 0.5f, 10f);
+			Settings.dpsMeterFarPlayerMeters = Clamp(_dpsMeterFarPlayerMeters!.Value, 0.6f, 20f);
+			Settings.dpsMeterHpDropCorrelationMs = Clamp(_dpsMeterHpDropCorrelationMs!.Value, 50f, 1000f);
+			if (Settings.dpsMeterFarPlayerMeters <= Settings.dpsMeterNearPlayerMeters)
+				Settings.dpsMeterFarPlayerMeters = Settings.dpsMeterNearPlayerMeters + 0.2f;
 			Settings.dpsMeterPanelLocked = _dpsMeterPanelLocked!.Value;
 			Settings.dpsMeterPanelX = Clamp(_dpsMeterPanelX!.Value, -1f, 10000f);
 			Settings.dpsMeterPanelY = Clamp(_dpsMeterPanelY!.Value, -1f, 10000f);
@@ -343,6 +357,10 @@ namespace Mod
 			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
 			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
 			_enableDpsMeterOnlineRaw!.Value = Settings.enableDpsMeterOnlineRaw;
+			_dpsMeterOnlineFilterMode!.Value = Settings.dpsMeterOnlineFilterMode;
+			_dpsMeterNearPlayerMeters!.Value = Settings.dpsMeterNearPlayerMeters;
+			_dpsMeterFarPlayerMeters!.Value = Settings.dpsMeterFarPlayerMeters;
+			_dpsMeterHpDropCorrelationMs!.Value = Settings.dpsMeterHpDropCorrelationMs;
 			_dpsMeterPanelLocked!.Value = Settings.dpsMeterPanelLocked;
 			_dpsMeterPanelX!.Value = Settings.dpsMeterPanelX;
 			_dpsMeterPanelY!.Value = Settings.dpsMeterPanelY;
@@ -585,6 +603,10 @@ namespace Mod
 			public float dpsMeterInactivityResetSeconds { get; set; }
 			public bool dpsMeterAutoReset { get; set; }
 			public bool enableDpsMeterOnlineRaw { get; set; }
+			public int dpsMeterOnlineFilterMode { get; set; }
+			public float dpsMeterNearPlayerMeters { get; set; }
+			public float dpsMeterFarPlayerMeters { get; set; }
+			public float dpsMeterHpDropCorrelationMs { get; set; }
 			public bool dpsMeterPanelLocked { get; set; }
 			public float dpsMeterPanelX { get; set; }
 			public float dpsMeterPanelY { get; set; }
@@ -666,6 +688,10 @@ namespace Mod
 				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
 				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
 				enableDpsMeterOnlineRaw = Settings.enableDpsMeterOnlineRaw,
+				dpsMeterOnlineFilterMode = Settings.dpsMeterOnlineFilterMode,
+				dpsMeterNearPlayerMeters = Settings.dpsMeterNearPlayerMeters,
+				dpsMeterFarPlayerMeters = Settings.dpsMeterFarPlayerMeters,
+				dpsMeterHpDropCorrelationMs = Settings.dpsMeterHpDropCorrelationMs,
 				dpsMeterPanelLocked = Settings.dpsMeterPanelLocked,
 				dpsMeterPanelX = Settings.dpsMeterPanelX,
 				dpsMeterPanelY = Settings.dpsMeterPanelY,
@@ -746,6 +772,12 @@ namespace Mod
 			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
 			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
 			Settings.enableDpsMeterOnlineRaw = s.enableDpsMeterOnlineRaw;
+			Settings.dpsMeterOnlineFilterMode = Math.Clamp(s.dpsMeterOnlineFilterMode, 0, 2);
+			Settings.dpsMeterNearPlayerMeters = Clamp(s.dpsMeterNearPlayerMeters, 0.5f, 10f);
+			Settings.dpsMeterFarPlayerMeters = Clamp(s.dpsMeterFarPlayerMeters, 0.6f, 20f);
+			Settings.dpsMeterHpDropCorrelationMs = Clamp(s.dpsMeterHpDropCorrelationMs, 50f, 1000f);
+			if (Settings.dpsMeterFarPlayerMeters <= Settings.dpsMeterNearPlayerMeters)
+				Settings.dpsMeterFarPlayerMeters = Settings.dpsMeterNearPlayerMeters + 0.2f;
 			Settings.dpsMeterPanelLocked = s.dpsMeterPanelLocked;
 			Settings.dpsMeterPanelX = Clamp(s.dpsMeterPanelX, -1f, 10000f);
 			Settings.dpsMeterPanelY = Clamp(s.dpsMeterPanelY, -1f, 10000f);

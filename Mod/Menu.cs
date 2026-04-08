@@ -175,7 +175,7 @@ namespace Mod
 					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay");
 					Settings.enableDpsMeterOnlineRaw = GUILayout.Toggle(
 						Settings.enableDpsMeterOnlineRaw,
-						"Allow Online Raw Source (Unfiltered)");
+						"Allow Online Raw Source");
 					Settings.dpsMeterPanelLocked = GUILayout.Toggle(
 						Settings.dpsMeterPanelLocked,
 						"Lock DPS Panel Position/Size");
@@ -207,6 +207,26 @@ namespace Mod
 						{
 							DpsMeter.ResetPanelLayout();
 						}
+
+						if (!ObjectManager.IsOfflineMode() && Settings.enableDpsMeterOnlineRaw)
+						{
+							GUILayout.Space(4f);
+							GUILayout.Label("Online Ownership Filter");
+							if (GUILayout.Button("Filter Mode: " + DescribeDpsFilterMode(Settings.dpsMeterOnlineFilterMode)))
+							{
+								Settings.dpsMeterOnlineFilterMode = (Settings.dpsMeterOnlineFilterMode + 1) % 3;
+							}
+
+							GUILayout.Label("Near Radius (incoming bias): " + Settings.dpsMeterNearPlayerMeters.ToString("F1") + "m");
+							Settings.dpsMeterNearPlayerMeters = GUILayout.HorizontalSlider(Settings.dpsMeterNearPlayerMeters, 0.5f, 6f);
+
+							float minFar = Mathf.Max(Settings.dpsMeterNearPlayerMeters + 0.2f, 0.7f);
+							GUILayout.Label("Far Radius (outgoing bias): " + Settings.dpsMeterFarPlayerMeters.ToString("F1") + "m");
+							Settings.dpsMeterFarPlayerMeters = GUILayout.HorizontalSlider(Settings.dpsMeterFarPlayerMeters, minFar, 12f);
+
+							GUILayout.Label("HP Drop Correlation Window: " + Settings.dpsMeterHpDropCorrelationMs.ToString("F0") + "ms");
+							Settings.dpsMeterHpDropCorrelationMs = GUILayout.HorizontalSlider(Settings.dpsMeterHpDropCorrelationMs, 50f, 1000f);
+						}
 					}
 
 					if (!Settings.dpsMeterPanelLocked)
@@ -219,7 +239,7 @@ namespace Mod
 					}
 					if (!ObjectManager.IsOfflineMode() && Settings.enableDpsMeterOnlineRaw)
 					{
-						GUILayout.Label("Online Raw includes all visible damage numbers (incoming + outgoing).");
+						GUILayout.Label("Online Raw can be filtered by proximity + local HP-drop correlation.");
 					}
 					if (Settings.enableDamageNumberDiagnostics)
 					{
@@ -378,6 +398,16 @@ namespace Mod
 					}
 					break;
 			}
+		}
+
+		private static string DescribeDpsFilterMode(int mode)
+		{
+			return mode switch
+			{
+				1 => "Likely Outgoing",
+				2 => "Likely Incoming",
+				_ => "All Visible"
+			};
 		}
 
 		public static Rect windowRect = new Rect(20, 20, 250, 700);

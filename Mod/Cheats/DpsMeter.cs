@@ -87,6 +87,7 @@ namespace Mod.Cheats
 		private static float s_lastHitAt = -1f;
 		private static int s_onlineColorSamples;
 		private static int s_onlineColorCritEvents;
+		private static int s_onlineFilteredOutEvents;
 		private static Color s_onlineLastColor;
 		private static bool s_onlineHasLastColor;
 		private static Color s_onlineLearnedNormalColor;
@@ -95,6 +96,8 @@ namespace Mod.Cheats
 		private static Color s_onlineLearnedCritColor;
 		private static bool s_onlineHasLearnedCritColor;
 		private static int s_onlineLearnedCritCount;
+		private static float s_lastKnownLocalHealthPercent = -1f;
+		private static float s_lastLocalHealthDropAt = -1f;
 
 		public static void OnDamageEvent(object source, float damage, int hitEvents)
 		{
@@ -158,7 +161,7 @@ namespace Mod.Cheats
 			RefreshDps();
 		}
 
-		public static void OnOnlineDamageTextSample(object source, string? text, Color? textColor)
+		public static void OnOnlineDamageTextSample(object source, string? text, Color? textColor, Vector3? worldPosition = null)
 		{
 			if (GetCurrentMode() != DpsSourceMode.OnlineRaw)
 				return;
@@ -172,6 +175,12 @@ namespace Mod.Cheats
 			float now = Time.unscaledTime;
 			if (!ShouldAcceptOnlineSample(instanceId, text!, now))
 				return;
+
+			if (!ShouldAcceptOnlineOwnershipFilter(worldPosition, now))
+			{
+				s_onlineFilteredOutEvents++;
+				return;
+			}
 
 			s_totalEvents++;
 			RegisterHit(damage, now);
@@ -224,6 +233,7 @@ namespace Mod.Cheats
 			if (s_sourceMode == DpsSourceMode.OnlineRaw)
 			{
 				PruneOnlineStates(now);
+				UpdateLocalHealthTracking(now);
 			}
 
 			if (!Settings.dpsMeterAutoReset || s_lastHitAt < 0f)
@@ -300,6 +310,7 @@ namespace Mod.Cheats
 			s_lastHitAt = -1f;
 			s_onlineColorSamples = 0;
 			s_onlineColorCritEvents = 0;
+			s_onlineFilteredOutEvents = 0;
 			s_onlineLastColor = default;
 			s_onlineHasLastColor = false;
 			s_onlineLearnedNormalColor = default;
@@ -308,6 +319,8 @@ namespace Mod.Cheats
 			s_onlineLearnedCritColor = default;
 			s_onlineHasLearnedCritColor = false;
 			s_onlineLearnedCritCount = 0;
+			s_lastKnownLocalHealthPercent = -1f;
+			s_lastLocalHealthDropAt = -1f;
 		}
 
 		private static void ResetForInactivity()
@@ -492,8 +505,14 @@ namespace Mod.Cheats
 				float critPercent = s_totalHits > 0
 					? (100f * s_onlineColorCritEvents / s_totalHits)
 					: 0f;
+				OnlineDamageFilterMode filterMode = GetOnlineFilterMode();
 				s_textBuilder.Append("Crits~(color): ").Append(s_onlineColorCritEvents)
 					.Append(" | Crit %: ").Append(critPercent.ToString("F1", CultureInfo.InvariantCulture)).Append('%').Append('\n');
+				s_textBuilder.Append("Filter: ").Append(OnlineDamageOwnershipFilter.Describe(filterMode)).Append('\n');
+				if (Settings.enableDamageNumberDiagnostics)
+				{
+					s_textBuilder.Append("Filtered Out: ").Append(s_onlineFilteredOutEvents).Append('\n');
+				}
 				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLastColor)
 				{
 					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
@@ -512,7 +531,18 @@ namespace Mod.Cheats
 				{
 					AppendOnlineCalibrationText();
 				}
-				s_textBuilder.Append("Note: includes all visible damage numbers.\n");
+				s_textBuilder.Append("Near/Far: ")
+					.Append(Settings.dpsMeterNearPlayerMeters.ToString("F1", CultureInfo.InvariantCulture))
+					.Append("m / ")
+					.Append(Settings.dpsMeterFarPlayerMeters.ToString("F1", CultureInfo.InvariantCulture))
+					.Append("m");
+				if (Settings.enableDamageNumberDiagnostics)
+				{
+					s_textBuilder.Append(" | HP corr: ")
+						.Append(Settings.dpsMeterHpDropCorrelationMs.ToString("F0", CultureInfo.InvariantCulture))
+						.Append("ms");
+				}
+				s_textBuilder.Append('\n');
 			}
 			s_textBuilder.Append("Total Damage: ").Append(FormatNumber(s_totalDamage)).Append('\n');
 			s_textBuilder.Append("Current DPS: ").Append(FormatNumber(s_currentDps)).Append('\n');
@@ -573,6 +603,83 @@ namespace Mod.Cheats
 				DpsSourceMode.OnlineRaw => "Online Raw",
 				_ => "Disabled"
 			};
+		}
+
+		private static OnlineDamageFilterMode GetOnlineFilterMode()
+		{
+			return Settings.dpsMeterOnlineFilterMode switch
+			{
+				1 => OnlineDamageFilterMode.LikelyOutgoing,
+				2 => OnlineDamageFilterMode.LikelyIncoming,
+				_ => OnlineDamageFilterMode.AllVisible
+			};
+		}
+
+		private static bool ShouldAcceptOnlineOwnershipFilter(Vector3? sampleWorldPosition, float now)
+		{
+			OnlineDamageFilterMode mode = GetOnlineFilterMode();
+			if (mode == OnlineDamageFilterMode.AllVisible)
+				return true;
+
+			if (!TryGetLocalPlayerPosition(out Vector3 playerPosition))
+				return true;
+
+			bool hasWorldPosition = sampleWorldPosition.HasValue;
+			Vector3 worldPosition = hasWorldPosition ? sampleWorldPosition!.Value : default;
+			bool recentHealthDrop = HasRecentLocalHealthDrop(now);
+			float nearMeters = Mathf.Clamp(Settings.dpsMeterNearPlayerMeters, 0.5f, 10f);
+			float farMeters = Mathf.Max(nearMeters + 0.2f, Settings.dpsMeterFarPlayerMeters);
+
+			return OnlineDamageOwnershipFilter.ShouldInclude(
+				mode,
+				hasWorldPosition,
+				worldPosition,
+				playerPosition,
+				nearMeters,
+				farMeters,
+				recentHealthDrop);
+		}
+
+		private static bool TryGetLocalPlayerPosition(out Vector3 position)
+		{
+			position = default;
+			var localPlayer = ObjectManager.GetLocalPlayer();
+			if (localPlayer == null)
+				return false;
+
+			var transform = localPlayer.transform;
+			if (transform == null)
+				return false;
+
+			position = transform.position;
+			return true;
+		}
+
+		private static bool HasRecentLocalHealthDrop(float now)
+		{
+			if (s_lastLocalHealthDropAt < 0f)
+				return false;
+
+			float windowSeconds = Mathf.Clamp(Settings.dpsMeterHpDropCorrelationMs, 50f, 1000f) / 1000f;
+			return (now - s_lastLocalHealthDropAt) <= windowSeconds;
+		}
+
+		private static void UpdateLocalHealthTracking(float now)
+		{
+			if (PlayerHealthReader.TryGetLocalHealthPercent(out float healthPercent))
+			{
+				if (s_lastKnownLocalHealthPercent >= 0f && healthPercent < s_lastKnownLocalHealthPercent - 0.0001f)
+				{
+					s_lastLocalHealthDropAt = now;
+				}
+				s_lastKnownLocalHealthPercent = healthPercent;
+			}
+			else
+			{
+				s_lastKnownLocalHealthPercent = -1f;
+			}
+
+			_ = TryGetLocalPlayerPosition(out _);
 		}
 
 		private static void RegisterHit(float damage, float now)
@@ -888,7 +995,8 @@ namespace Mod.Cheats
 			float critPercent = s_totalHits > 0
 				? (100f * s_onlineColorCritEvents / s_totalHits)
 				: 0f;
-			string summary = $"[DpsMeter] Online color summary ({reason}) hits={s_totalHits} crits~={s_onlineColorCritEvents} crit%={critPercent:F1}";
+			OnlineDamageFilterMode filterMode = GetOnlineFilterMode();
+			string summary = $"[DpsMeter] Online color summary ({reason}) hits={s_totalHits} crits~={s_onlineColorCritEvents} crit%={critPercent:F1} filter={OnlineDamageOwnershipFilter.Describe(filterMode)} filtered={s_onlineFilteredOutEvents}";
 
 			if (TryGetTopOnlineColor(out uint topKey, out int topCount))
 			{

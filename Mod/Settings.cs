@@ -17,6 +17,10 @@ namespace Mod
         public static float dpsMeterInactivityResetSeconds = 10f;
         public static bool dpsMeterAutoReset = true;
         public static bool enableDpsMeterOnlineRaw = false;
+        public static int dpsMeterOnlineFilterMode = 0; // 0=AllVisible, 1=LikelyOutgoing, 2=LikelyIncoming
+        public static float dpsMeterNearPlayerMeters = 2.2f;
+        public static float dpsMeterFarPlayerMeters = 3.8f;
+        public static float dpsMeterHpDropCorrelationMs = 180f;
         public static bool dpsMeterPanelLocked = true;
         public static float dpsMeterPanelX = -1f; // -1 anchors to right side on first load
         public static float dpsMeterPanelY = 88f;

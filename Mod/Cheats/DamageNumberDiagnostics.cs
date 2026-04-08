@@ -130,7 +130,12 @@ namespace Mod.Cheats
 					}
 					if (state != null && !string.IsNullOrWhiteSpace(state.Text))
 					{
-						DpsMeter.OnOnlineDamageTextSample(__instance, state.Text, state.HasLastColor ? state.LastColor : null);
+						Vector3? worldPosition = null;
+						if (__instance is Component component && component.transform != null)
+						{
+							worldPosition = component.transform.position;
+						}
+						DpsMeter.OnOnlineDamageTextSample(__instance, state.Text, state.HasLastColor ? state.LastColor : null, worldPosition);
 					}
 					if (Settings.enableDamageNumberDiagnostics)
 					{
