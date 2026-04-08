@@ -54,7 +54,7 @@ namespace Mod.Cheats
 		private static readonly Queue<HitSample> s_recentHits = new Queue<HitSample>(256);
 		private static readonly Dictionary<int, OnlineSampleState> s_onlineStates = new Dictionary<int, OnlineSampleState>(128);
 		private static readonly List<int> s_onlinePruneBuffer = new List<int>(64);
-		private static readonly Dictionary<uint, int> s_onlineColorHistogram = new Dictionary<uint, int>(24);
+		private static readonly OnlineCritColorCalibrator s_onlineCritCalibrator = new OnlineCritColorCalibrator();
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
 		private static Rect s_panelRect = new Rect(0f, 88f, DefaultPanelWidth, DefaultPanelHeight);
 
@@ -85,17 +85,7 @@ namespace Mod.Cheats
 		private static float s_minDps = float.MaxValue;
 		private static float s_firstHitAt = -1f;
 		private static float s_lastHitAt = -1f;
-		private static int s_onlineColorSamples;
-		private static int s_onlineColorCritEvents;
 		private static int s_onlineFilteredOutEvents;
-		private static Color s_onlineLastColor;
-		private static bool s_onlineHasLastColor;
-		private static Color s_onlineLearnedNormalColor;
-		private static bool s_onlineHasLearnedNormalColor;
-		private static int s_onlineLearnedNormalCount;
-		private static Color s_onlineLearnedCritColor;
-		private static bool s_onlineHasLearnedCritColor;
-		private static int s_onlineLearnedCritCount;
 		private static float s_lastKnownLocalHealthPercent = -1f;
 		private static float s_lastLocalHealthDropAt = -1f;
 
@@ -186,15 +176,7 @@ namespace Mod.Cheats
 			RegisterHit(damage, now);
 			if (textColor.HasValue)
 			{
-				s_onlineColorSamples++;
-				s_onlineLastColor = textColor.Value;
-				s_onlineHasLastColor = true;
-				RecordOnlineColorSample(textColor.Value);
-				UpdateOnlineColorCalibration();
-				if (IsLikelyCritColorAdaptive(textColor.Value))
-				{
-					s_onlineColorCritEvents++;
-				}
+				s_onlineCritCalibrator.RegisterSample(textColor.Value);
 			}
 		}
 
@@ -287,7 +269,7 @@ namespace Mod.Cheats
 			s_recentHits.Clear();
 			s_onlineStates.Clear();
 			s_onlinePruneBuffer.Clear();
-			s_onlineColorHistogram.Clear();
+			s_onlineCritCalibrator.Reset();
 			s_recentDamage = 0f;
 			s_totalDamage = 0f;
 			s_totalEvents = 0;
@@ -308,17 +290,7 @@ namespace Mod.Cheats
 			s_minDps = float.MaxValue;
 			s_firstHitAt = -1f;
 			s_lastHitAt = -1f;
-			s_onlineColorSamples = 0;
-			s_onlineColorCritEvents = 0;
 			s_onlineFilteredOutEvents = 0;
-			s_onlineLastColor = default;
-			s_onlineHasLastColor = false;
-			s_onlineLearnedNormalColor = default;
-			s_onlineHasLearnedNormalColor = false;
-			s_onlineLearnedNormalCount = 0;
-			s_onlineLearnedCritColor = default;
-			s_onlineHasLearnedCritColor = false;
-			s_onlineLearnedCritCount = 0;
 			s_lastKnownLocalHealthPercent = -1f;
 			s_lastLocalHealthDropAt = -1f;
 		}
@@ -503,29 +475,29 @@ namespace Mod.Cheats
 			else if (s_sourceMode == DpsSourceMode.OnlineRaw)
 			{
 				float critPercent = s_totalHits > 0
-					? (100f * s_onlineColorCritEvents / s_totalHits)
+					? (100f * s_onlineCritCalibrator.CritSamples / s_totalHits)
 					: 0f;
 				OnlineDamageFilterMode filterMode = GetOnlineFilterMode();
-				s_textBuilder.Append("Crits~(color): ").Append(s_onlineColorCritEvents)
+				s_textBuilder.Append("Crits~(color): ").Append(s_onlineCritCalibrator.CritSamples)
 					.Append(" | Crit %: ").Append(critPercent.ToString("F1", CultureInfo.InvariantCulture)).Append('%').Append('\n');
 				s_textBuilder.Append("Filter: ").Append(OnlineDamageOwnershipFilter.Describe(filterMode)).Append('\n');
 				if (Settings.enableDamageNumberDiagnostics)
 				{
 					s_textBuilder.Append("Filtered Out: ").Append(s_onlineFilteredOutEvents).Append('\n');
 				}
-				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLastColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineCritCalibrator.HasLastColor)
 				{
-					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
+					s_textBuilder.Append("Last Color: ").Append(OnlineCritColorCalibrator.FormatColor(s_onlineCritCalibrator.LastColor)).Append('\n');
 				}
-				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLearnedNormalColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineCritCalibrator.HasLearnedNormalColor)
 				{
-					s_textBuilder.Append("Calib Normal: ").Append(FormatColor(s_onlineLearnedNormalColor))
-						.Append(" x").Append(s_onlineLearnedNormalCount).Append('\n');
+					s_textBuilder.Append("Calib Normal: ").Append(OnlineCritColorCalibrator.FormatColor(s_onlineCritCalibrator.LearnedNormalColor))
+						.Append(" x").Append(s_onlineCritCalibrator.LearnedNormalCount).Append('\n');
 				}
-				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLearnedCritColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineCritCalibrator.HasLearnedCritColor)
 				{
-					s_textBuilder.Append("Calib Crit: ").Append(FormatColor(s_onlineLearnedCritColor))
-						.Append(" x").Append(s_onlineLearnedCritCount).Append('\n');
+					s_textBuilder.Append("Calib Crit: ").Append(OnlineCritColorCalibrator.FormatColor(s_onlineCritCalibrator.LearnedCritColor))
+						.Append(" x").Append(s_onlineCritCalibrator.LearnedCritCount).Append('\n');
 				}
 				if (Settings.enableDamageNumberDiagnostics)
 				{
@@ -815,204 +787,37 @@ namespace Mod.Cheats
 			return !float.IsNaN(damage) && !float.IsInfinity(damage);
 		}
 
-		private static bool IsLikelyCritColorAdaptive(Color color)
-		{
-			if (s_onlineHasLearnedCritColor && ColorDistanceRgb(color, s_onlineLearnedCritColor) <= 0.12f)
-				return true;
-			if (s_onlineHasLearnedNormalColor && ColorDistanceRgb(color, s_onlineLearnedNormalColor) <= 0.08f)
-				return false;
-			if (s_onlineHasLearnedNormalColor)
-				return IsLikelyCritAgainstNormal(color, s_onlineLearnedNormalColor);
-			return IsLikelyCritColorFallback(color);
-		}
-
-		private static bool IsLikelyCritColorFallback(Color color)
-		{
-			Color.RGBToHSV(color, out float h, out float s, out float v);
-			float hueDegrees = h * 360f;
-			bool yellowBand = hueDegrees >= 35f && hueDegrees <= 75f;
-			return yellowBand && s >= 0.35f && v >= 0.5f;
-		}
-
-		private static bool IsLikelyCritAgainstNormal(Color sample, Color normal)
-		{
-			Color.RGBToHSV(sample, out float sampleHue, out float sampleSat, out float sampleVal);
-			Color.RGBToHSV(normal, out float normalHue, out float normalSat, out float normalVal);
-
-			float sampleHueDegrees = sampleHue * 360f;
-			float hueDelta = HueDeltaDegrees(sampleHue, normalHue);
-			bool warmBand = sampleHueDegrees >= 30f && sampleHueDegrees <= 80f;
-			bool saturationLift = sampleSat >= Mathf.Max(0.30f, normalSat + 0.15f);
-			bool valueOk = sampleVal >= Mathf.Max(0.35f, normalVal - 0.12f);
-			bool awayFromNormal = hueDelta >= 10f || ColorDistanceRgb(sample, normal) >= 0.10f;
-
-			return warmBand && saturationLift && valueOk && awayFromNormal;
-		}
-
-		private static string FormatColor(Color color)
-		{
-			return $"{color.r:F2},{color.g:F2},{color.b:F2},{color.a:F2}";
-		}
-
-		private static void RecordOnlineColorSample(Color color)
-		{
-			uint key = ColorToKey(color);
-			if (s_onlineColorHistogram.TryGetValue(key, out int count))
-			{
-				s_onlineColorHistogram[key] = count + 1;
-				return;
-			}
-
-			if (s_onlineColorHistogram.Count >= 24)
-				return;
-
-			s_onlineColorHistogram[key] = 1;
-		}
-
-		private static void UpdateOnlineColorCalibration()
-		{
-			if (!TryGetTopOnlineColor(out uint topKey, out int topCount) || topCount < 5)
-			{
-				s_onlineHasLearnedNormalColor = false;
-				s_onlineHasLearnedCritColor = false;
-				return;
-			}
-
-			Color normal = KeyToColor(topKey);
-			s_onlineLearnedNormalColor = normal;
-			s_onlineLearnedNormalCount = topCount;
-			s_onlineHasLearnedNormalColor = true;
-
-			s_onlineHasLearnedCritColor = false;
-			uint bestCritKey = 0;
-			int bestCritCount = 0;
-
-			foreach (var kv in s_onlineColorHistogram)
-			{
-				if (kv.Key == topKey || kv.Value < 3)
-					continue;
-
-				Color candidate = KeyToColor(kv.Key);
-				if (!IsLikelyCritAgainstNormal(candidate, normal))
-					continue;
-
-				if (kv.Value <= bestCritCount)
-					continue;
-
-				bestCritCount = kv.Value;
-				bestCritKey = kv.Key;
-			}
-
-			if (bestCritCount > 0)
-			{
-				s_onlineLearnedCritColor = KeyToColor(bestCritKey);
-				s_onlineLearnedCritCount = bestCritCount;
-				s_onlineHasLearnedCritColor = true;
-			}
-		}
-
-		private static uint ColorToKey(Color color)
-		{
-			var c32 = (Color32)color;
-			return ((uint)c32.r << 24)
-				| ((uint)c32.g << 16)
-				| ((uint)c32.b << 8)
-				| c32.a;
-		}
-
-		private static Color KeyToColor(uint key)
-		{
-			byte r = (byte)((key >> 24) & 0xFF);
-			byte g = (byte)((key >> 16) & 0xFF);
-			byte b = (byte)((key >> 8) & 0xFF);
-			byte a = (byte)(key & 0xFF);
-			return new Color32(r, g, b, a);
-		}
-
-		private static float ColorDistanceRgb(Color a, Color b)
-		{
-			float dr = a.r - b.r;
-			float dg = a.g - b.g;
-			float db = a.b - b.b;
-			return Mathf.Sqrt((dr * dr) + (dg * dg) + (db * db));
-		}
-
-		private static float HueDeltaDegrees(float hueA, float hueB)
-		{
-			float delta = Mathf.Abs(hueA - hueB);
-			delta = Mathf.Min(delta, 1f - delta);
-			return delta * 360f;
-		}
-
 		private static void AppendOnlineCalibrationText()
 		{
-			if (!TryGetTopOnlineColor(out uint topKey, out int topCount))
-				return;
-
-			var topColor = KeyToColor(topKey);
-			s_textBuilder.Append("Top Color #1: ").Append(FormatColor(topColor)).Append(" x").Append(topCount).Append('\n');
-
-			if (TryGetSecondOnlineColor(topKey, out uint secondKey, out int secondCount))
-			{
-				var secondColor = KeyToColor(secondKey);
-				s_textBuilder.Append("Top Color #2: ").Append(FormatColor(secondColor)).Append(" x").Append(secondCount).Append('\n');
-			}
-		}
-
-		private static bool TryGetTopOnlineColor(out uint colorKey, out int count)
-		{
-			colorKey = 0;
-			count = 0;
-			foreach (var kv in s_onlineColorHistogram)
-			{
-				if (kv.Value <= count)
-					continue;
-				colorKey = kv.Key;
-				count = kv.Value;
-			}
-			return count > 0;
-		}
-
-		private static bool TryGetSecondOnlineColor(uint firstKey, out uint colorKey, out int count)
-		{
-			colorKey = 0;
-			count = 0;
-			foreach (var kv in s_onlineColorHistogram)
-			{
-				if (kv.Key == firstKey || kv.Value <= count)
-					continue;
-				colorKey = kv.Key;
-				count = kv.Value;
-			}
-			return count > 0;
+			s_onlineCritCalibrator.AppendTopColors(s_textBuilder);
 		}
 
 		private static void MaybeLogOnlineColorSummary(string reason)
 		{
-			if (s_sourceMode != DpsSourceMode.OnlineRaw || s_onlineColorSamples <= 0)
+			if (s_sourceMode != DpsSourceMode.OnlineRaw || s_onlineCritCalibrator.TotalSamples <= 0)
 				return;
 
 			float critPercent = s_totalHits > 0
-				? (100f * s_onlineColorCritEvents / s_totalHits)
+				? (100f * s_onlineCritCalibrator.CritSamples / s_totalHits)
 				: 0f;
 			OnlineDamageFilterMode filterMode = GetOnlineFilterMode();
-			string summary = $"[DpsMeter] Online color summary ({reason}) hits={s_totalHits} crits~={s_onlineColorCritEvents} crit%={critPercent:F1} filter={OnlineDamageOwnershipFilter.Describe(filterMode)} filtered={s_onlineFilteredOutEvents}";
+			string summary = $"[DpsMeter] Online color summary ({reason}) hits={s_totalHits} crits~={s_onlineCritCalibrator.CritSamples} crit%={critPercent:F1} filter={OnlineDamageOwnershipFilter.Describe(filterMode)} filtered={s_onlineFilteredOutEvents}";
 
-			if (TryGetTopOnlineColor(out uint topKey, out int topCount))
+			if (s_onlineCritCalibrator.TryGetTopColor(out uint topKey, out Color topColor, out int topCount))
 			{
-				summary += $" | top1={FormatColor(KeyToColor(topKey))}x{topCount}";
-				if (TryGetSecondOnlineColor(topKey, out uint secondKey, out int secondCount))
+				summary += $" | top1={OnlineCritColorCalibrator.FormatColor(topColor)}x{topCount}";
+				if (s_onlineCritCalibrator.TryGetSecondColor(topKey, out Color secondColor, out int secondCount))
 				{
-					summary += $" | top2={FormatColor(KeyToColor(secondKey))}x{secondCount}";
+					summary += $" | top2={OnlineCritColorCalibrator.FormatColor(secondColor)}x{secondCount}";
 				}
 			}
-			if (s_onlineHasLearnedNormalColor)
+			if (s_onlineCritCalibrator.HasLearnedNormalColor)
 			{
-				summary += $" | normal={FormatColor(s_onlineLearnedNormalColor)}x{s_onlineLearnedNormalCount}";
+				summary += $" | normal={OnlineCritColorCalibrator.FormatColor(s_onlineCritCalibrator.LearnedNormalColor)}x{s_onlineCritCalibrator.LearnedNormalCount}";
 			}
-			if (s_onlineHasLearnedCritColor)
+			if (s_onlineCritCalibrator.HasLearnedCritColor)
 			{
-				summary += $" | crit={FormatColor(s_onlineLearnedCritColor)}x{s_onlineLearnedCritCount}";
+				summary += $" | crit={OnlineCritColorCalibrator.FormatColor(s_onlineCritCalibrator.LearnedCritColor)}x{s_onlineCritCalibrator.LearnedCritCount}";
 			}
 
 			Log.InfoThrottled(LogSource.Hooks, $"dps-online-color-summary:{reason}", summary, TimeSpan.FromSeconds(5));
