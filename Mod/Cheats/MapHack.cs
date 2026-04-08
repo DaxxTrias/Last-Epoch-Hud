@@ -7,7 +7,7 @@ namespace Mod.Cheats
     internal class MapHack
     {
         private const float DefaultRevealRadius = 40f;
-        private const float BoostRevealRadius = 5000f;
+        private const float BoostRevealRadius = 8000f; // beast rifts can exceed 5000
         private const float BoostDurationSeconds = 60f;
         private const float LookupRetrySeconds = 1f;
         private const float ErrorLogCooldownSeconds = 5f;
