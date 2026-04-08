@@ -24,8 +24,6 @@ namespace Mod.Cheats
 		private const int HitEventMeleeHit = 64;
 		private const int HitEventParry = 128;
 		private const int HitEventSuperCrit = 256;
-		private const float OnlineSameTextGapSeconds = 0.25f;
-		private const float OnlineStateTtlSeconds = 12f;
 		private const int PanelWindowId = 90873;
 		private const float DefaultPanelWidth = 360f;
 		private const float DefaultPanelHeight = 320f;
@@ -45,15 +43,8 @@ namespace Mod.Cheats
 			}
 		}
 
-		private struct OnlineSampleState
-		{
-			public string LastText;
-			public float LastSeenAt;
-		}
-
 		private static readonly Queue<HitSample> s_recentHits = new Queue<HitSample>(256);
-		private static readonly Dictionary<int, OnlineSampleState> s_onlineStates = new Dictionary<int, OnlineSampleState>(128);
-		private static readonly List<int> s_onlinePruneBuffer = new List<int>(64);
+		private static readonly OnlineDamageTextSampler s_onlineTextSampler = new OnlineDamageTextSampler();
 		private static readonly OnlineCritColorCalibrator s_onlineCritCalibrator = new OnlineCritColorCalibrator();
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
 		private static Rect s_panelRect = new Rect(0f, 88f, DefaultPanelWidth, DefaultPanelHeight);
@@ -156,14 +147,8 @@ namespace Mod.Cheats
 			if (GetCurrentMode() != DpsSourceMode.OnlineRaw)
 				return;
 
-			if (string.IsNullOrWhiteSpace(text) || !TryParseDamageText(text, out float damage) || damage <= 0f)
-				return;
-
-			if (!TryGetSourceInstanceId(source, out int instanceId))
-				return;
-
 			float now = Time.unscaledTime;
-			if (!ShouldAcceptOnlineSample(instanceId, text!, now))
+			if (!s_onlineTextSampler.TryAcceptSample(source, text, now, out float damage))
 				return;
 
 			if (!ShouldAcceptOnlineOwnershipFilter(worldPosition, now))
@@ -214,7 +199,7 @@ namespace Mod.Cheats
 			RefreshDps();
 			if (s_sourceMode == DpsSourceMode.OnlineRaw)
 			{
-				PruneOnlineStates(now);
+				s_onlineTextSampler.PruneExpired(now);
 				UpdateLocalHealthTracking(now);
 			}
 
@@ -267,8 +252,7 @@ namespace Mod.Cheats
 		private static void ResetInternal()
 		{
 			s_recentHits.Clear();
-			s_onlineStates.Clear();
-			s_onlinePruneBuffer.Clear();
+			s_onlineTextSampler.Reset();
 			s_onlineCritCalibrator.Reset();
 			s_recentDamage = 0f;
 			s_totalDamage = 0f;
@@ -668,123 +652,6 @@ namespace Mod.Cheats
 			s_recentDamage += damage;
 			PruneWindow(now);
 			RefreshDps();
-		}
-
-		private static bool TryGetSourceInstanceId(object source, out int instanceId)
-		{
-			instanceId = 0;
-			if (source is UnityEngine.Object unityObject)
-			{
-				instanceId = unityObject.GetInstanceID();
-				return instanceId != 0;
-			}
-
-			return false;
-		}
-
-		private static bool ShouldAcceptOnlineSample(int instanceId, string text, float now)
-		{
-			if (!s_onlineStates.TryGetValue(instanceId, out var state))
-			{
-				s_onlineStates[instanceId] = new OnlineSampleState
-				{
-					LastText = text,
-					LastSeenAt = now
-				};
-				return true;
-			}
-
-			bool accepted = !string.Equals(state.LastText, text, StringComparison.Ordinal)
-				|| (now - state.LastSeenAt) >= OnlineSameTextGapSeconds;
-
-			state.LastText = text;
-			state.LastSeenAt = now;
-			s_onlineStates[instanceId] = state;
-			return accepted;
-		}
-
-		private static void PruneOnlineStates(float now)
-		{
-			if (s_onlineStates.Count == 0)
-				return;
-
-			s_onlinePruneBuffer.Clear();
-			foreach (var kv in s_onlineStates)
-			{
-				if (now - kv.Value.LastSeenAt > OnlineStateTtlSeconds)
-					s_onlinePruneBuffer.Add(kv.Key);
-			}
-
-			for (int i = 0; i < s_onlinePruneBuffer.Count; i++)
-			{
-				s_onlineStates.Remove(s_onlinePruneBuffer[i]);
-			}
-		}
-
-		private static bool TryParseDamageText(string text, out float damage)
-		{
-			damage = 0f;
-			string trimmed = text.Trim();
-			if (trimmed.Length == 0)
-				return false;
-
-			int start = -1;
-			for (int i = 0; i < trimmed.Length; i++)
-			{
-				if (char.IsDigit(trimmed[i]))
-				{
-					start = i;
-					break;
-				}
-			}
-			if (start < 0)
-				return false;
-
-			int end = start;
-			bool seenDecimal = false;
-			while (end < trimmed.Length)
-			{
-				char c = trimmed[end];
-				if (char.IsDigit(c))
-				{
-					end++;
-					continue;
-				}
-				if (c == ',' )
-				{
-					end++;
-					continue;
-				}
-				if (c == '.' && !seenDecimal)
-				{
-					seenDecimal = true;
-					end++;
-					continue;
-				}
-				break;
-			}
-
-			if (end <= start)
-				return false;
-
-			string token = trimmed[start..end].Replace(",", string.Empty);
-			if (!float.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
-				return false;
-
-			float multiplier = 1f;
-			if (end < trimmed.Length)
-			{
-				char suffix = char.ToLowerInvariant(trimmed[end]);
-				if (suffix == 'k')
-					multiplier = 1_000f;
-				else if (suffix == 'm')
-					multiplier = 1_000_000f;
-				else if (suffix == 'b')
-					multiplier = 1_000_000_000f;
-			}
-
-			damage = value * multiplier;
-			return !float.IsNaN(damage) && !float.IsInfinity(damage);
 		}
 
 		private static void AppendOnlineCalibrationText()
