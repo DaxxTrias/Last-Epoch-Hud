@@ -86,11 +86,11 @@ namespace Mod.Cheats.ESP
 
 					// Detect special entities (loot lizards, champions, etc.)
 					var special = SpecialEntityEspHelper.DetectType(actor);
-					bool isLizard = special == SpecialEntityType.LootLizard;
+					bool bypassActorFilters = special is SpecialEntityType.LootLizard or SpecialEntityType.Omen;
 					bool isAnySpecial = SpecialEntityEspHelper.IsSpecial(special);
 
-					// Non-lizard actors respect alignment/classification filters
-					if (!isLizard)
+					// Some special entities are atypical and should bypass normal actor filters.
+					if (!bypassActorFilters)
 					{
 						// Dedicated barrel pass reads ActorList.actors to support props that
 						// do not surface as ActorVisuals in some builds/scenes.

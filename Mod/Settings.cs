@@ -88,6 +88,7 @@ namespace Mod
         public static bool espShowRunePrisons = true;
         public static bool espShowChampions = true;
         public static bool espShowLootLizards = true;
+        public static bool espShowOmens = true;
 
 #if DEBUG
         // Debug / diagnostics (DEBUG builds only)

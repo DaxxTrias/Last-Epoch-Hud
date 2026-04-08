@@ -60,6 +60,7 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _espShowRunePrisons;
 		private static MelonPreferences_Entry<bool>? _espShowChampions;
 		private static MelonPreferences_Entry<bool>? _espShowLootLizards;
+		private static MelonPreferences_Entry<bool>? _espShowOmens;
 #if DEBUG
 		private static MelonPreferences_Entry<bool>? _debugEnableDiagnostics;
 		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerPanel;
@@ -183,6 +184,7 @@ namespace Mod
 			_espShowRunePrisons = _esp.CreateEntry("ShowRunePrisons", Settings.espShowRunePrisons);
 			_espShowChampions = _esp.CreateEntry("ShowChampions", Settings.espShowChampions);
 			_espShowLootLizards = _esp.CreateEntry("ShowLootLizards", Settings.espShowLootLizards);
+			_espShowOmens = _esp.CreateEntry("ShowOmens", Settings.espShowOmens);
 #if DEBUG
 			_debugEnableDiagnostics = _esp.CreateEntry("DebugEnableDiagnostics", Settings.debugEnableDiagnostics);
 			_debugShowLocalPlayerPanel = _esp.CreateEntry("DebugShowLocalPlayerPanel", Settings.debugShowLocalPlayerPanel);
@@ -282,6 +284,7 @@ namespace Mod
 			Settings.espShowRunePrisons = _espShowRunePrisons!.Value;
 			Settings.espShowChampions = _espShowChampions!.Value;
 			Settings.espShowLootLizards = _espShowLootLizards!.Value;
+			Settings.espShowOmens = _espShowOmens!.Value;
 #if DEBUG
 			Settings.debugEnableDiagnostics = _debugEnableDiagnostics!.Value;
 			Settings.debugShowLocalPlayerPanel = _debugShowLocalPlayerPanel!.Value;
@@ -376,6 +379,7 @@ namespace Mod
 			_espShowRunePrisons!.Value = Settings.espShowRunePrisons;
 			_espShowChampions!.Value = Settings.espShowChampions;
 			_espShowLootLizards!.Value = Settings.espShowLootLizards;
+			_espShowOmens!.Value = Settings.espShowOmens;
 #if DEBUG
 			_debugEnableDiagnostics!.Value = Settings.debugEnableDiagnostics;
 			_debugShowLocalPlayerPanel!.Value = Settings.debugShowLocalPlayerPanel;
@@ -658,6 +662,7 @@ namespace Mod
 			public bool espShowRunePrisons { get; set; }
 			public bool espShowChampions { get; set; }
 			public bool espShowLootLizards { get; set; }
+			public bool espShowOmens { get; set; }
 #if DEBUG
 			public bool debugEnableDiagnostics { get; set; }
 			public bool debugShowLocalPlayerPanel { get; set; }
@@ -743,6 +748,7 @@ namespace Mod
 				espShowRunePrisons = Settings.espShowRunePrisons,
 				espShowChampions = Settings.espShowChampions,
 				espShowLootLizards = Settings.espShowLootLizards,
+				espShowOmens = Settings.espShowOmens,
 #if DEBUG
 				debugEnableDiagnostics = Settings.debugEnableDiagnostics,
 				debugShowLocalPlayerPanel = Settings.debugShowLocalPlayerPanel,
@@ -826,6 +832,7 @@ namespace Mod
 			Settings.espShowRunePrisons = s.espShowRunePrisons;
 			Settings.espShowChampions = s.espShowChampions;
 			Settings.espShowLootLizards = s.espShowLootLizards;
+			Settings.espShowOmens = s.espShowOmens;
 #if DEBUG
 			Settings.debugEnableDiagnostics = s.debugEnableDiagnostics;
 			Settings.debugShowLocalPlayerPanel = s.debugShowLocalPlayerPanel;

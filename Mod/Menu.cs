@@ -46,6 +46,7 @@ namespace Mod
 					// Per-special toggles
 					Settings.espShowLootLizards = GUILayout.Toggle(Settings.espShowLootLizards, "Show Loot Lizards");
 					Settings.espShowChampions = GUILayout.Toggle(Settings.espShowChampions, "Show Champions");
+					Settings.espShowOmens = GUILayout.Toggle(Settings.espShowOmens, "Show Omens");
 					Settings.espShowChests = GUILayout.Toggle(Settings.espShowChests, "Show Chests");
 					Settings.espShowShrines = GUILayout.Toggle(Settings.espShowShrines, "Show Shrines");
 					Settings.espShowRunePrisons = GUILayout.Toggle(Settings.espShowRunePrisons, "Show Rune Prisons");
