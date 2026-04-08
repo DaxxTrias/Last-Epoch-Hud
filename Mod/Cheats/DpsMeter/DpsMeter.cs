@@ -6,6 +6,8 @@ using UnityEngine;
 
 namespace Mod.Cheats
 {
+	// Module overview and responsibility boundaries:
+	// see Mod/Cheats/DpsMeter/README.md
 	internal static class DpsMeter
 	{
 		private enum DpsSourceMode
