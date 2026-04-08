@@ -25,6 +25,8 @@ namespace Mod
 		public static bool dpsMeterSubDropdown = false;
 		public static bool espDropdown = false;
 		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
+		private static bool s_hasAppliedInputBlockState;
+		private static bool s_lastAppliedInputBlockState;
 #if DEBUG
 		public static bool debugToolsDropdown = false;
 #endif
@@ -444,7 +446,12 @@ namespace Mod
 
 			// Optional input-blocking: blocks gameplay keyboard + mouse while menu is visible.
 			bool shouldBlockGameInput = Settings.blockMenuInputWhenOpen && guiVisible;
-			EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
+			if (!s_hasAppliedInputBlockState || s_lastAppliedInputBlockState != shouldBlockGameInput)
+			{
+				EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
+				s_lastAppliedInputBlockState = shouldBlockGameInput;
+				s_hasAppliedInputBlockState = true;
+			}
 
 			// Debug key for auto-potion system (F12)
 			if (Input.GetKeyDown(KeyCode.F12))

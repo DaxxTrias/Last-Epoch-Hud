@@ -32,6 +32,7 @@ namespace Mod.Cheats
 		private const float MinPanelWidth = 320f;
 		private const float MinPanelHeight = 250f;
 		private const float ResizeGripSize = 18f;
+		private const float PanelTextRefreshIntervalSeconds = 0.1f;
 
 		private readonly struct HitSample
 		{
@@ -50,6 +51,7 @@ namespace Mod.Cheats
 		private static readonly OnlineCritColorCalibrator s_onlineCritCalibrator = new OnlineCritColorCalibrator();
 		private static readonly OnlineDamageOwnershipTracker s_onlineOwnershipTracker = new OnlineDamageOwnershipTracker();
 		private static readonly StringBuilder s_textBuilder = new StringBuilder(256);
+		private static readonly GUIContent s_panelTextContent = new GUIContent();
 		private static Rect s_panelRect = new Rect(0f, 88f, DefaultPanelWidth, DefaultPanelHeight);
 
 		private static DpsSourceMode s_sourceMode;
@@ -57,6 +59,7 @@ namespace Mod.Cheats
 		private static bool s_panelResizing;
 		private static int s_lastScreenWidth;
 		private static int s_lastScreenHeight;
+		private static float s_nextPanelTextRefreshAt;
 		private static string s_panelText = string.Empty;
 		private static GUIStyle? s_panelLabelStyle;
 		private static float s_recentDamage;
@@ -203,6 +206,11 @@ namespace Mod.Cheats
 				s_onlineTextSampler.PruneExpired(now);
 				s_onlineOwnershipTracker.OnUpdate(now);
 			}
+			if (now >= s_nextPanelTextRefreshAt)
+			{
+				s_panelText = BuildOverlayText(now);
+				s_nextPanelTextRefreshAt = now + PanelTextRefreshIntervalSeconds;
+			}
 
 			if (!Settings.dpsMeterAutoReset || s_lastHitAt < 0f)
 				return;
@@ -221,7 +229,7 @@ namespace Mod.Cheats
 
 			EnsurePanelInitialized();
 			EnsurePanelStyle();
-			s_panelText = BuildOverlayText(Time.unscaledTime);
+			s_panelTextContent.text = s_panelText;
 			AutoGrowPanelForContent();
 			s_panelRect = GUI.Window(PanelWindowId, s_panelRect, (GUI.WindowFunction)DrawPanelWindow, "LEHud DPS Meter");
 			ClampPanelToScreen();
@@ -277,6 +285,9 @@ namespace Mod.Cheats
 			s_firstHitAt = -1f;
 			s_lastHitAt = -1f;
 			s_onlineFilteredOutEvents = 0;
+			s_nextPanelTextRefreshAt = 0f;
+			s_panelText = string.Empty;
+			s_panelTextContent.text = string.Empty;
 		}
 
 		private static void ResetForInactivity()
@@ -334,7 +345,7 @@ namespace Mod.Cheats
 				return;
 
 			float availableWidth = Mathf.Max(120f, s_panelRect.width - 16f);
-			float neededHeight = s_panelLabelStyle.CalcHeight(new GUIContent(s_panelText), availableWidth) + 34f;
+			float neededHeight = s_panelLabelStyle.CalcHeight(s_panelTextContent, availableWidth) + 34f;
 			if (neededHeight > s_panelRect.height)
 			{
 				s_panelRect.height = neededHeight;
@@ -345,7 +356,7 @@ namespace Mod.Cheats
 		{
 			var style = s_panelLabelStyle ?? GUI.skin.label;
 			Rect contentRect = new Rect(8f, 24f, s_panelRect.width - 16f, s_panelRect.height - 32f);
-			GUI.Label(contentRect, s_panelText, style);
+			GUI.Label(contentRect, s_panelTextContent, style);
 
 			if (!Settings.dpsMeterPanelLocked)
 			{

@@ -566,6 +566,8 @@ namespace Mod.Cheats.Patches
                     {
                         if (!Settings.enableDpsMeter)
                             return;
+                        if (!ObjectManager.IsOfflineMode())
+                            return;
 
                         if (__args == null || __args.Length == 0)
                             return;
@@ -704,6 +706,12 @@ namespace Mod.Cheats.Patches
 
                 public static void Prefix(object __instance, System.Reflection.MethodBase __originalMethod)
                 {
+                    if (!Settings.enableDamageNumberDiagnostics
+                        && !(Settings.enableDpsMeter && Settings.enableDpsMeterOnlineRaw))
+                    {
+                        return;
+                    }
+
                     try
                     {
                         DamageNumberDiagnostics.OnPrefix(__instance, __originalMethod);
@@ -716,6 +724,12 @@ namespace Mod.Cheats.Patches
 
                 public static void Postfix(object __instance, System.Reflection.MethodBase __originalMethod)
                 {
+                    if (!Settings.enableDamageNumberDiagnostics
+                        && !(Settings.enableDpsMeter && Settings.enableDpsMeterOnlineRaw))
+                    {
+                        return;
+                    }
+
                     try
                     {
                         DamageNumberDiagnostics.OnPostfix(__instance, __originalMethod);
