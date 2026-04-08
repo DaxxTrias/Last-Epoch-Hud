@@ -550,6 +550,9 @@ namespace Mod.Cheats
 
 		private static DpsSourceMode GetCurrentMode()
 		{
+			if (!ObjectManager.HasPlayer())
+				return DpsSourceMode.None;
+
 			if (ObjectManager.IsOfflineMode())
 				return DpsSourceMode.OfflineRelay;
 
