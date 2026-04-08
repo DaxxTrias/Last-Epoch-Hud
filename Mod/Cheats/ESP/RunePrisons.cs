@@ -10,11 +10,15 @@ namespace Mod.Cheats.ESP
 	internal static class RunePrisons
 	{
 		private static readonly List<Transform> s_runePrisonTransforms = new List<Transform>(8);
+		private static readonly List<Transform> s_scanResults = new List<Transform>(8);
 		private static readonly List<Transform> s_sceneTraversalStack = new List<Transform>(128);
 		private static bool s_needsScan;
+		private static bool s_scanInProgress;
 		private static float s_nextScanTime;
 		private const float FirstScanDelay = 0.25f;
-		private const float RetryScanInterval = 5.0f;
+		private const float RetryScanIntervalWhenEmpty = 20.0f;
+		private const float RetryScanIntervalWhenPopulated = 8.0f;
+		private const int ScanTraversalBatchSize = 96;
 		private static readonly Color SpecialColor = new Color(0.90f, 0.30f, 0.00f, 1f);
 		private const string RunePrisonVisualsObjectName = "Rune Prison Visuals(Clone)";
 		private static PropertyInfo? s_visualsTriggeredProperty;
@@ -22,8 +26,10 @@ namespace Mod.Cheats.ESP
 		public static void OnSceneChanged()
 		{
 			s_runePrisonTransforms.Clear();
+			s_scanResults.Clear();
 			s_sceneTraversalStack.Clear();
 			s_needsScan = true;
+			s_scanInProgress = false;
 			s_nextScanTime = Time.unscaledTime + FirstScanDelay;
 			// Cache reflection for optional triggered check if available
 			s_visualsTriggeredProperty = typeof(RunePrisonVisuals).GetProperty("triggered", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -38,7 +44,7 @@ namespace Mod.Cheats.ESP
 			return val is bool b && b;
 		}
 
-		private static void TryAddRunePrison(Transform candidate)
+		private static void TryAddRunePrison(Transform candidate, List<Transform> target)
 		{
 			if (candidate == null) return;
 			var go = candidate.gameObject;
@@ -49,19 +55,20 @@ namespace Mod.Cheats.ESP
 			if (visuals == null) return;
 			if (IsTriggered(visuals)) return;
 
-			s_runePrisonTransforms.Add(candidate);
+			target.Add(candidate);
 		}
 
-		private static void RebuildOnce(GameObject player)
+		private static void BeginRebuild(GameObject player)
 		{
 			var scene = player.scene;
 			if (!scene.IsValid() || !scene.isLoaded)
 			{
-				s_nextScanTime = Time.unscaledTime + RetryScanInterval;
+				s_nextScanTime = Time.unscaledTime + RetryScanIntervalWhenEmpty;
+				s_needsScan = true;
 				return;
 			}
 
-			s_runePrisonTransforms.Clear();
+			s_scanResults.Clear();
 			s_sceneTraversalStack.Clear();
 
 			var roots = scene.GetRootGameObjects();
@@ -73,26 +80,53 @@ namespace Mod.Cheats.ESP
 				if (rootTransform == null) continue;
 				s_sceneTraversalStack.Add(rootTransform);
 			}
+			s_scanInProgress = true;
+			s_needsScan = false;
+		}
 
-			while (s_sceneTraversalStack.Count > 0)
+		private static void ProcessRebuildBatch(float now)
+		{
+			if (!s_scanInProgress)
+				return;
+
+			int processed = 0;
+			while (processed < ScanTraversalBatchSize && s_sceneTraversalStack.Count > 0)
 			{
 				int lastIndex = s_sceneTraversalStack.Count - 1;
 				var current = s_sceneTraversalStack[lastIndex];
 				s_sceneTraversalStack.RemoveAt(lastIndex);
-				if (current == null) continue;
+				if (current == null)
+					continue;
 
-				TryAddRunePrison(current);
+				TryAddRunePrison(current, s_scanResults);
 
 				for (int i = 0; i < current.childCount; i++)
 				{
 					var child = current.GetChild(i);
-					if (child == null) continue;
+					if (child == null)
+						continue;
 					s_sceneTraversalStack.Add(child);
 				}
+
+				processed++;
 			}
 
-			// Schedule periodic rescans to catch late activations or dynamic spawns
-			s_nextScanTime = Time.unscaledTime + RetryScanInterval;
+			if (s_sceneTraversalStack.Count > 0)
+				return;
+
+			s_scanInProgress = false;
+			s_runePrisonTransforms.Clear();
+			for (int i = 0; i < s_scanResults.Count; i++)
+			{
+				s_runePrisonTransforms.Add(s_scanResults[i]);
+			}
+			s_scanResults.Clear();
+
+			// Schedule periodic rescans to catch late activations or dynamic spawns.
+			float retryInterval = s_runePrisonTransforms.Count == 0
+				? RetryScanIntervalWhenEmpty
+				: RetryScanIntervalWhenPopulated;
+			s_nextScanTime = now + retryInterval;
 			s_needsScan = true;
 		}
 
@@ -100,10 +134,13 @@ namespace Mod.Cheats.ESP
 		{
 			if (!Settings.espShowRunePrisons) return;
 
-			if (s_needsScan && Time.unscaledTime >= s_nextScanTime)
+			float now = Time.unscaledTime;
+			if (s_needsScan && now >= s_nextScanTime)
 			{
-				RebuildOnce(player);
+				BeginRebuild(player);
 			}
+			ProcessRebuildBatch(now);
+
 			if (s_runePrisonTransforms.Count == 0) return;
 
 			// Prune consumed or inactive rune prisons
