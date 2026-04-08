@@ -494,21 +494,24 @@ namespace Mod.Cheats
 					: 0f;
 				s_textBuilder.Append("Crits~(color): ").Append(s_onlineColorCritEvents)
 					.Append(" | Crit %: ").Append(critPercent.ToString("F1", CultureInfo.InvariantCulture)).Append('%').Append('\n');
-				if (s_onlineHasLastColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLastColor)
 				{
 					s_textBuilder.Append("Last Color: ").Append(FormatColor(s_onlineLastColor)).Append('\n');
 				}
-				if (s_onlineHasLearnedNormalColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLearnedNormalColor)
 				{
 					s_textBuilder.Append("Calib Normal: ").Append(FormatColor(s_onlineLearnedNormalColor))
 						.Append(" x").Append(s_onlineLearnedNormalCount).Append('\n');
 				}
-				if (s_onlineHasLearnedCritColor)
+				if (Settings.enableDamageNumberDiagnostics && s_onlineHasLearnedCritColor)
 				{
 					s_textBuilder.Append("Calib Crit: ").Append(FormatColor(s_onlineLearnedCritColor))
 						.Append(" x").Append(s_onlineLearnedCritCount).Append('\n');
 				}
-				AppendOnlineCalibrationText();
+				if (Settings.enableDamageNumberDiagnostics)
+				{
+					AppendOnlineCalibrationText();
+				}
 				s_textBuilder.Append("Note: includes all visible damage numbers.\n");
 			}
 			s_textBuilder.Append("Total Damage: ").Append(FormatNumber(s_totalDamage)).Append('\n');
