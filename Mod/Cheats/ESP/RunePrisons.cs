@@ -22,6 +22,8 @@ namespace Mod.Cheats.ESP
 		private static readonly Color SpecialColor = new Color(0.90f, 0.30f, 0.00f, 1f);
 		private const string RunePrisonVisualsObjectName = "Rune Prison Visuals(Clone)";
 		private static PropertyInfo? s_visualsTriggeredProperty;
+		private static PropertyInfo? s_visualsTimeLastAttemptedTriggerProperty;
+		private static FieldInfo? s_visualsTimeLastAttemptedTriggerField;
 
 		public static void OnSceneChanged()
 		{
@@ -33,6 +35,9 @@ namespace Mod.Cheats.ESP
 			s_nextScanTime = Time.unscaledTime + FirstScanDelay;
 			// Cache reflection for optional triggered check if available
 			s_visualsTriggeredProperty = typeof(RunePrisonVisuals).GetProperty("triggered", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+			// Newer builds appear to track interaction state with this float.
+			s_visualsTimeLastAttemptedTriggerProperty = typeof(RunePrisonVisuals).GetProperty("timeLastAttemptedTrigger", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+			s_visualsTimeLastAttemptedTriggerField = typeof(RunePrisonVisuals).GetField("timeLastAttemptedTrigger", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		}
 
 		private static bool IsTriggered(RunePrisonVisuals visuals)
@@ -44,6 +49,58 @@ namespace Mod.Cheats.ESP
 			return val is bool b && b;
 		}
 
+		private static bool TryGetTimeLastAttemptedTrigger(RunePrisonVisuals visuals, out float timeLastAttemptedTrigger)
+		{
+			timeLastAttemptedTrigger = 0f;
+			if (s_visualsTimeLastAttemptedTriggerProperty == null && s_visualsTimeLastAttemptedTriggerField == null)
+				return false;
+
+			object? val = null;
+			try
+			{
+				val = s_visualsTimeLastAttemptedTriggerProperty?.GetValue(visuals)
+					?? s_visualsTimeLastAttemptedTriggerField?.GetValue(visuals);
+			}
+			catch
+			{
+				return false;
+			}
+
+			switch (val)
+			{
+				case float f:
+					timeLastAttemptedTrigger = f;
+					return true;
+				case double d:
+					timeLastAttemptedTrigger = (float)d;
+					return true;
+				case int i:
+					timeLastAttemptedTrigger = i;
+					return true;
+				case long l:
+					timeLastAttemptedTrigger = l;
+					return true;
+			}
+
+			if (val != null && float.TryParse(val.ToString(), out var parsed))
+			{
+				timeLastAttemptedTrigger = parsed;
+				return true;
+			}
+
+			return false;
+		}
+
+		private static bool IsConsumed(RunePrisonVisuals visuals)
+		{
+			// Prefer timeLastAttemptedTrigger for newer game builds where `triggered` no longer updates.
+			if (TryGetTimeLastAttemptedTrigger(visuals, out var lastAttempted))
+				return Mathf.Abs(lastAttempted) > 0.0001f;
+
+			// Backward compatibility with older builds.
+			return IsTriggered(visuals);
+		}
+
 		private static void TryAddRunePrison(Transform candidate, List<Transform> target)
 		{
 			if (candidate == null) return;
@@ -53,7 +110,7 @@ namespace Mod.Cheats.ESP
 
 			var visuals = go.GetComponent<RunePrisonVisuals>();
 			if (visuals == null) return;
-			if (IsTriggered(visuals)) return;
+			if (IsConsumed(visuals)) return;
 
 			target.Add(candidate);
 		}
@@ -151,13 +208,15 @@ namespace Mod.Cheats.ESP
 				var go = tr.gameObject;
 				if (go == null || !go.activeInHierarchy) { s_runePrisonTransforms.RemoveAt(i); continue; }
 
-				// If visuals report triggered, remove
-				if (s_visualsTriggeredProperty != null)
+				// If visuals report consumed, remove.
+				if (s_visualsTriggeredProperty != null
+					|| s_visualsTimeLastAttemptedTriggerProperty != null
+					|| s_visualsTimeLastAttemptedTriggerField != null)
 				{
 					var visuals = go.GetComponent<RunePrisonVisuals>();
 					if (visuals != null)
 					{
-						if (IsTriggered(visuals))
+						if (IsConsumed(visuals))
 						{
 							s_runePrisonTransforms.RemoveAt(i);
 							continue;
