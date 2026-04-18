@@ -1,16 +1,18 @@
 ﻿using Il2CppLE.UI.Minimap;
 using MelonLoader;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Mod.Cheats
 {
     internal class MapHack
     {
         private const float DefaultRevealRadius = 40f;
-        private const float BoostRevealRadius = 5000f;
+        private const float BoostRevealRadius = 8000f; // beast rifts can exceed 5000
         private const float BoostDurationSeconds = 60f;
         private const float LookupRetrySeconds = 1f;
         private const float ErrorLogCooldownSeconds = 5f;
+        private const float RevealRadiusComparisonEpsilon = 0.01f;
         private const string MinimapCanvasName = "DMMap Canvas";
 
         private static Minimap? s_minimap;
@@ -24,26 +26,45 @@ namespace Mod.Cheats
         private static float s_nextErrorLogAt;
         private static float s_originalRevealRadius = DefaultRevealRadius;
         private static bool s_hasOriginalRevealRadius;
+        private static bool s_sceneManagerFallbackEnabled;
+        private static int s_lastActiveSceneHandle = -1;
+        private static bool s_hasLastActiveSceneHandle;
+
+        public static void InitializeSceneFallback()
+        {
+            if (s_sceneManagerFallbackEnabled)
+                return;
+
+            try
+            {
+                Scene activeScene = SceneManager.GetActiveScene();
+                s_lastActiveSceneHandle = activeScene.handle;
+                s_hasLastActiveSceneHandle = true;
+                s_sceneManagerFallbackEnabled = true;
+                MelonLogger.Msg("[MapHack] SceneManager active-scene fallback enabled.");
+            }
+            catch (Exception e)
+            {
+                LogErrorThrottled($"[MapHack] Failed to enable SceneManager fallback: {e.Message}");
+            }
+        }
+
+        public static void DisposeSceneFallback()
+        {
+            s_sceneManagerFallbackEnabled = false;
+            s_hasLastActiveSceneHandle = false;
+            s_lastActiveSceneHandle = -1;
+        }
 
         public static void OnSceneWasInitialized()
         {
-            unchecked
-            {
-                s_sceneVersion++;
-            }
-
-            s_minimap = null;
-            s_minimapCanvas = null;
-            s_boostApplied = false;
-            s_restoreAt = 0f;
-            s_nextLookupAt = 0f;
-            s_nextErrorLogAt = 0f;
-            s_originalRevealRadius = DefaultRevealRadius;
-            s_hasOriginalRevealRadius = false;
+            ResetSceneState();
         }
 
         public static void OnUpdate(bool hasPlayer)
         {
+            CheckActiveSceneChangedFallback();
+
             // If toggled off mid-session, restore immediately if we previously boosted.
             if (!Settings.mapHack)
             {
@@ -68,8 +89,18 @@ namespace Mod.Cheats
 
             if (TryGetRevealRadius(minimap, out float originalRevealRadius))
             {
-                s_originalRevealRadius = originalRevealRadius;
-                s_hasOriginalRevealRadius = true;
+                if (IsBoostRevealRadius(originalRevealRadius))
+                {
+                    // Edge case: if we read while a previous pulse is still active,
+                    // never treat the boost value as the scene's baseline.
+                    s_originalRevealRadius = DefaultRevealRadius;
+                    s_hasOriginalRevealRadius = false;
+                }
+                else
+                {
+                    s_originalRevealRadius = originalRevealRadius;
+                    s_hasOriginalRevealRadius = true;
+                }
             }
 
             if (!TrySetRevealRadius(minimap, BoostRevealRadius))
@@ -93,6 +124,9 @@ namespace Mod.Cheats
                 return;
 
             float restoreValue = s_hasOriginalRevealRadius ? s_originalRevealRadius : DefaultRevealRadius;
+            if (IsBoostRevealRadius(restoreValue))
+                restoreValue = DefaultRevealRadius;
+
             if (!TrySetRevealRadius(minimap, restoreValue))
                 return;
 
@@ -172,6 +206,57 @@ namespace Mod.Cheats
             {
                 LogErrorThrottled($"[MapHack] Failed setting RevealRadius: {e.Message}");
                 return false;
+            }
+        }
+
+        private static bool IsBoostRevealRadius(float value)
+        {
+            return Mathf.Abs(value - BoostRevealRadius) <= RevealRadiusComparisonEpsilon;
+        }
+
+        private static void ResetSceneState()
+        {
+            unchecked
+            {
+                s_sceneVersion++;
+            }
+
+            s_minimap = null;
+            s_minimapCanvas = null;
+            s_boostApplied = false;
+            s_restoreAt = 0f;
+            s_nextLookupAt = 0f;
+            s_nextErrorLogAt = 0f;
+            s_originalRevealRadius = DefaultRevealRadius;
+            s_hasOriginalRevealRadius = false;
+        }
+
+        private static void CheckActiveSceneChangedFallback()
+        {
+            if (!s_sceneManagerFallbackEnabled)
+                return;
+
+            try
+            {
+                Scene activeScene = SceneManager.GetActiveScene();
+                int activeSceneHandle = activeScene.handle;
+
+                if (!s_hasLastActiveSceneHandle)
+                {
+                    s_lastActiveSceneHandle = activeSceneHandle;
+                    s_hasLastActiveSceneHandle = true;
+                    return;
+                }
+
+                if (activeSceneHandle == s_lastActiveSceneHandle)
+                    return;
+
+                s_lastActiveSceneHandle = activeSceneHandle;
+                ResetSceneState();
+            }
+            catch (Exception e)
+            {
+                LogErrorThrottled($"[MapHack] SceneManager fallback check failed: {e.Message}");
             }
         }
 

@@ -39,6 +39,17 @@ namespace Mod
 		private static MelonPreferences_Entry<float>? _dpsMeterWindowSeconds;
 		private static MelonPreferences_Entry<float>? _dpsMeterInactivityResetSeconds;
 		private static MelonPreferences_Entry<bool>? _dpsMeterAutoReset;
+		private static MelonPreferences_Entry<bool>? _enableDpsMeterOnlineRaw;
+		private static MelonPreferences_Entry<int>? _dpsMeterOnlineFilterMode;
+		private static MelonPreferences_Entry<float>? _dpsMeterNearPlayerMeters;
+		private static MelonPreferences_Entry<float>? _dpsMeterFarPlayerMeters;
+		private static MelonPreferences_Entry<float>? _dpsMeterHpDropCorrelationMs;
+		private static MelonPreferences_Entry<bool>? _dpsMeterPanelLocked;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelX;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelY;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelWidth;
+		private static MelonPreferences_Entry<float>? _dpsMeterPanelHeight;
+		private static MelonPreferences_Entry<bool>? _enableDamageNumberDiagnostics;
 
 		// Entries - ESP
 		private static MelonPreferences_Entry<bool>? _showESPLines;
@@ -49,6 +60,7 @@ namespace Mod
 		private static MelonPreferences_Entry<bool>? _espShowRunePrisons;
 		private static MelonPreferences_Entry<bool>? _espShowChampions;
 		private static MelonPreferences_Entry<bool>? _espShowLootLizards;
+		private static MelonPreferences_Entry<bool>? _espShowOmens;
 #if DEBUG
 		private static MelonPreferences_Entry<bool>? _debugEnableDiagnostics;
 		private static MelonPreferences_Entry<bool>? _debugShowLocalPlayerPanel;
@@ -152,6 +164,17 @@ namespace Mod
 			_dpsMeterWindowSeconds = _general.CreateEntry("DpsMeterWindowSeconds", Settings.dpsMeterWindowSeconds);
 			_dpsMeterInactivityResetSeconds = _general.CreateEntry("DpsMeterInactivityResetSeconds", Settings.dpsMeterInactivityResetSeconds);
 			_dpsMeterAutoReset = _general.CreateEntry("DpsMeterAutoReset", Settings.dpsMeterAutoReset);
+			_enableDpsMeterOnlineRaw = _general.CreateEntry("EnableDpsMeterOnlineRaw", Settings.enableDpsMeterOnlineRaw);
+			_dpsMeterOnlineFilterMode = _general.CreateEntry("DpsMeterOnlineFilterMode", Settings.dpsMeterOnlineFilterMode);
+			_dpsMeterNearPlayerMeters = _general.CreateEntry("DpsMeterNearPlayerMeters", Settings.dpsMeterNearPlayerMeters);
+			_dpsMeterFarPlayerMeters = _general.CreateEntry("DpsMeterFarPlayerMeters", Settings.dpsMeterFarPlayerMeters);
+			_dpsMeterHpDropCorrelationMs = _general.CreateEntry("DpsMeterHpDropCorrelationMs", Settings.dpsMeterHpDropCorrelationMs);
+			_dpsMeterPanelLocked = _general.CreateEntry("DpsMeterPanelLocked", Settings.dpsMeterPanelLocked);
+			_dpsMeterPanelX = _general.CreateEntry("DpsMeterPanelX", Settings.dpsMeterPanelX);
+			_dpsMeterPanelY = _general.CreateEntry("DpsMeterPanelY", Settings.dpsMeterPanelY);
+			_dpsMeterPanelWidth = _general.CreateEntry("DpsMeterPanelWidth", Settings.dpsMeterPanelWidth);
+			_dpsMeterPanelHeight = _general.CreateEntry("DpsMeterPanelHeight", Settings.dpsMeterPanelHeight);
+			_enableDamageNumberDiagnostics = _general.CreateEntry("EnableDamageNumberDiagnostics", Settings.enableDamageNumberDiagnostics);
 
 			_showESPLines = _esp.CreateEntry("ShowESPLines", Settings.showESPLines);
 			_showESPLabels = _esp.CreateEntry("ShowESPLabels", Settings.showESPLabels);
@@ -161,6 +184,7 @@ namespace Mod
 			_espShowRunePrisons = _esp.CreateEntry("ShowRunePrisons", Settings.espShowRunePrisons);
 			_espShowChampions = _esp.CreateEntry("ShowChampions", Settings.espShowChampions);
 			_espShowLootLizards = _esp.CreateEntry("ShowLootLizards", Settings.espShowLootLizards);
+			_espShowOmens = _esp.CreateEntry("ShowOmens", Settings.espShowOmens);
 #if DEBUG
 			_debugEnableDiagnostics = _esp.CreateEntry("DebugEnableDiagnostics", Settings.debugEnableDiagnostics);
 			_debugShowLocalPlayerPanel = _esp.CreateEntry("DebugShowLocalPlayerPanel", Settings.debugShowLocalPlayerPanel);
@@ -238,6 +262,19 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(_dpsMeterWindowSeconds!.Value, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(_dpsMeterInactivityResetSeconds!.Value, 2f, 300f);
 			Settings.dpsMeterAutoReset = _dpsMeterAutoReset!.Value;
+			Settings.enableDpsMeterOnlineRaw = _enableDpsMeterOnlineRaw!.Value;
+			Settings.dpsMeterOnlineFilterMode = Math.Clamp(_dpsMeterOnlineFilterMode!.Value, 0, 2);
+			Settings.dpsMeterNearPlayerMeters = Clamp(_dpsMeterNearPlayerMeters!.Value, 0.5f, 10f);
+			Settings.dpsMeterFarPlayerMeters = Clamp(_dpsMeterFarPlayerMeters!.Value, 0.6f, 20f);
+			Settings.dpsMeterHpDropCorrelationMs = Clamp(_dpsMeterHpDropCorrelationMs!.Value, 50f, 1000f);
+			if (Settings.dpsMeterFarPlayerMeters <= Settings.dpsMeterNearPlayerMeters)
+				Settings.dpsMeterFarPlayerMeters = Settings.dpsMeterNearPlayerMeters + 0.2f;
+			Settings.dpsMeterPanelLocked = _dpsMeterPanelLocked!.Value;
+			Settings.dpsMeterPanelX = Clamp(_dpsMeterPanelX!.Value, -1f, 10000f);
+			Settings.dpsMeterPanelY = Clamp(_dpsMeterPanelY!.Value, -1f, 10000f);
+			Settings.dpsMeterPanelWidth = Clamp(_dpsMeterPanelWidth!.Value, 280f, 1400f);
+			Settings.dpsMeterPanelHeight = Clamp(_dpsMeterPanelHeight!.Value, 220f, 1400f);
+			Settings.enableDamageNumberDiagnostics = _enableDamageNumberDiagnostics!.Value;
 
 			Settings.showESPLines = _showESPLines!.Value;
 			Settings.showESPLabels = _showESPLabels!.Value;
@@ -247,6 +284,7 @@ namespace Mod
 			Settings.espShowRunePrisons = _espShowRunePrisons!.Value;
 			Settings.espShowChampions = _espShowChampions!.Value;
 			Settings.espShowLootLizards = _espShowLootLizards!.Value;
+			Settings.espShowOmens = _espShowOmens!.Value;
 #if DEBUG
 			Settings.debugEnableDiagnostics = _debugEnableDiagnostics!.Value;
 			Settings.debugShowLocalPlayerPanel = _debugShowLocalPlayerPanel!.Value;
@@ -321,6 +359,17 @@ namespace Mod
 			_dpsMeterWindowSeconds!.Value = Settings.dpsMeterWindowSeconds;
 			_dpsMeterInactivityResetSeconds!.Value = Settings.dpsMeterInactivityResetSeconds;
 			_dpsMeterAutoReset!.Value = Settings.dpsMeterAutoReset;
+			_enableDpsMeterOnlineRaw!.Value = Settings.enableDpsMeterOnlineRaw;
+			_dpsMeterOnlineFilterMode!.Value = Settings.dpsMeterOnlineFilterMode;
+			_dpsMeterNearPlayerMeters!.Value = Settings.dpsMeterNearPlayerMeters;
+			_dpsMeterFarPlayerMeters!.Value = Settings.dpsMeterFarPlayerMeters;
+			_dpsMeterHpDropCorrelationMs!.Value = Settings.dpsMeterHpDropCorrelationMs;
+			_dpsMeterPanelLocked!.Value = Settings.dpsMeterPanelLocked;
+			_dpsMeterPanelX!.Value = Settings.dpsMeterPanelX;
+			_dpsMeterPanelY!.Value = Settings.dpsMeterPanelY;
+			_dpsMeterPanelWidth!.Value = Settings.dpsMeterPanelWidth;
+			_dpsMeterPanelHeight!.Value = Settings.dpsMeterPanelHeight;
+			_enableDamageNumberDiagnostics!.Value = Settings.enableDamageNumberDiagnostics;
 
 			_showESPLines!.Value = Settings.showESPLines;
 			_showESPLabels!.Value = Settings.showESPLabels;
@@ -330,6 +379,7 @@ namespace Mod
 			_espShowRunePrisons!.Value = Settings.espShowRunePrisons;
 			_espShowChampions!.Value = Settings.espShowChampions;
 			_espShowLootLizards!.Value = Settings.espShowLootLizards;
+			_espShowOmens!.Value = Settings.espShowOmens;
 #if DEBUG
 			_debugEnableDiagnostics!.Value = Settings.debugEnableDiagnostics;
 			_debugShowLocalPlayerPanel!.Value = Settings.debugShowLocalPlayerPanel;
@@ -556,6 +606,17 @@ namespace Mod
 			public float dpsMeterWindowSeconds { get; set; }
 			public float dpsMeterInactivityResetSeconds { get; set; }
 			public bool dpsMeterAutoReset { get; set; }
+			public bool enableDpsMeterOnlineRaw { get; set; }
+			public int dpsMeterOnlineFilterMode { get; set; }
+			public float dpsMeterNearPlayerMeters { get; set; }
+			public float dpsMeterFarPlayerMeters { get; set; }
+			public float dpsMeterHpDropCorrelationMs { get; set; }
+			public bool dpsMeterPanelLocked { get; set; }
+			public float dpsMeterPanelX { get; set; }
+			public float dpsMeterPanelY { get; set; }
+			public float dpsMeterPanelWidth { get; set; }
+			public float dpsMeterPanelHeight { get; set; }
+			public bool enableDamageNumberDiagnostics { get; set; }
 			public bool removeFog { get; set; }
 			public bool cameraZoomUnlock { get; set; }
 			public bool minimapZoomUnlock { get; set; }
@@ -601,6 +662,7 @@ namespace Mod
 			public bool espShowRunePrisons { get; set; }
 			public bool espShowChampions { get; set; }
 			public bool espShowLootLizards { get; set; }
+			public bool espShowOmens { get; set; }
 #if DEBUG
 			public bool debugEnableDiagnostics { get; set; }
 			public bool debugShowLocalPlayerPanel { get; set; }
@@ -630,6 +692,17 @@ namespace Mod
 				dpsMeterWindowSeconds = Settings.dpsMeterWindowSeconds,
 				dpsMeterInactivityResetSeconds = Settings.dpsMeterInactivityResetSeconds,
 				dpsMeterAutoReset = Settings.dpsMeterAutoReset,
+				enableDpsMeterOnlineRaw = Settings.enableDpsMeterOnlineRaw,
+				dpsMeterOnlineFilterMode = Settings.dpsMeterOnlineFilterMode,
+				dpsMeterNearPlayerMeters = Settings.dpsMeterNearPlayerMeters,
+				dpsMeterFarPlayerMeters = Settings.dpsMeterFarPlayerMeters,
+				dpsMeterHpDropCorrelationMs = Settings.dpsMeterHpDropCorrelationMs,
+				dpsMeterPanelLocked = Settings.dpsMeterPanelLocked,
+				dpsMeterPanelX = Settings.dpsMeterPanelX,
+				dpsMeterPanelY = Settings.dpsMeterPanelY,
+				dpsMeterPanelWidth = Settings.dpsMeterPanelWidth,
+				dpsMeterPanelHeight = Settings.dpsMeterPanelHeight,
+				enableDamageNumberDiagnostics = Settings.enableDamageNumberDiagnostics,
 				removeFog = Settings.removeFog,
 				cameraZoomUnlock = Settings.cameraZoomUnlock,
 				minimapZoomUnlock = Settings.minimapZoomUnlock,
@@ -675,6 +748,7 @@ namespace Mod
 				espShowRunePrisons = Settings.espShowRunePrisons,
 				espShowChampions = Settings.espShowChampions,
 				espShowLootLizards = Settings.espShowLootLizards,
+				espShowOmens = Settings.espShowOmens,
 #if DEBUG
 				debugEnableDiagnostics = Settings.debugEnableDiagnostics,
 				debugShowLocalPlayerPanel = Settings.debugShowLocalPlayerPanel,
@@ -703,6 +777,19 @@ namespace Mod
 			Settings.dpsMeterWindowSeconds = Clamp(s.dpsMeterWindowSeconds, 0.5f, 30f);
 			Settings.dpsMeterInactivityResetSeconds = Clamp(s.dpsMeterInactivityResetSeconds, 2f, 300f);
 			Settings.dpsMeterAutoReset = s.dpsMeterAutoReset;
+			Settings.enableDpsMeterOnlineRaw = s.enableDpsMeterOnlineRaw;
+			Settings.dpsMeterOnlineFilterMode = Math.Clamp(s.dpsMeterOnlineFilterMode, 0, 2);
+			Settings.dpsMeterNearPlayerMeters = Clamp(s.dpsMeterNearPlayerMeters, 0.5f, 10f);
+			Settings.dpsMeterFarPlayerMeters = Clamp(s.dpsMeterFarPlayerMeters, 0.6f, 20f);
+			Settings.dpsMeterHpDropCorrelationMs = Clamp(s.dpsMeterHpDropCorrelationMs, 50f, 1000f);
+			if (Settings.dpsMeterFarPlayerMeters <= Settings.dpsMeterNearPlayerMeters)
+				Settings.dpsMeterFarPlayerMeters = Settings.dpsMeterNearPlayerMeters + 0.2f;
+			Settings.dpsMeterPanelLocked = s.dpsMeterPanelLocked;
+			Settings.dpsMeterPanelX = Clamp(s.dpsMeterPanelX, -1f, 10000f);
+			Settings.dpsMeterPanelY = Clamp(s.dpsMeterPanelY, -1f, 10000f);
+			Settings.dpsMeterPanelWidth = Clamp(s.dpsMeterPanelWidth, 280f, 1400f);
+			Settings.dpsMeterPanelHeight = Clamp(s.dpsMeterPanelHeight, 220f, 1400f);
+			Settings.enableDamageNumberDiagnostics = s.enableDamageNumberDiagnostics;
 			Settings.removeFog = s.removeFog;
 			Settings.cameraZoomUnlock = s.cameraZoomUnlock;
 			Settings.minimapZoomUnlock = s.minimapZoomUnlock;
@@ -745,6 +832,7 @@ namespace Mod
 			Settings.espShowRunePrisons = s.espShowRunePrisons;
 			Settings.espShowChampions = s.espShowChampions;
 			Settings.espShowLootLizards = s.espShowLootLizards;
+			Settings.espShowOmens = s.espShowOmens;
 #if DEBUG
 			Settings.debugEnableDiagnostics = s.debugEnableDiagnostics;
 			Settings.debugShowLocalPlayerPanel = s.debugShowLocalPlayerPanel;

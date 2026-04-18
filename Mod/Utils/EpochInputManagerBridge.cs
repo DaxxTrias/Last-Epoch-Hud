@@ -369,6 +369,9 @@ namespace Mod.Utils
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             s_piMouseBlocked = FindBoolProperty(s_epochInputManagerType,
+                "BlockMouseMovementInput",
+                "blockMouseMovementInput",
+                "<BlockMouseMovementInput>k__BackingField",
                 "MouseButtonPressBlocked",
                 "MousePressBlocked",
                 "MouseInputBlocked",
@@ -376,6 +379,10 @@ namespace Mod.Utils
                 "IsMouseBlocked");
 
             s_fiMouseBlocked = FindBoolField(s_epochInputManagerType,
+                "BlockMouseMovementInput",
+                "blockMouseMovementInput",
+                "_blockMouseMovementInput",
+                "<BlockMouseMovementInput>k__BackingField",
                 "mouseButtonPressBlocked",
                 "_mouseButtonPressBlocked",
                 "mousePressBlocked",

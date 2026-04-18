@@ -16,6 +16,17 @@ namespace Mod
         public static float dpsMeterWindowSeconds = 5f;
         public static float dpsMeterInactivityResetSeconds = 10f;
         public static bool dpsMeterAutoReset = true;
+        public static bool enableDpsMeterOnlineRaw = false;
+        public static int dpsMeterOnlineFilterMode = 0; // 0=AllVisible, 1=LikelyOutgoing, 2=LikelyIncoming
+        public static float dpsMeterNearPlayerMeters = 2.2f;
+        public static float dpsMeterFarPlayerMeters = 3.8f;
+        public static float dpsMeterHpDropCorrelationMs = 180f;
+        public static bool dpsMeterPanelLocked = true;
+        public static float dpsMeterPanelX = -1f; // -1 anchors to right side on first load
+        public static float dpsMeterPanelY = 88f;
+        public static float dpsMeterPanelWidth = 360f;
+        public static float dpsMeterPanelHeight = 320f;
+        public static bool enableDamageNumberDiagnostics = false;
         public static bool removeFog = true;
         public static bool cameraZoomUnlock = true;
         public static bool minimapZoomUnlock = true;
@@ -77,6 +88,7 @@ namespace Mod
         public static bool espShowRunePrisons = true;
         public static bool espShowChampions = true;
         public static bool espShowLootLizards = true;
+        public static bool espShowOmens = true;
 
 #if DEBUG
         // Debug / diagnostics (DEBUG builds only)

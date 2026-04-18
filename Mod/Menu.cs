@@ -25,6 +25,8 @@ namespace Mod
 		public static bool dpsMeterSubDropdown = false;
 		public static bool espDropdown = false;
 		public static bool specialsSubDropdown = false; // Placeholder for future per-special options
+		private static bool s_hasAppliedInputBlockState;
+		private static bool s_lastAppliedInputBlockState;
 #if DEBUG
 		public static bool debugToolsDropdown = false;
 #endif
@@ -44,6 +46,7 @@ namespace Mod
 					// Per-special toggles
 					Settings.espShowLootLizards = GUILayout.Toggle(Settings.espShowLootLizards, "Show Loot Lizards");
 					Settings.espShowChampions = GUILayout.Toggle(Settings.espShowChampions, "Show Champions");
+					Settings.espShowOmens = GUILayout.Toggle(Settings.espShowOmens, "Show Omens");
 					Settings.espShowChests = GUILayout.Toggle(Settings.espShowChests, "Show Chests");
 					Settings.espShowShrines = GUILayout.Toggle(Settings.espShowShrines, "Show Shrines");
 					Settings.espShowRunePrisons = GUILayout.Toggle(Settings.espShowRunePrisons, "Show Rune Prisons");
@@ -172,7 +175,16 @@ namespace Mod
 				if (dpsMeterSubDropdown)
 				{
 					bool wasEnabled = Settings.enableDpsMeter;
-					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay (Offline Only)");
+					Settings.enableDpsMeter = GUILayout.Toggle(Settings.enableDpsMeter, "Enable DPS Meter Overlay");
+					Settings.enableDpsMeterOnlineRaw = GUILayout.Toggle(
+						Settings.enableDpsMeterOnlineRaw,
+						"Allow Online Raw Source");
+					Settings.dpsMeterPanelLocked = GUILayout.Toggle(
+						Settings.dpsMeterPanelLocked,
+						"Lock DPS Panel Position/Size");
+					Settings.enableDamageNumberDiagnostics = GUILayout.Toggle(
+						Settings.enableDamageNumberDiagnostics,
+						"Enable DamageNumber Diagnostics (Verbose Logs)");
 					if (wasEnabled && !Settings.enableDpsMeter)
 					{
 						DpsMeter.Reset();
@@ -194,11 +206,47 @@ namespace Mod
 						{
 							DpsMeter.Reset();
 						}
+						if (GUILayout.Button("Reset DPS Panel Layout"))
+						{
+							DpsMeter.ResetPanelLayout();
+						}
+
+						if (!ObjectManager.IsOfflineMode() && Settings.enableDpsMeterOnlineRaw)
+						{
+							GUILayout.Space(4f);
+							GUILayout.Label("Online Ownership Filter");
+							if (GUILayout.Button("Filter Mode: " + DescribeDpsFilterMode(Settings.dpsMeterOnlineFilterMode)))
+							{
+								Settings.dpsMeterOnlineFilterMode = (Settings.dpsMeterOnlineFilterMode + 1) % 3;
+							}
+
+							GUILayout.Label("Near Radius (incoming bias): " + Settings.dpsMeterNearPlayerMeters.ToString("F1") + "m");
+							Settings.dpsMeterNearPlayerMeters = GUILayout.HorizontalSlider(Settings.dpsMeterNearPlayerMeters, 0.5f, 6f);
+
+							float minFar = Mathf.Max(Settings.dpsMeterNearPlayerMeters + 0.2f, 0.7f);
+							GUILayout.Label("Far Radius (outgoing bias): " + Settings.dpsMeterFarPlayerMeters.ToString("F1") + "m");
+							Settings.dpsMeterFarPlayerMeters = GUILayout.HorizontalSlider(Settings.dpsMeterFarPlayerMeters, minFar, 12f);
+
+							GUILayout.Label("HP Drop Correlation Window: " + Settings.dpsMeterHpDropCorrelationMs.ToString("F0") + "ms");
+							Settings.dpsMeterHpDropCorrelationMs = GUILayout.HorizontalSlider(Settings.dpsMeterHpDropCorrelationMs, 50f, 1000f);
+						}
 					}
 
-					if (!ObjectManager.IsOfflineMode())
+					if (!Settings.dpsMeterPanelLocked)
 					{
-						GUILayout.Label("DPS meter is currently unavailable in online mode.");
+						GUILayout.Label("DPS panel unlocked: drag title to move, bottom-right grip to resize.");
+					}
+					if (!ObjectManager.IsOfflineMode() && !Settings.enableDpsMeterOnlineRaw)
+					{
+						GUILayout.Label("Online meter disabled. Enable 'Online Raw Source' to collect from damage-number text.");
+					}
+					if (!ObjectManager.IsOfflineMode() && Settings.enableDpsMeterOnlineRaw)
+					{
+						GUILayout.Label("Online Raw can be filtered by proximity + local HP-drop correlation.");
+					}
+					if (Settings.enableDamageNumberDiagnostics)
+					{
+						GUILayout.Label("DamageNumber diagnostics are active. Check Melon logs for renderer summaries.");
 					}
 				}
 			}
@@ -355,6 +403,16 @@ namespace Mod
 			}
 		}
 
+		private static string DescribeDpsFilterMode(int mode)
+		{
+			return mode switch
+			{
+				1 => "Likely Outgoing",
+				2 => "Likely Incoming",
+				_ => "All Visible"
+			};
+		}
+
 		public static Rect windowRect = new Rect(20, 20, 250, 700);
 
 		public static void OnGUI()
@@ -389,7 +447,12 @@ namespace Mod
 
 			// Optional input-blocking: blocks gameplay keyboard + mouse while menu is visible.
 			bool shouldBlockGameInput = Settings.blockMenuInputWhenOpen && guiVisible;
-			EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
+			if (!s_hasAppliedInputBlockState || s_lastAppliedInputBlockState != shouldBlockGameInput)
+			{
+				EpochInputManagerBridge.TrySetMenuInputBlocked(shouldBlockGameInput);
+				s_lastAppliedInputBlockState = shouldBlockGameInput;
+				s_hasAppliedInputBlockState = true;
+			}
 
 			// Debug key for auto-potion system (F12)
 			if (Input.GetKeyDown(KeyCode.F12))
