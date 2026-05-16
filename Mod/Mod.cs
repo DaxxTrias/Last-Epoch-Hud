@@ -11,8 +11,8 @@ using Mod.Utils;
 [assembly: MelonInfo(typeof(Mod.Mod), "LEHud", "0.4.9", "Daxx")]
 [assembly: MelonGame("Eleventh Hour Games", "Last Epoch")]
 
-namespace Mod
-{
+namespace Mod;
+
 	public static class BuildInfo
 	{
 		public const string Name = "LEHud"; // Name of the Mod.  (MUST BE SET)
@@ -257,4 +257,3 @@ namespace Mod
 			}
 		}
 	}
-}
