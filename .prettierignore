@@ -1,0 +1,35 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+artifacts/
+output/
+
+# IDE and dependency folders
+.vs/
+.idea/
+node_modules/
+
+# Generated or bundled files
+*.min.js
+*.min.css
+*.bundle.js
+*.bundle.css
+
+# Binary/runtime artifacts
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# Lock files
+package-lock.json
+npm-shrinkwrap.json
+
+# Secrets and local environment
+credentials.json
+gcreds.json
+.env
+.env.*
