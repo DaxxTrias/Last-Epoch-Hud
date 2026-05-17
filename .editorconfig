@@ -7,6 +7,7 @@ indent_size = 4
 end_of_line = crlf
 charset = utf-8
 trim_trailing_whitespace = true
+insert_final_newline = true
 
 # Xml files
 [*.xml]
@@ -15,6 +16,30 @@ indent_size = 2
 # Markdown files
 [*.md]
 trim_trailing_whitespace = false
+
+# Visual Studio solution files
+[*.sln]
+indent_style = tab
+
+# MSBuild and XML-like project files
+[*.{csproj,props,targets,xml,config,resx,ruleset}]
+indent_size = 2
+
+# JSON files
+[*.{json,jsonc,json5}]
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
+# Web and Node tooling files
+[*.{js,mjs,cjs,ts,tsx,css,scss,html,svg}]
+indent_size = 2
+
+# Shell scripts should keep Unix line endings.
+[*.sh]
+end_of_line = lf
 
 # C# files
 [*.cs]
