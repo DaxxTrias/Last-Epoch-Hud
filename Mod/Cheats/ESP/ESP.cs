@@ -77,6 +77,7 @@ namespace Mod.Cheats.ESP
                 lineDrawings[i].Draw();
             }
 
+            Drawing.BeginLabelPlacementPass();
             for (int i = 0; i < stringDrawings.Count; i++)
             {
                 stringDrawings[i].Draw();

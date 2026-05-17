@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Color = UnityEngine.Color;
 using MelonLoader;
@@ -16,10 +17,18 @@ namespace Mod
 		public static readonly Color BloodOrange = new Color(1.00f, 0.50f, 0.00f, 1f);
 		public static readonly Color MagicLightBlue = new Color(0.55f, 0.8f, 1f, 1f);
 		private static readonly Vector2 LabelScreenPadding = new Vector2(25f, 25f);
+		private const float OffScreenLabelSpacing = 3f;
+		private const int OffScreenLabelMaxPlacementAttempts = 24;
 		private static readonly Color EmphasizedOutlineColor = new Color(0f, 0f, 0f, 0.95f);
 
 		private static readonly GUIContent s_contentA = new GUIContent();
 		private static readonly GUIContent s_contentB = new GUIContent();
+		private static readonly List<Rect> s_offScreenLabelRects = new List<Rect>(128);
+
+		public static void BeginLabelPlacementPass()
+		{
+			s_offScreenLabelRects.Clear();
+		}
 
 		static Vector2 ClampToScreen(Vector3 vecIn, Vector3 padding)
 		{
@@ -51,7 +60,10 @@ namespace Mod
 			if (cam == null) return false;
 
 			Vector3 screen = cam.WorldToScreenPoint(worldPosition);
-			if (screen.z < 0) screen *= -1; // mirror behind-camera points like ClampToScreen
+			bool isBehindCamera = screen.z < 0;
+			if (isBehindCamera) screen *= -1; // mirror behind-camera points like ClampToScreen
+			bool isOffScreen = isBehindCamera || IsOffScreen(screen);
+			bool preferVerticalStacking = ShouldStackVertically(screen);
 			screen.y = Screen.height - screen.y;
 
 			size = style.CalcSize(content);
@@ -59,7 +71,122 @@ namespace Mod
 				? new Vector2(screen.x, screen.y) - size / 2f
 				: new Vector2(screen.x, screen.y);
 			upperLeft = ClampRectToScreen(desiredUpperLeft, size, LabelScreenPadding);
+			if (isOffScreen)
+			{
+				return TryReserveOffScreenLabelPlacement(upperLeft, size, preferVerticalStacking, out upperLeft);
+			}
+
 			return true;
+		}
+
+		static bool IsOffScreen(Vector3 screen)
+		{
+			return screen.x < 0f
+				|| screen.x > Screen.width
+				|| screen.y < 0f
+				|| screen.y > Screen.height;
+		}
+
+		static bool ShouldStackVertically(Vector3 screen)
+		{
+			float overflowX = 0f;
+			if (screen.x < 0f) overflowX = -screen.x;
+			else if (screen.x > Screen.width) overflowX = screen.x - Screen.width;
+
+			float overflowY = 0f;
+			if (screen.y < 0f) overflowY = -screen.y;
+			else if (screen.y > Screen.height) overflowY = screen.y - Screen.height;
+
+			return overflowX >= overflowY;
+		}
+
+		static bool TryReserveOffScreenLabelPlacement(Vector2 preferredUpperLeft, Vector2 size, bool preferVerticalStacking, out Vector2 upperLeft)
+		{
+			upperLeft = preferredUpperLeft;
+			if (TryReserveOffScreenRect(new Rect(preferredUpperLeft, size)))
+			{
+				return true;
+			}
+
+			float step = (preferVerticalStacking ? size.y : size.x) + OffScreenLabelSpacing;
+			for (int attempt = 1; attempt <= OffScreenLabelMaxPlacementAttempts; attempt++)
+			{
+				int slot = (attempt + 1) / 2;
+				float offset = slot * step * ((attempt & 1) == 1 ? 1f : -1f);
+				Vector2 candidate = preferVerticalStacking
+					? new Vector2(preferredUpperLeft.x, preferredUpperLeft.y + offset)
+					: new Vector2(preferredUpperLeft.x + offset, preferredUpperLeft.y);
+
+				candidate = ClampRectToScreen(candidate, size, LabelScreenPadding);
+				if (TryReserveOffScreenRect(new Rect(candidate, size)))
+				{
+					upperLeft = candidate;
+					return true;
+				}
+			}
+
+			return TryReserveFirstAvailableOffScreenSlot(preferredUpperLeft, size, preferVerticalStacking, out upperLeft);
+		}
+
+		static bool TryReserveFirstAvailableOffScreenSlot(Vector2 preferredUpperLeft, Vector2 size, bool preferVerticalStacking, out Vector2 upperLeft)
+		{
+			upperLeft = preferredUpperLeft;
+			float step = (preferVerticalStacking ? size.y : size.x) + OffScreenLabelSpacing;
+			if (step <= 0f)
+			{
+				return false;
+			}
+
+			if (preferVerticalStacking)
+			{
+				float maxY = Screen.height - size.y - LabelScreenPadding.y;
+				for (float y = LabelScreenPadding.y; y <= maxY; y += step)
+				{
+					var candidate = new Vector2(preferredUpperLeft.x, y);
+					if (TryReserveOffScreenRect(new Rect(candidate, size)))
+					{
+						upperLeft = candidate;
+						return true;
+					}
+				}
+			}
+			else
+			{
+				float maxX = Screen.width - size.x - LabelScreenPadding.x;
+				for (float x = LabelScreenPadding.x; x <= maxX; x += step)
+				{
+					var candidate = new Vector2(x, preferredUpperLeft.y);
+					if (TryReserveOffScreenRect(new Rect(candidate, size)))
+					{
+						upperLeft = candidate;
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+
+		static bool TryReserveOffScreenRect(Rect rect)
+		{
+			for (int i = 0; i < s_offScreenLabelRects.Count; i++)
+			{
+				if (RectsOverlap(rect, s_offScreenLabelRects[i], OffScreenLabelSpacing))
+				{
+					return false;
+				}
+			}
+
+			s_offScreenLabelRects.Add(rect);
+			return true;
+		}
+
+		static bool RectsOverlap(Rect a, Rect b, float padding)
+		{
+			return a.xMin - padding < b.xMax
+				&& a.xMax + padding > b.xMin
+				&& a.yMin - padding < b.yMax
+				&& a.yMax + padding > b.yMin;
 		}
 
 		public static void SetupGuiStyle()
